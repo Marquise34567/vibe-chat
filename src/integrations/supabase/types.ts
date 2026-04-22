@@ -23,6 +23,7 @@ export type Database = {
           gender: string | null
           id: string
           interests: string[] | null
+          last_seen_at: string
           subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           updated_at: string
           username: string | null
@@ -35,6 +36,7 @@ export type Database = {
           gender?: string | null
           id: string
           interests?: string[] | null
+          last_seen_at?: string
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
           username?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           gender?: string | null
           id?: string
           interests?: string[] | null
+          last_seen_at?: string
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
           username?: string | null
