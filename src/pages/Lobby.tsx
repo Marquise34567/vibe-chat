@@ -26,12 +26,32 @@ const ONLINE_WINDOW_MS = 2 * 60 * 1000; // active in last 2 min
 const Lobby = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   usePresence();
 
   const [users, setUsers] = useState<LobbyUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  // Multi-select filters, hydrated from URL
+  const [countries, setCountries] = useState<string[]>(
+    () => searchParams.get("countries")?.split(",").filter(Boolean) ?? []
+  );
+  const [gender, setGender] = useState<string>(
+    () => searchParams.get("gender") ?? "Any"
+  );
+  const [interests, setInterests] = useState<string[]>(
+    () => searchParams.get("interests")?.split(",").filter(Boolean) ?? []
+  );
+
+  // Sync filter state -> URL
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (countries.length) next.set("countries", countries.join(","));
+    if (gender !== "Any") next.set("gender", gender);
+    if (interests.length) next.set("interests", interests.join(","));
+    setSearchParams(next, { replace: true });
+  }, [countries, gender, interests, setSearchParams]);
 
   const fetchUsers = async () => {
     const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
@@ -59,13 +79,19 @@ const Lobby = () => {
   const filtered = useMemo(() => {
     return users
       .filter((u) => u.id !== user?.id)
-      .filter((u) => (selectedCountry ? u.country === selectedCountry : true))
+      .filter((u) => (countries.length ? (u.country ? countries.includes(u.country) : false) : true))
+      .filter((u) => (gender !== "Any" ? u.gender === gender : true))
+      .filter((u) =>
+        interests.length
+          ? (u.interests ?? []).some((i) => interests.includes(i))
+          : true
+      )
       .filter((u) =>
         search.trim()
           ? (u.display_name ?? "").toLowerCase().includes(search.toLowerCase())
           : true
       );
-  }, [users, user, selectedCountry, search]);
+  }, [users, user, countries, gender, interests, search]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LobbyUser[]>();
@@ -99,6 +125,32 @@ const Lobby = () => {
     const random = filtered[Math.floor(Math.random() * filtered.length)];
     startChat(random.id);
   };
+
+  // If arrived with ?random=1, auto-trigger once after first load
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (autoRanRef.current || loading) return;
+    if (searchParams.get("random") === "1") {
+      autoRanRef.current = true;
+      shuffleMatch();
+      const next = new URLSearchParams(searchParams);
+      next.delete("random");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const toggleCountry = (code: string) =>
+    setCountries((p) => (p.includes(code) ? p.filter((c) => c !== code) : [...p, code]));
+  const toggleInterest = (i: string) =>
+    setInterests((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  const clearFilters = () => {
+    setCountries([]);
+    setGender("Any");
+    setInterests([]);
+  };
+
+  const activeCount = countries.length + (gender !== "Any" ? 1 : 0) + interests.length;
 
   return (
     <div className="min-h-screen">
