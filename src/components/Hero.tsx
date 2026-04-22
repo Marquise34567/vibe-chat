@@ -1,7 +1,10 @@
 import { Video, Zap, Globe2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Hero = () => {
+  const { user } = useAuth();
+  const ctaTo = user ? "/lobby" : "/auth";
   return (
     <section className="relative px-4 md:px-8 pt-16 pb-24 overflow-hidden">
       {/* Floating sticker decorations */}
@@ -37,9 +40,9 @@ export const Hero = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Link to="/auth" className="brutal-hover bg-primary text-primary-foreground border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2 group">
+          <Link to={ctaTo} className="brutal-hover bg-primary text-primary-foreground border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2 group">
             <Video className="w-5 h-5 group-hover:scale-125 transition-transform" strokeWidth={3} />
-            Start chatting now
+            {user ? "Open the lobby" : "Start chatting now"}
           </Link>
           <a href="#how" className="brutal-hover glass border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2">
             <Zap className="w-5 h-5" strokeWidth={3} />
