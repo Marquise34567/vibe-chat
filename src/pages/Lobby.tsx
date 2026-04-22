@@ -17,6 +17,7 @@ type LobbyUser = {
   gender: string | null;
   country: string | null;
   interests: string[] | null;
+  avatar_url: string | null;
   last_seen_at: string;
   subscription_tier: "free" | "plus" | "vip";
 };
@@ -57,7 +58,7 @@ const Lobby = () => {
     const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, display_name, gender, country, interests, last_seen_at, subscription_tier")
+      .select("id, display_name, gender, country, interests, avatar_url, last_seen_at, subscription_tier")
       .gte("last_seen_at", since)
       .order("last_seen_at", { ascending: false })
       .limit(100);
