@@ -420,7 +420,9 @@ const UserCard = ({ user, onChat }: { user: LobbyUser; onChat: () => void }) => 
   const colorIdx = (user.id.charCodeAt(0) + user.id.charCodeAt(1)) % COLORS.length;
   const bg = COLORS[colorIdx];
   const initial = (user.display_name ?? "?").charAt(0).toUpperCase();
-  const isVip = user.subscription_tier === "vip";
+  const userTier = user.subscription_tier as Tier;
+  const tierBadge = TIER_FEATURES[userTier].badge;
+  const tierBadgeBg = TIER_FEATURES[userTier].badgeBg;
 
   return (
     <button
@@ -443,9 +445,9 @@ const UserCard = ({ user, onChat }: { user: LobbyUser; onChat: () => void }) => 
           LIVE
         </div>
         {c && <div className="absolute top-2 right-2 text-2xl">{c.flag}</div>}
-        {isVip && (
-          <div className="absolute bottom-2 right-2 sticker bg-foreground text-background text-xs">
-            👑 VIP
+        {tierBadge && (
+          <div className={`absolute bottom-2 right-2 sticker ${tierBadgeBg} text-xs`}>
+            {tierBadge}
           </div>
         )}
       </div>
