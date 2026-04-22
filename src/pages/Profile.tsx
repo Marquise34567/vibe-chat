@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Check, Loader2, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, Loader2, Sparkles, X, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
 import { COUNTRIES } from "@/lib/countries";
+import { TIER_FEATURES, TIER_LABEL, Tier } from "@/lib/tiers";
 import { toast } from "sonner";
 
 const GENDERS = ["Woman", "Man", "Non-binary", "Trans", "Genderfluid", "Prefer not to say"];
@@ -145,6 +146,20 @@ const Profile = () => {
     toast.success("Profile saved ✨");
   };
 
+  const switchTier = async (next: Tier) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ subscription_tier: next })
+      .eq("id", user.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setTier(next);
+    toast.success(`Switched to ${TIER_LABEL[next]} ✨`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -188,9 +203,9 @@ const Profile = () => {
                   <span className="font-display font-bold text-6xl text-primary-foreground">{initial}</span>
                 )}
               </div>
-              {tier === "vip" && (
-                <div className="absolute -top-2 -right-2 sticker bg-foreground text-background text-xs animate-wiggle">
-                  👑 VIP
+              {TIER_FEATURES[tier].badge && (
+                <div className={`absolute -top-2 -right-2 sticker ${TIER_FEATURES[tier].badgeBg} text-xs animate-wiggle`}>
+                  {TIER_FEATURES[tier].badge}
                 </div>
               )}
             </div>
@@ -229,7 +244,33 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Form */}
+        {/* Dev tier switcher (until real payments are wired) */}
+        <div className="glass brutal rounded-3xl p-4 md:p-5 mb-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="font-display font-bold text-sm flex items-center gap-1">
+                <Crown className="w-4 h-4" strokeWidth={3} /> Subscription tier
+                <span className="ml-1 sticker bg-highlight text-[10px]">DEV</span>
+              </div>
+              <div className="text-xs text-muted-foreground font-medium">
+                Switch tiers to test gated features. Real payments coming soon.
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {(["free", "plus", "vip"] as Tier[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => switchTier(t)}
+                  className={`brutal-sm border-2 border-foreground rounded-xl px-3 py-2 font-display font-bold text-sm transition-colors ${
+                    tier === t ? "bg-foreground text-background" : "bg-card hover:bg-highlight"
+                  }`}
+                >
+                  {TIER_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="glass brutal-lg rounded-3xl p-6 md:p-8 space-y-6">
           <div>
             <label className="font-display font-bold text-sm mb-2 block">Display name</label>

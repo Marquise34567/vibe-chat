@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Video, Search, Users, Shuffle, X } from "lucide-react";
+import { Video, Search, Users, Shuffle, X, Crown, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
+import { useTier } from "@/hooks/useTier";
 import { Navbar } from "@/components/Navbar";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { COUNTRIES, countryByCode } from "@/lib/countries";
+import { TIER_FEATURES, Tier, isAtLeast } from "@/lib/tiers";
 import { toast } from "sonner";
 
 const GENDERS = ["Any", "Woman", "Man", "Non-binary", "Trans", "Genderfluid"];
@@ -27,12 +30,16 @@ const ONLINE_WINDOW_MS = 2 * 60 * 1000; // active in last 2 min
 const Lobby = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { tier, features } = useTier();
   const [searchParams, setSearchParams] = useSearchParams();
   usePresence();
 
   const [users, setUsers] = useState<LobbyUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"all" | "priority">(
+    () => (searchParams.get("tab") === "priority" ? "priority" : "all")
+  );
 
   // Multi-select filters, hydrated from URL
   const [countries, setCountries] = useState<string[]>(
@@ -80,6 +87,7 @@ const Lobby = () => {
   const filtered = useMemo(() => {
     return users
       .filter((u) => u.id !== user?.id)
+      .filter((u) => (tab === "priority" ? u.subscription_tier !== "free" : true))
       .filter((u) => (countries.length ? (u.country ? countries.includes(u.country) : false) : true))
       .filter((u) => (gender !== "Any" ? u.gender === gender : true))
       .filter((u) =>
@@ -91,8 +99,13 @@ const Lobby = () => {
         search.trim()
           ? (u.display_name ?? "").toLowerCase().includes(search.toLowerCase())
           : true
-      );
-  }, [users, user, countries, gender, interests, search]);
+      )
+      // VIP first, then Plus, then Free (within each: most recently active)
+      .sort((a, b) => {
+        const rank = (t: string) => (t === "vip" ? 2 : t === "plus" ? 1 : 0);
+        return rank(b.subscription_tier) - rank(a.subscription_tier);
+      });
+  }, [users, user, tab, countries, gender, interests, search]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LobbyUser[]>();
@@ -141,10 +154,27 @@ const Lobby = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
-  const toggleCountry = (code: string) =>
-    setCountries((p) => (p.includes(code) ? p.filter((c) => c !== code) : [...p, code]));
+  const toggleCountry = (code: string) => {
+    setCountries((p) => {
+      if (p.includes(code)) return p.filter((c) => c !== code);
+      if (features.maxCountryFilters !== -1 && p.length >= features.maxCountryFilters) {
+        toast.error(
+          `Free tier limited to ${features.maxCountryFilters} countries. Upgrade to Plus for unlimited!`
+        );
+        return p;
+      }
+      return [...p, code];
+    });
+  };
   const toggleInterest = (i: string) =>
     setInterests((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  const handleGenderChange = (g: string) => {
+    if (g !== "Any" && !features.canFilterByGender) {
+      toast.error("Gender filter is a Plus feature. Upgrade to unlock!");
+      return;
+    }
+    setGender(g);
+  };
   const clearFilters = () => {
     setCountries([]);
     setGender("Any");
@@ -152,6 +182,18 @@ const Lobby = () => {
   };
 
   const activeCount = countries.length + (gender !== "Any" ? 1 : 0) + interests.length;
+
+  const switchTab = (next: "all" | "priority") => {
+    if (next === "priority" && !features.priorityQueue) {
+      toast.error("Priority lobby is a Plus feature. Upgrade to unlock!");
+      return;
+    }
+    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "priority") params.set("tab", "priority");
+    else params.delete("tab");
+    setSearchParams(params, { replace: true });
+  };
 
   return (
     <div className="min-h-screen">
@@ -173,11 +215,38 @@ const Lobby = () => {
             </p>
           </div>
 
+          <div className="flex items-center gap-3 self-start">
+            {features.badge && (
+              <span className={`sticker ${features.badgeBg}`}>{features.badge}</span>
+            )}
+            <button
+              onClick={shuffleMatch}
+              className="brutal-hover bg-foreground text-background border-2 border-foreground rounded-2xl px-6 py-4 font-display font-bold text-lg flex items-center gap-2"
+            >
+              <Shuffle className="w-5 h-5" strokeWidth={3} /> Random match
+            </button>
+          </div>
+        </div>
+
+        {/* Lobby tabs */}
+        <div className="flex gap-2 mb-4 p-1 border-2 border-foreground rounded-2xl bg-card brutal-sm w-full max-w-md">
           <button
-            onClick={shuffleMatch}
-            className="brutal-hover bg-foreground text-background border-2 border-foreground rounded-2xl px-6 py-4 font-display font-bold text-lg flex items-center gap-2 self-start"
+            onClick={() => switchTab("all")}
+            className={`flex-1 py-2 font-display font-bold rounded-xl transition-colors ${
+              tab === "all" ? "bg-foreground text-background" : ""
+            }`}
           >
-            <Shuffle className="w-5 h-5" strokeWidth={3} /> Random match
+            All
+          </button>
+          <button
+            onClick={() => switchTab("priority")}
+            className={`flex-1 py-2 font-display font-bold rounded-xl transition-colors flex items-center justify-center gap-1 ${
+              tab === "priority" ? "bg-primary text-primary-foreground" : ""
+            } ${!features.priorityQueue ? "opacity-70" : ""}`}
+          >
+            <Crown className="w-4 h-4" strokeWidth={3} />
+            Priority
+            {!features.priorityQueue && <Lock className="w-3 h-3" strokeWidth={3} />}
           </button>
         </div>
 
@@ -209,7 +278,19 @@ const Lobby = () => {
 
           {/* Countries (multi-select) */}
           <div>
-            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">🌍 Countries</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-display font-bold text-xs uppercase tracking-wide text-muted-foreground">
+                🌍 Countries
+                {features.maxCountryFilters !== -1 && (
+                  <span className="ml-1 normal-case">
+                    ({countries.length}/{features.maxCountryFilters})
+                  </span>
+                )}
+              </div>
+              {features.maxCountryFilters !== -1 && (
+                <UpgradePrompt feature="" requiredTier="plus" compact />
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {COUNTRIES.map((c) => {
                 const count = countryCounts.get(c.code) ?? 0;
@@ -233,19 +314,30 @@ const Lobby = () => {
 
           {/* Gender */}
           <div>
-            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">👤 Gender</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-display font-bold text-xs uppercase tracking-wide text-muted-foreground">
+                👤 Gender
+              </div>
+              {!features.canFilterByGender && (
+                <UpgradePrompt feature="" requiredTier="plus" compact />
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {GENDERS.map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setGender(g)}
-                  className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors ${
-                    gender === g ? "bg-primary text-primary-foreground" : "bg-card hover:bg-highlight"
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
+              {GENDERS.map((g) => {
+                const locked = g !== "Any" && !features.canFilterByGender;
+                return (
+                  <button
+                    key={g}
+                    onClick={() => handleGenderChange(g)}
+                    className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors flex items-center gap-1 ${
+                      gender === g ? "bg-primary text-primary-foreground" : "bg-card hover:bg-highlight"
+                    } ${locked ? "opacity-60" : ""}`}
+                  >
+                    {locked && <Lock className="w-3 h-3" strokeWidth={3} />}
+                    {g}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -328,7 +420,9 @@ const UserCard = ({ user, onChat }: { user: LobbyUser; onChat: () => void }) => 
   const colorIdx = (user.id.charCodeAt(0) + user.id.charCodeAt(1)) % COLORS.length;
   const bg = COLORS[colorIdx];
   const initial = (user.display_name ?? "?").charAt(0).toUpperCase();
-  const isVip = user.subscription_tier === "vip";
+  const userTier = user.subscription_tier as Tier;
+  const tierBadge = TIER_FEATURES[userTier].badge;
+  const tierBadgeBg = TIER_FEATURES[userTier].badgeBg;
 
   return (
     <button
@@ -351,9 +445,9 @@ const UserCard = ({ user, onChat }: { user: LobbyUser; onChat: () => void }) => 
           LIVE
         </div>
         {c && <div className="absolute top-2 right-2 text-2xl">{c.flag}</div>}
-        {isVip && (
-          <div className="absolute bottom-2 right-2 sticker bg-foreground text-background text-xs">
-            👑 VIP
+        {tierBadge && (
+          <div className={`absolute bottom-2 right-2 sticker ${tierBadgeBg} text-xs`}>
+            {tierBadge}
           </div>
         )}
       </div>
