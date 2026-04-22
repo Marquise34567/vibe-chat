@@ -278,7 +278,19 @@ const Lobby = () => {
 
           {/* Countries (multi-select) */}
           <div>
-            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">🌍 Countries</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-display font-bold text-xs uppercase tracking-wide text-muted-foreground">
+                🌍 Countries
+                {features.maxCountryFilters !== -1 && (
+                  <span className="ml-1 normal-case">
+                    ({countries.length}/{features.maxCountryFilters})
+                  </span>
+                )}
+              </div>
+              {features.maxCountryFilters !== -1 && (
+                <UpgradePrompt feature="" requiredTier="plus" compact />
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {COUNTRIES.map((c) => {
                 const count = countryCounts.get(c.code) ?? 0;
@@ -302,19 +314,30 @@ const Lobby = () => {
 
           {/* Gender */}
           <div>
-            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">👤 Gender</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-display font-bold text-xs uppercase tracking-wide text-muted-foreground">
+                👤 Gender
+              </div>
+              {!features.canFilterByGender && (
+                <UpgradePrompt feature="" requiredTier="plus" compact />
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {GENDERS.map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setGender(g)}
-                  className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors ${
-                    gender === g ? "bg-primary text-primary-foreground" : "bg-card hover:bg-highlight"
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
+              {GENDERS.map((g) => {
+                const locked = g !== "Any" && !features.canFilterByGender;
+                return (
+                  <button
+                    key={g}
+                    onClick={() => handleGenderChange(g)}
+                    className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors flex items-center gap-1 ${
+                      gender === g ? "bg-primary text-primary-foreground" : "bg-card hover:bg-highlight"
+                    } ${locked ? "opacity-60" : ""}`}
+                  >
+                    {locked && <Lock className="w-3 h-3" strokeWidth={3} />}
+                    {g}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
