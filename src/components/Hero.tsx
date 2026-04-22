@@ -1,4 +1,5 @@
 import { Video, Zap, Globe2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const Hero = () => {
   return (
@@ -36,14 +37,14 @@ export const Hero = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <button className="brutal-hover bg-primary text-primary-foreground border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2 group">
+          <Link to="/auth" className="brutal-hover bg-primary text-primary-foreground border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2 group">
             <Video className="w-5 h-5 group-hover:scale-125 transition-transform" strokeWidth={3} />
             Start chatting now
-          </button>
-          <button className="brutal-hover glass border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2">
+          </Link>
+          <a href="#how" className="brutal-hover glass border-2 border-foreground rounded-2xl px-8 py-4 font-display font-bold text-lg flex items-center gap-2">
             <Zap className="w-5 h-5" strokeWidth={3} />
             Watch a preview
-          </button>
+          </a>
         </div>
 
         {/* Quick stats */}

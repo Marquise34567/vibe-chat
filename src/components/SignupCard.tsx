@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 
 const genders = ["Woman", "Man", "Non-binary", "Trans", "Genderfluid", "Prefer not to say"];
@@ -67,9 +68,12 @@ export const SignupCard = () => {
             ))}
           </div>
 
-          <button className="brutal-hover w-full bg-foreground text-background border-2 border-foreground rounded-2xl py-4 font-display font-bold text-lg flex items-center justify-center gap-2">
-            Let's go <ArrowRight className="w-5 h-5" strokeWidth={3} />
-          </button>
+          <Link
+            to="/auth"
+            className="brutal-hover w-full bg-foreground text-background border-2 border-foreground rounded-2xl py-4 font-display font-bold text-lg flex items-center justify-center gap-2"
+          >
+            Continue full sign up <ArrowRight className="w-5 h-5" strokeWidth={3} />
+          </Link>
         </div>
       </div>
     </section>
