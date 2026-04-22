@@ -1,10 +1,14 @@
 import { Mic, Video, SkipForward, Heart, Flag } from "lucide-react";
+import personMika from "@/assets/person-mika.jpg";
+import personLeo from "@/assets/person-leo.jpg";
+import personAya from "@/assets/person-aya.jpg";
+import personKai from "@/assets/person-kai.jpg";
 
 const tiles = [
-  { name: "Mika", country: "🇯🇵", age: 22, color: "bg-primary" },
-  { name: "Leo", country: "🇧🇷", age: 24, color: "bg-accent" },
-  { name: "Aya", country: "🇫🇷", age: 21, color: "bg-secondary" },
-  { name: "Kai", country: "🇰🇷", age: 23, color: "bg-highlight" },
+  { name: "Mika", country: "🇯🇵", age: 22, color: "bg-primary", img: personMika },
+  { name: "Leo", country: "🇧🇷", age: 24, color: "bg-accent", img: personLeo },
+  { name: "Aya", country: "🇫🇷", age: 21, color: "bg-secondary", img: personAya },
+  { name: "Kai", country: "🇰🇷", age: 23, color: "bg-highlight", img: personKai },
 ];
 
 export const LivePreview = () => {
@@ -25,7 +29,15 @@ export const LivePreview = () => {
                 key={i}
                 className={`${t.color} aspect-[3/4] rounded-2xl border-2 border-foreground brutal relative overflow-hidden group cursor-pointer hover:scale-105 transition-transform`}
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
+                <img
+                  src={t.img}
+                  alt={`${t.name}, ${t.age}, from ${t.country}`}
+                  loading="lazy"
+                  width={768}
+                  height={1024}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/10 to-transparent" />
                 {i === 0 && (
                   <div className="absolute top-2 left-2 sticker bg-destructive text-destructive-foreground text-xs animate-wiggle">
                     ● LIVE
