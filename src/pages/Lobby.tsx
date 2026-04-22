@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Video, Search, Users, Shuffle, X } from "lucide-react";
+import { Video, Search, Users, Shuffle, X, Crown, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
+import { useTier } from "@/hooks/useTier";
 import { Navbar } from "@/components/Navbar";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { COUNTRIES, countryByCode } from "@/lib/countries";
+import { TIER_FEATURES, Tier, isAtLeast } from "@/lib/tiers";
 import { toast } from "sonner";
 
 const GENDERS = ["Any", "Woman", "Man", "Non-binary", "Trans", "Genderfluid"];
