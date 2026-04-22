@@ -15,9 +15,15 @@ export const Navbar = () => {
           <span className="font-display font-bold text-xl md:text-2xl">VIBEZ</span>
         </Link>
         <div className="hidden md:flex items-center gap-6 font-display font-semibold">
-          <a href="#how" className="hover:text-primary transition-colors">How it works</a>
-          <a href="#plans" className="hover:text-primary transition-colors">Plans</a>
-          <a href="#countries" className="hover:text-primary transition-colors">Countries</a>
+          {user ? (
+            <Link to="/lobby" className="hover:text-primary transition-colors">Lobby</Link>
+          ) : (
+            <>
+              <a href="#how" className="hover:text-primary transition-colors">How it works</a>
+              <a href="#plans" className="hover:text-primary transition-colors">Plans</a>
+              <a href="#countries" className="hover:text-primary transition-colors">Countries</a>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {user ? (
