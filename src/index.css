@@ -110,6 +110,13 @@
   .sticker {
     @apply inline-flex items-center justify-center border-2 border-foreground bg-background brutal-sm rounded-full px-3 py-1 font-display font-bold text-sm;
   }
+  .brutal-input {
+    @apply w-full border-2 border-foreground rounded-xl px-4 py-3 bg-background font-body font-medium text-base outline-none focus:ring-0 focus:translate-x-[-2px] focus:translate-y-[-2px] transition-transform;
+    box-shadow: var(--shadow-brutal-sm);
+  }
+  .brutal-input:focus {
+    box-shadow: 5px 5px 0 0 hsl(var(--foreground));
+  }
   .marquee {
     animation: marquee 25s linear infinite;
   }
