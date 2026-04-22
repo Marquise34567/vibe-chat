@@ -17,6 +17,7 @@ type LobbyUser = {
   gender: string | null;
   country: string | null;
   interests: string[] | null;
+  avatar_url: string | null;
   last_seen_at: string;
   subscription_tier: "free" | "plus" | "vip";
 };
@@ -57,7 +58,7 @@ const Lobby = () => {
     const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, display_name, gender, country, interests, last_seen_at, subscription_tier")
+      .select("id, display_name, gender, country, interests, avatar_url, last_seen_at, subscription_tier")
       .gte("last_seen_at", since)
       .order("last_seen_at", { ascending: false })
       .limit(100);
@@ -334,8 +335,17 @@ const UserCard = ({ user, onChat }: { user: LobbyUser; onChat: () => void }) => 
       onClick={onChat}
       className="text-left group brutal-hover border-2 border-foreground rounded-2xl overflow-hidden bg-card"
     >
-      <div className={`${bg} aspect-[4/3] relative border-b-2 border-foreground flex items-center justify-center`}>
-        <span className="font-display font-bold text-6xl text-foreground/80">{initial}</span>
+      <div className={`${bg} aspect-[4/3] relative border-b-2 border-foreground flex items-center justify-center overflow-hidden`}>
+        {user.avatar_url ? (
+          <img
+            src={user.avatar_url}
+            alt={user.display_name ?? "user"}
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <span className="font-display font-bold text-6xl text-foreground/80">{initial}</span>
+        )}
         <div className="absolute top-2 left-2 sticker bg-destructive text-destructive-foreground text-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-background mr-1 animate-pulse" />
           LIVE
