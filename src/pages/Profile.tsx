@@ -189,9 +189,9 @@ const Profile = () => {
                   <span className="font-display font-bold text-6xl text-primary-foreground">{initial}</span>
                 )}
               </div>
-              {tier === "vip" && (
-                <div className="absolute -top-2 -right-2 sticker bg-foreground text-background text-xs animate-wiggle">
-                  👑 VIP
+              {TIER_FEATURES[tier].badge && (
+                <div className={`absolute -top-2 -right-2 sticker ${TIER_FEATURES[tier].badgeBg} text-xs animate-wiggle`}>
+                  {TIER_FEATURES[tier].badge}
                 </div>
               )}
             </div>
