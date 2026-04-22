@@ -16,7 +16,10 @@ export const Navbar = () => {
         </Link>
         <div className="hidden md:flex items-center gap-6 font-display font-semibold">
           {user ? (
-            <Link to="/lobby" className="hover:text-primary transition-colors">Lobby</Link>
+            <>
+              <Link to="/lobby" className="hover:text-primary transition-colors">Lobby</Link>
+              <Link to="/profile" className="hover:text-primary transition-colors">Profile</Link>
+            </>
           ) : (
             <>
               <a href="#how" className="hover:text-primary transition-colors">How it works</a>
@@ -28,9 +31,9 @@ export const Navbar = () => {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <span className="hidden sm:inline font-display font-bold text-sm">
+              <Link to="/profile" className="hidden sm:inline font-display font-bold text-sm hover:underline">
                 hey {user.user_metadata?.display_name || user.email?.split("@")[0]} ✨
-              </span>
+              </Link>
               <button
                 onClick={signOut}
                 className="brutal-hover bg-foreground text-background border-2 border-foreground rounded-xl px-3 py-2 font-display font-bold text-sm flex items-center gap-1"
