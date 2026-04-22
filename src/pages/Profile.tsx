@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Check, Loader2, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, Loader2, Sparkles, X, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
 import { COUNTRIES } from "@/lib/countries";
+import { TIER_FEATURES, TIER_LABEL, Tier } from "@/lib/tiers";
 import { toast } from "sonner";
 
 const GENDERS = ["Woman", "Man", "Non-binary", "Trans", "Genderfluid", "Prefer not to say"];
