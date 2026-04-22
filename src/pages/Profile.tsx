@@ -146,6 +146,20 @@ const Profile = () => {
     toast.success("Profile saved ✨");
   };
 
+  const switchTier = async (next: Tier) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ subscription_tier: next })
+      .eq("id", user.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setTier(next);
+    toast.success(`Switched to ${TIER_LABEL[next]} ✨`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
