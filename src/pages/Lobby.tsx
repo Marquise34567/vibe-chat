@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Video, Search, Globe2, Users, Shuffle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Video, Search, Users, Shuffle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
 import { Navbar } from "@/components/Navbar";
 import { COUNTRIES, countryByCode } from "@/lib/countries";
 import { toast } from "sonner";
+
+const GENDERS = ["Any", "Woman", "Man", "Non-binary", "Trans", "Genderfluid"];
+const INTERESTS = ["Music 🎵", "Gaming 🎮", "Art 🎨", "Sports ⚽", "Anime ✨", "Travel ✈️", "Foodie 🍜", "Memes 💀"];
 
 type LobbyUser = {
   id: string;
@@ -23,12 +26,32 @@ const ONLINE_WINDOW_MS = 2 * 60 * 1000; // active in last 2 min
 const Lobby = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   usePresence();
 
   const [users, setUsers] = useState<LobbyUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  // Multi-select filters, hydrated from URL
+  const [countries, setCountries] = useState<string[]>(
+    () => searchParams.get("countries")?.split(",").filter(Boolean) ?? []
+  );
+  const [gender, setGender] = useState<string>(
+    () => searchParams.get("gender") ?? "Any"
+  );
+  const [interests, setInterests] = useState<string[]>(
+    () => searchParams.get("interests")?.split(",").filter(Boolean) ?? []
+  );
+
+  // Sync filter state -> URL
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (countries.length) next.set("countries", countries.join(","));
+    if (gender !== "Any") next.set("gender", gender);
+    if (interests.length) next.set("interests", interests.join(","));
+    setSearchParams(next, { replace: true });
+  }, [countries, gender, interests, setSearchParams]);
 
   const fetchUsers = async () => {
     const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
@@ -56,13 +79,19 @@ const Lobby = () => {
   const filtered = useMemo(() => {
     return users
       .filter((u) => u.id !== user?.id)
-      .filter((u) => (selectedCountry ? u.country === selectedCountry : true))
+      .filter((u) => (countries.length ? (u.country ? countries.includes(u.country) : false) : true))
+      .filter((u) => (gender !== "Any" ? u.gender === gender : true))
+      .filter((u) =>
+        interests.length
+          ? (u.interests ?? []).some((i) => interests.includes(i))
+          : true
+      )
       .filter((u) =>
         search.trim()
           ? (u.display_name ?? "").toLowerCase().includes(search.toLowerCase())
           : true
       );
-  }, [users, user, selectedCountry, search]);
+  }, [users, user, countries, gender, interests, search]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LobbyUser[]>();
@@ -97,6 +126,32 @@ const Lobby = () => {
     startChat(random.id);
   };
 
+  // If arrived with ?random=1, auto-trigger once after first load
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (autoRanRef.current || loading) return;
+    if (searchParams.get("random") === "1") {
+      autoRanRef.current = true;
+      shuffleMatch();
+      const next = new URLSearchParams(searchParams);
+      next.delete("random");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const toggleCountry = (code: string) =>
+    setCountries((p) => (p.includes(code) ? p.filter((c) => c !== code) : [...p, code]));
+  const toggleInterest = (i: string) =>
+    setInterests((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  const clearFilters = () => {
+    setCountries([]);
+    setGender("Any");
+    setInterests([]);
+  };
+
+  const activeCount = countries.length + (gender !== "Any" ? 1 : 0) + interests.length;
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -127,6 +182,20 @@ const Lobby = () => {
 
         {/* Filters */}
         <div className="glass brutal rounded-2xl p-4 mb-6 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-display font-bold text-sm">
+              filters {activeCount > 0 && <span className="ml-1 sticker bg-primary text-primary-foreground text-xs">{activeCount} active</span>}
+            </div>
+            {activeCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="font-display font-bold text-xs flex items-center gap-1 hover:underline"
+              >
+                <X className="w-3 h-3" strokeWidth={3} /> clear all
+              </button>
+            )}
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" strokeWidth={3} />
             <input
@@ -137,32 +206,67 @@ const Lobby = () => {
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setSelectedCountry(null)}
-              className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm ${
-                selectedCountry === null ? "bg-foreground text-background" : "bg-card"
-              }`}
-            >
-              <Globe2 className="w-4 h-4 inline mr-1" strokeWidth={3} /> All
-            </button>
-            {COUNTRIES.map((c) => {
-              const count = countryCounts.get(c.code) ?? 0;
-              const active = selectedCountry === c.code;
-              return (
+          {/* Countries (multi-select) */}
+          <div>
+            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">🌍 Countries</div>
+            <div className="flex flex-wrap gap-2">
+              {COUNTRIES.map((c) => {
+                const count = countryCounts.get(c.code) ?? 0;
+                const active = countries.includes(c.code);
+                return (
+                  <button
+                    key={c.code}
+                    onClick={() => toggleCountry(c.code)}
+                    className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm flex items-center gap-1.5 transition-colors ${
+                      active ? "bg-accent text-accent-foreground" : "bg-card hover:bg-highlight"
+                    }`}
+                  >
+                    <span>{c.flag}</span>
+                    <span>{c.name}</span>
+                    <span className="opacity-70">·{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Gender */}
+          <div>
+            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">👤 Gender</div>
+            <div className="flex flex-wrap gap-2">
+              {GENDERS.map((g) => (
                 <button
-                  key={c.code}
-                  onClick={() => setSelectedCountry(active ? null : c.code)}
-                  className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm flex items-center gap-1.5 transition-colors ${
-                    active ? "bg-accent text-accent-foreground" : "bg-card hover:bg-highlight"
+                  key={g}
+                  onClick={() => setGender(g)}
+                  className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors ${
+                    gender === g ? "bg-primary text-primary-foreground" : "bg-card hover:bg-highlight"
                   }`}
                 >
-                  <span>{c.flag}</span>
-                  <span>{c.name}</span>
-                  <span className="opacity-70">·{count}</span>
+                  {g}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* Interests */}
+          <div>
+            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">⚡ Interests</div>
+            <div className="flex flex-wrap gap-2">
+              {INTERESTS.map((i) => {
+                const active = interests.includes(i);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => toggleInterest(i)}
+                    className={`brutal-sm border-2 border-foreground rounded-xl px-3 py-2 font-display font-bold text-sm transition-colors ${
+                      active ? "bg-secondary text-secondary-foreground" : "bg-card hover:bg-highlight"
+                    }`}
+                  >
+                    {i}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -175,10 +279,17 @@ const Lobby = () => {
           <div className="glass brutal rounded-3xl p-12 text-center">
             <div className="text-6xl mb-4">😴</div>
             <h3 className="font-display font-bold text-2xl mb-2">crickets...</h3>
-            <p className="font-body text-muted-foreground">
-              No one online{selectedCountry ? ` from ${countryByCode(selectedCountry)?.name}` : ""} right now.
-              Try a different country or come back in a bit.
+            <p className="font-body text-muted-foreground mb-4">
+              No one online matching your filters right now.
             </p>
+            {activeCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="brutal-hover bg-foreground text-background border-2 border-foreground rounded-xl px-4 py-2 font-display font-bold text-sm"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-8">
