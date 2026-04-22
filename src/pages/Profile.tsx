@@ -244,7 +244,33 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Form */}
+        {/* Dev tier switcher (until real payments are wired) */}
+        <div className="glass brutal rounded-3xl p-4 md:p-5 mb-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="font-display font-bold text-sm flex items-center gap-1">
+                <Crown className="w-4 h-4" strokeWidth={3} /> Subscription tier
+                <span className="ml-1 sticker bg-highlight text-[10px]">DEV</span>
+              </div>
+              <div className="text-xs text-muted-foreground font-medium">
+                Switch tiers to test gated features. Real payments coming soon.
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {(["free", "plus", "vip"] as Tier[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => switchTier(t)}
+                  className={`brutal-sm border-2 border-foreground rounded-xl px-3 py-2 font-display font-bold text-sm transition-colors ${
+                    tier === t ? "bg-foreground text-background" : "bg-card hover:bg-highlight"
+                  }`}
+                >
+                  {TIER_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="glass brutal-lg rounded-3xl p-6 md:p-8 space-y-6">
           <div>
             <label className="font-display font-bold text-sm mb-2 block">Display name</label>
