@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Video, Search, Globe2, Users, Shuffle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Video, Search, Users, Shuffle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
 import { Navbar } from "@/components/Navbar";
 import { COUNTRIES, countryByCode } from "@/lib/countries";
 import { toast } from "sonner";
+
+const GENDERS = ["Any", "Woman", "Man", "Non-binary", "Trans", "Genderfluid"];
+const INTERESTS = ["Music 🎵", "Gaming 🎮", "Art 🎨", "Sports ⚽", "Anime ✨", "Travel ✈️", "Foodie 🍜", "Memes 💀"];
 
 type LobbyUser = {
   id: string;
