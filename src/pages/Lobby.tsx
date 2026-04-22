@@ -154,10 +154,27 @@ const Lobby = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
-  const toggleCountry = (code: string) =>
-    setCountries((p) => (p.includes(code) ? p.filter((c) => c !== code) : [...p, code]));
+  const toggleCountry = (code: string) => {
+    setCountries((p) => {
+      if (p.includes(code)) return p.filter((c) => c !== code);
+      if (features.maxCountryFilters !== -1 && p.length >= features.maxCountryFilters) {
+        toast.error(
+          `Free tier limited to ${features.maxCountryFilters} countries. Upgrade to Plus for unlimited!`
+        );
+        return p;
+      }
+      return [...p, code];
+    });
+  };
   const toggleInterest = (i: string) =>
     setInterests((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  const handleGenderChange = (g: string) => {
+    if (g !== "Any" && !features.canFilterByGender) {
+      toast.error("Gender filter is a Plus feature. Upgrade to unlock!");
+      return;
+    }
+    setGender(g);
+  };
   const clearFilters = () => {
     setCountries([]);
     setGender("Any");
@@ -165,6 +182,18 @@ const Lobby = () => {
   };
 
   const activeCount = countries.length + (gender !== "Any" ? 1 : 0) + interests.length;
+
+  const switchTab = (next: "all" | "priority") => {
+    if (next === "priority" && !features.priorityQueue) {
+      toast.error("Priority lobby is a Plus feature. Upgrade to unlock!");
+      return;
+    }
+    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "priority") params.set("tab", "priority");
+    else params.delete("tab");
+    setSearchParams(params, { replace: true });
+  };
 
   return (
     <div className="min-h-screen">
