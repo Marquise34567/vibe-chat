@@ -30,12 +30,16 @@ const ONLINE_WINDOW_MS = 2 * 60 * 1000; // active in last 2 min
 const Lobby = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { tier, features } = useTier();
   const [searchParams, setSearchParams] = useSearchParams();
   usePresence();
 
   const [users, setUsers] = useState<LobbyUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"all" | "priority">(
+    () => (searchParams.get("tab") === "priority" ? "priority" : "all")
+  );
 
   // Multi-select filters, hydrated from URL
   const [countries, setCountries] = useState<string[]>(
@@ -83,6 +87,7 @@ const Lobby = () => {
   const filtered = useMemo(() => {
     return users
       .filter((u) => u.id !== user?.id)
+      .filter((u) => (tab === "priority" ? u.subscription_tier !== "free" : true))
       .filter((u) => (countries.length ? (u.country ? countries.includes(u.country) : false) : true))
       .filter((u) => (gender !== "Any" ? u.gender === gender : true))
       .filter((u) =>
@@ -94,8 +99,13 @@ const Lobby = () => {
         search.trim()
           ? (u.display_name ?? "").toLowerCase().includes(search.toLowerCase())
           : true
-      );
-  }, [users, user, countries, gender, interests, search]);
+      )
+      // VIP first, then Plus, then Free (within each: most recently active)
+      .sort((a, b) => {
+        const rank = (t: string) => (t === "vip" ? 2 : t === "plus" ? 1 : 0);
+        return rank(b.subscription_tier) - rank(a.subscription_tier);
+      });
+  }, [users, user, tab, countries, gender, interests, search]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LobbyUser[]>();
