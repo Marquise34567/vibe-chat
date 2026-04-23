@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Video, Search, Users, Shuffle, X, Crown, Lock } from "lucide-react";
+import { Video, Search, Users, Shuffle, X, Crown, Lock, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
@@ -52,6 +52,9 @@ const Lobby = () => {
   const [interests, setInterests] = useState<string[]>(
     () => searchParams.get("interests")?.split(",").filter(Boolean) ?? []
   );
+  const [tiers, setTiers] = useState<string[]>(
+    () => searchParams.get("tiers")?.split(",").filter(Boolean) ?? []
+  );
 
   // Sync filter state -> URL
   useEffect(() => {
@@ -59,8 +62,9 @@ const Lobby = () => {
     if (countries.length) next.set("countries", countries.join(","));
     if (gender !== "Any") next.set("gender", gender);
     if (interests.length) next.set("interests", interests.join(","));
+    if (tiers.length) next.set("tiers", tiers.join(","));
     setSearchParams(next, { replace: true });
-  }, [countries, gender, interests, setSearchParams]);
+  }, [countries, gender, interests, tiers, setSearchParams]);
 
   const fetchUsers = async () => {
     const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
@@ -91,6 +95,7 @@ const Lobby = () => {
       .filter((u) => (tab === "priority" ? u.subscription_tier !== "free" : true))
       .filter((u) => (countries.length ? (u.country ? countries.includes(u.country) : false) : true))
       .filter((u) => (gender !== "Any" ? u.gender === gender : true))
+      .filter((u) => (tiers.length ? tiers.includes(u.subscription_tier) : true))
       .filter((u) =>
         interests.length
           ? (u.interests ?? []).some((i) => interests.includes(i))
@@ -106,7 +111,7 @@ const Lobby = () => {
         const rank = (t: string) => (t === "vip" ? 2 : t === "plus" ? 1 : 0);
         return rank(b.subscription_tier) - rank(a.subscription_tier);
       });
-  }, [users, user, tab, countries, gender, interests, search]);
+  }, [users, user, tab, countries, gender, interests, tiers, search]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LobbyUser[]>();
@@ -139,8 +144,12 @@ const Lobby = () => {
     if (countries.length) sp.set("countries", countries.join(","));
     if (gender !== "Any") sp.set("gender", gender);
     if (interests.length) sp.set("interests", interests.join(","));
+    if (tiers.length) sp.set("tiers", tiers.join(","));
     navigate(`/queue${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
+
+  const toggleTier = (t: string) =>
+    setTiers((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
 
   // If arrived with ?random=1, auto-trigger once after first load
   const autoRanRef = useRef(false);
@@ -181,9 +190,11 @@ const Lobby = () => {
     setCountries([]);
     setGender("Any");
     setInterests([]);
+    setTiers([]);
   };
 
-  const activeCount = countries.length + (gender !== "Any" ? 1 : 0) + interests.length;
+  const activeCount =
+    countries.length + (gender !== "Any" ? 1 : 0) + interests.length + tiers.length;
 
   const switchTab = (next: "all" | "priority") => {
     if (next === "priority" && !features.priorityQueue) {
@@ -217,15 +228,21 @@ const Lobby = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-start">
+          <div className="flex items-center gap-3 self-start flex-wrap">
             {features.badge && (
               <span className={`sticker ${features.badgeBg}`}>{features.badge}</span>
             )}
             <button
               onClick={shuffleMatch}
-              className="brutal-hover bg-foreground text-background border-2 border-foreground rounded-2xl px-6 py-4 font-display font-bold text-lg flex items-center gap-2"
+              className="brutal-hover bg-card border-2 border-foreground rounded-2xl px-4 py-3 font-display font-bold text-sm flex items-center gap-2"
             >
-              <Shuffle className="w-5 h-5" strokeWidth={3} /> Random match
+              <Shuffle className="w-4 h-4" strokeWidth={3} /> Random
+            </button>
+            <button
+              onClick={shuffleMatch}
+              className="brutal-hover bg-primary text-primary-foreground border-2 border-foreground rounded-2xl px-6 py-4 font-display font-bold text-lg flex items-center gap-2 -rotate-1"
+            >
+              <Zap className="w-5 h-5" strokeWidth={3} /> Enter Live
             </button>
           </div>
         </div>
@@ -337,6 +354,33 @@ const Lobby = () => {
                   >
                     {locked && <Lock className="w-3 h-3" strokeWidth={3} />}
                     {g}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Subscription tier */}
+          <div>
+            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">
+              💎 Subscription
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: "free", label: "Free", bg: "bg-card" },
+                { key: "plus", label: "✨ Plus", bg: "bg-secondary text-secondary-foreground" },
+                { key: "vip", label: "👑 VIP", bg: "bg-primary text-primary-foreground" },
+              ].map((t) => {
+                const active = tiers.includes(t.key);
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => toggleTier(t.key)}
+                    className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors ${
+                      active ? t.bg : "bg-card hover:bg-highlight"
+                    }`}
+                  >
+                    {t.label}
                   </button>
                 );
               })}
