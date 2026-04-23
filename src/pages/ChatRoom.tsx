@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { countryByCode } from "@/lib/countries";
 import { useTier } from "@/hooks/useTier";
 import { TIER_FEATURES, Tier } from "@/lib/tiers";
+import { addRecentlySeen } from "@/lib/recentlySeen";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { toast } from "sonner";
 
@@ -64,8 +65,11 @@ const ChatRoom = () => {
   }, [translateOn]);
 
   const handleSkip = () => {
-    if (otherId) lastSkippedRef.current = otherId;
-    navigate("/lobby");
+    if (otherId) {
+      lastSkippedRef.current = otherId;
+      addRecentlySeen(otherId);
+    }
+    navigate("/queue");
   };
 
   const handleRewind = () => {
