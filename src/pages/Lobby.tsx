@@ -95,6 +95,7 @@ const Lobby = () => {
       .filter((u) => (tab === "priority" ? u.subscription_tier !== "free" : true))
       .filter((u) => (countries.length ? (u.country ? countries.includes(u.country) : false) : true))
       .filter((u) => (gender !== "Any" ? u.gender === gender : true))
+      .filter((u) => (tiers.length ? tiers.includes(u.subscription_tier) : true))
       .filter((u) =>
         interests.length
           ? (u.interests ?? []).some((i) => interests.includes(i))
@@ -110,7 +111,7 @@ const Lobby = () => {
         const rank = (t: string) => (t === "vip" ? 2 : t === "plus" ? 1 : 0);
         return rank(b.subscription_tier) - rank(a.subscription_tier);
       });
-  }, [users, user, tab, countries, gender, interests, search]);
+  }, [users, user, tab, countries, gender, interests, tiers, search]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, LobbyUser[]>();
@@ -143,8 +144,12 @@ const Lobby = () => {
     if (countries.length) sp.set("countries", countries.join(","));
     if (gender !== "Any") sp.set("gender", gender);
     if (interests.length) sp.set("interests", interests.join(","));
+    if (tiers.length) sp.set("tiers", tiers.join(","));
     navigate(`/queue${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
+
+  const toggleTier = (t: string) =>
+    setTiers((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
 
   // If arrived with ?random=1, auto-trigger once after first load
   const autoRanRef = useRef(false);
@@ -185,9 +190,11 @@ const Lobby = () => {
     setCountries([]);
     setGender("Any");
     setInterests([]);
+    setTiers([]);
   };
 
-  const activeCount = countries.length + (gender !== "Any" ? 1 : 0) + interests.length;
+  const activeCount =
+    countries.length + (gender !== "Any" ? 1 : 0) + interests.length + tiers.length;
 
   const switchTab = (next: "all" | "priority") => {
     if (next === "priority" && !features.priorityQueue) {
