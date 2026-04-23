@@ -113,8 +113,8 @@ const ChatRoom = () => {
 
       <div className="max-w-5xl mx-auto">
         <div className="glass brutal-lg rounded-3xl p-4 md:p-6">
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            {/* Their tile */}
+          <div className="flex flex-col gap-4 mb-4">
+            {/* Their tile (top) */}
             <div className="bg-primary aspect-video rounded-2xl border-2 border-foreground brutal relative overflow-hidden flex items-center justify-center">
               {other?.avatar_url ? (
                 <img
@@ -158,7 +158,7 @@ const ChatRoom = () => {
               </div>
             </div>
 
-            {/* Your tile */}
+            {/* Your tile (bottom) */}
             <div className="bg-accent aspect-video rounded-2xl border-2 border-foreground brutal relative overflow-hidden flex items-center justify-center">
               <span className="font-display font-bold text-3xl text-accent-foreground text-center px-4">
                 {camOff ? "📷 cam off" : "📹 your camera"}
