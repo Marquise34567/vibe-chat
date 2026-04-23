@@ -128,16 +128,16 @@ const Lobby = () => {
   }, [users, user]);
 
   const startChat = (otherId: string) => {
-    navigate(`/chat/${otherId}`);
+    navigate(`/pre-room/${otherId}`);
   };
 
   const shuffleMatch = () => {
-    if (filtered.length === 0) {
-      toast("Nobody online matching your filters yet 😢");
-      return;
-    }
-    const random = filtered[Math.floor(Math.random() * filtered.length)];
-    startChat(random.id);
+    // Send the user to the queue with current filters; queue will pick a match
+    const sp = new URLSearchParams();
+    if (countries.length) sp.set("countries", countries.join(","));
+    if (gender !== "Any") sp.set("gender", gender);
+    if (interests.length) sp.set("interests", interests.join(","));
+    navigate(`/queue${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
 
   // If arrived with ?random=1, auto-trigger once after first load

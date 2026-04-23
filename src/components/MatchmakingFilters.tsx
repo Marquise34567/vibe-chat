@@ -59,9 +59,16 @@ export const MatchmakingFilters = () => {
     if (f.countries.length) params.set("countries", f.countries.join(","));
     if (f.gender && f.gender !== "Any") params.set("gender", f.gender);
     if (f.interests.length) params.set("interests", f.interests.join(","));
-    if (random) params.set("random", "1");
     const qs = params.toString();
-    navigate(user ? `/lobby${qs ? `?${qs}` : ""}` : "/auth");
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    if (random) {
+      navigate(`/queue${qs ? `?${qs}` : ""}`);
+    } else {
+      navigate(`/lobby${qs ? `?${qs}` : ""}`);
+    }
   };
 
   const activeCount =

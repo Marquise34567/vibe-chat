@@ -8,6 +8,8 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import Lobby from "./pages/Lobby.tsx";
+import Queue from "./pages/Queue.tsx";
+import PreRoom from "./pages/PreRoom.tsx";
 import ChatRoom from "./pages/ChatRoom.tsx";
 import Profile from "./pages/Profile.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -25,6 +27,9 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/lobby" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
+            <Route path="/queue" element={<ProtectedRoute><Queue /></ProtectedRoute>} />
+            <Route path="/pre-room" element={<ProtectedRoute><PreRoom /></ProtectedRoute>} />
+            <Route path="/pre-room/:otherId" element={<ProtectedRoute><PreRoom /></ProtectedRoute>} />
             <Route path="/chat/:otherId" element={<ProtectedRoute><ChatRoom /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
