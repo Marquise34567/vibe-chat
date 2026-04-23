@@ -71,7 +71,7 @@ const Auth = () => {
       toast.error(error.message);
       return;
     }
-    toast.success("You're in! Welcome to VIBEZ 🎉");
+    toast.success("You're in! Welcome to FaceFrenzy 🎉");
     navigate("/");
   };
 
@@ -90,7 +90,7 @@ const Auth = () => {
             <div className="w-10 h-10 rounded-xl bg-primary border-2 border-foreground brutal-sm flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary-foreground" strokeWidth={3} />
             </div>
-            <span className="font-display font-bold text-2xl">VIBEZ</span>
+            <span className="font-display font-bold text-2xl">FaceFrenzy</span>
           </div>
 
           {/* Mode toggle */}
@@ -117,7 +117,7 @@ const Auth = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="brutal-input"
-                  placeholder="you@vibez.app"
+                  placeholder="you@facefrenzy.app"
                 />
               </Field>
               <Field label="Password">
@@ -160,7 +160,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="brutal-input"
-                      placeholder="you@vibez.app"
+                      placeholder="you@facefrenzy.app"
                     />
                   </Field>
                   <Field label="Password">

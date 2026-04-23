@@ -15,7 +15,7 @@ export const Footer = () => {
           <a href="#" className="hover:underline">Safety</a>
           <a href="#" className="hover:underline">Contact</a>
         </div>
-        <p className="font-body text-xs text-muted-foreground mt-4">© 2026 VIBEZ. Made with chaos & love.</p>
+        <p className="font-body text-xs text-muted-foreground mt-4">© 2026 FaceFrenzy. Made with chaos & love.</p>
       </div>
     </footer>
   );

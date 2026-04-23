@@ -198,7 +198,7 @@ const ChatRoom = () => {
             <CtrlBtn onClick={handleSkip} label="Skip">
               <SkipForward className="w-5 h-5" strokeWidth={3} />
             </CtrlBtn>
-            <CtrlBtn onClick={() => toast("reported. thanks for keeping VIBEZ safe.")} label="Report">
+            <CtrlBtn onClick={() => toast("reported. thanks for keeping FaceFrenzy safe.")} label="Report">
               <Flag className="w-5 h-5" strokeWidth={3} />
             </CtrlBtn>
           </div>
