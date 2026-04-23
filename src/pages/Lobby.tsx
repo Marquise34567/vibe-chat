@@ -228,15 +228,21 @@ const Lobby = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-start">
+          <div className="flex items-center gap-3 self-start flex-wrap">
             {features.badge && (
               <span className={`sticker ${features.badgeBg}`}>{features.badge}</span>
             )}
             <button
               onClick={shuffleMatch}
-              className="brutal-hover bg-foreground text-background border-2 border-foreground rounded-2xl px-6 py-4 font-display font-bold text-lg flex items-center gap-2"
+              className="brutal-hover bg-card border-2 border-foreground rounded-2xl px-4 py-3 font-display font-bold text-sm flex items-center gap-2"
             >
-              <Shuffle className="w-5 h-5" strokeWidth={3} /> Random match
+              <Shuffle className="w-4 h-4" strokeWidth={3} /> Random
+            </button>
+            <button
+              onClick={shuffleMatch}
+              className="brutal-hover bg-primary text-primary-foreground border-2 border-foreground rounded-2xl px-6 py-4 font-display font-bold text-lg flex items-center gap-2 -rotate-1"
+            >
+              <Zap className="w-5 h-5" strokeWidth={3} /> Enter Live
             </button>
           </div>
         </div>
@@ -348,6 +354,33 @@ const Lobby = () => {
                   >
                     {locked && <Lock className="w-3 h-3" strokeWidth={3} />}
                     {g}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Subscription tier */}
+          <div>
+            <div className="font-display font-bold text-xs uppercase tracking-wide mb-2 text-muted-foreground">
+              💎 Subscription
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: "free", label: "Free", bg: "bg-card" },
+                { key: "plus", label: "✨ Plus", bg: "bg-secondary text-secondary-foreground" },
+                { key: "vip", label: "👑 VIP", bg: "bg-primary text-primary-foreground" },
+              ].map((t) => {
+                const active = tiers.includes(t.key);
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => toggleTier(t.key)}
+                    className={`brutal-sm border-2 border-foreground rounded-full px-3 py-2 font-display font-bold text-sm transition-colors ${
+                      active ? t.bg : "bg-card hover:bg-highlight"
+                    }`}
+                  >
+                    {t.label}
                   </button>
                 );
               })}
