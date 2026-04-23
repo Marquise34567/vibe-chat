@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Video, Search, Users, Shuffle, X, Crown, Lock } from "lucide-react";
+import { Video, Search, Users, Shuffle, X, Crown, Lock, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePresence } from "@/hooks/usePresence";
@@ -52,6 +52,9 @@ const Lobby = () => {
   const [interests, setInterests] = useState<string[]>(
     () => searchParams.get("interests")?.split(",").filter(Boolean) ?? []
   );
+  const [tiers, setTiers] = useState<string[]>(
+    () => searchParams.get("tiers")?.split(",").filter(Boolean) ?? []
+  );
 
   // Sync filter state -> URL
   useEffect(() => {
@@ -59,8 +62,9 @@ const Lobby = () => {
     if (countries.length) next.set("countries", countries.join(","));
     if (gender !== "Any") next.set("gender", gender);
     if (interests.length) next.set("interests", interests.join(","));
+    if (tiers.length) next.set("tiers", tiers.join(","));
     setSearchParams(next, { replace: true });
-  }, [countries, gender, interests, setSearchParams]);
+  }, [countries, gender, interests, tiers, setSearchParams]);
 
   const fetchUsers = async () => {
     const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
