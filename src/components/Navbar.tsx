@@ -12,7 +12,7 @@ export const Navbar = () => {
           <div className="w-9 h-9 rounded-xl bg-primary border-2 border-foreground brutal-sm flex items-center justify-center group-hover:rotate-12 transition-transform">
             <Sparkles className="w-5 h-5 text-primary-foreground" strokeWidth={3} />
           </div>
-          <span className="font-display font-bold text-xl md:text-2xl">VIBEZ</span>
+          <span className="font-display font-bold text-xl md:text-2xl">FaceFrenzy</span>
         </Link>
         <div className="hidden md:flex items-center gap-6 font-display font-semibold">
           {user ? (
