@@ -9,6 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import { COUNTRIES, countryByCode } from "@/lib/countries";
 import { TIER_FEATURES, Tier, isAtLeast } from "@/lib/tiers";
+import { addRecentlySeen } from "@/lib/recentlySeen";
 import { toast } from "sonner";
 
 const GENDERS = ["Any", "Woman", "Man", "Non-binary", "Trans", "Genderfluid"];
@@ -128,6 +129,7 @@ const Lobby = () => {
   }, [users, user]);
 
   const startChat = (otherId: string) => {
+    addRecentlySeen(otherId);
     navigate(`/pre-room/${otherId}`);
   };
 

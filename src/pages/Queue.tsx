@@ -4,6 +4,7 @@ import { ArrowLeft, Radar, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { countryByCode } from "@/lib/countries";
+import { addRecentlySeen, getRecentlySeen } from "@/lib/recentlySeen";
 import { toast } from "sonner";
 
 const ONLINE_WINDOW_MS = 2 * 60 * 1000;
@@ -50,8 +51,10 @@ const Queue = () => {
   useEffect(() => {
     if (!user) return;
     cancelledRef.current = false;
+    let attempts = 0;
 
     const findMatch = async () => {
+      attempts += 1;
       const since = new Date(Date.now() - ONLINE_WINDOW_MS).toISOString();
       let q = supabase
         .from("profiles")
@@ -72,8 +75,18 @@ const Queue = () => {
           (p.interests ?? []).some((i: string) => interests.includes(i))
         );
       }
-      if (pool.length === 0) return;
-      const pick = pool[Math.floor(Math.random() * pool.length)];
+
+      // Exclude recently-seen users (matched/skipped in this session)
+      const excluded = new Set(getRecentlySeen());
+      const fresh = pool.filter((p) => !excluded.has(p.id));
+
+      // After many attempts with no fresh matches, fall back to the full pool
+      // so the user isn't stuck forever in a small room.
+      const finalPool = fresh.length > 0 ? fresh : attempts > 8 ? pool : [];
+      if (finalPool.length === 0) return;
+
+      const pick = finalPool[Math.floor(Math.random() * finalPool.length)];
+      addRecentlySeen(pick.id);
       navigate(`/chat/${pick.id}${vibe ? `?vibe=${encodeURIComponent(vibe)}` : ""}`, {
         replace: true,
       });
