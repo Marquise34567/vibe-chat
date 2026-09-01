@@ -74,20 +74,22 @@ const Match = () => {
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: "scaleX(-1)", objectPosition: "center top" }}
         />
-        <div className="absolute inset-0 bg-black/45" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
       </div>
 
       {/* ── Centered search content ── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full">
-        <RadarPulse className="mb-6" />
+        <div style={{ filter: "drop-shadow(0 0 30px rgba(124,92,255,0.5))" }}>
+          <RadarPulse className="mb-8" />
+        </div>
 
-        <h2 className="text-2xl font-bold tracking-tight mb-2 text-white">
+        <h2 className="text-3xl font-bold tracking-tight mb-2 text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
           {showMatched ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
         </h2>
-        <p className="text-white/80 text-center mb-1">{statusText}</p>
+        <p className="text-white/90 text-center mb-1" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>{statusText}</p>
 
-        <div className="mt-4 text-3xl font-bold tabular-nums text-white/90">
+        <div className="mt-4 text-4xl font-bold tabular-nums text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
           {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
         </div>
       </div>
