@@ -303,20 +303,7 @@ const StartTab = () => {
       {/* ═══════════════════════════════════════════════════
           LAYER 2 — Top bar (floating glass)
       ═══════════════════════════════════════════════════ */}
-      <div style={{ position: "relative", zIndex: 10, paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)", paddingLeft: 20, paddingRight: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {/* Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 11,
-            background: "linear-gradient(135deg, #7C5CFF, #FF4D8D)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 20px rgba(124,92,255,0.5)",
-          }}>
-            <span style={{ fontSize: 17, fontWeight: 900, color: "#fff" }}>F</span>
-          </div>
-          <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-0.3px", color: "#fff", fontFamily: "Inter, system-ui, -apple-system, sans-serif", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>facefrenzy</span>
-        </div>
-
+      <div style={{ position: "relative", zIndex: 10, paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)", paddingLeft: 20, paddingRight: 20, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
         {/* Right cluster */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Online pill */}
