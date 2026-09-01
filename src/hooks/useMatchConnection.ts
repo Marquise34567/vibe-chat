@@ -75,6 +75,7 @@ export function useMatchConnection() {
   const localVideoRef = useRef<HTMLVideoElement | null>(null); // self-preview video element
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null); // store stream until video element mounts
+  const pendingOfferRef = useRef<any>(null); // queue offer if pc isn't ready yet
   const roleRef = useRef<"caller" | "receiver">("receiver");
   const paramsRef = useRef<MatchParams | null>(null);
   const countryRef = useRef<string | null>(null);
@@ -91,11 +92,15 @@ export function useMatchConnection() {
   const createPeerConnection = useCallback(() => {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    // Add local tracks
+    // Add local tracks — this is what sends our video/audio to the peer
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
+      const tracks = localStreamRef.current.getTracks();
+      console.log(`[webrtc] Adding ${tracks.length} local tracks:`, tracks.map(t => `${t.kind}:${t.enabled}`));
+      tracks.forEach((track) => {
         pc.addTrack(track, localStreamRef.current!);
       });
+    } else {
+      console.error("[webrtc] No local stream when creating peer connection — video will be empty!");
     }
 
     // Remote stream → attach to video element
@@ -105,6 +110,7 @@ export function useMatchConnection() {
     // muted so the peer's audio plays.
     pc.ontrack = (event) => {
       const [stream] = event.streams;
+      console.log(`[webrtc] ontrack: ${event.track?.kind}, streams: ${event.streams.length}, tracks in stream: ${stream?.getTracks().length}`);
       // Merge all incoming tracks into the stored stream
       remoteStreamRef.current = stream;
       const attach = () => {
@@ -150,10 +156,15 @@ export function useMatchConnection() {
     };
 
     pc.onconnectionstatechange = () => {
+      console.log(`[webrtc] Connection state: ${pc.connectionState}`);
       if (pc.connectionState === "connected") setState("connected");
       if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
         setState("disconnected");
       }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[webrtc] ICE state: ${pc.iceConnectionState}`);
     };
 
     pcRef.current = pc;
@@ -242,6 +253,7 @@ export function useMatchConnection() {
           // Create peer connection and start WebRTC handshake
           try {
             await startLocalStream();
+            console.log(`[webrtc] Matched as ${data.role}. Local stream:`, localStreamRef.current ? `${localStreamRef.current.getTracks().length} tracks` : "null");
             const pc = createPeerConnection();
 
             if (data.role === "caller") {
@@ -249,8 +261,20 @@ export function useMatchConnection() {
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
               wsRef.current?.send(JSON.stringify({ type: "offer", sdp: offer }));
+              console.log("[webrtc] Sent offer");
+            } else {
+              // Receiver — if the offer already arrived (race condition), process it now
+              if (pendingOfferRef.current) {
+                console.log("[webrtc] Processing pending offer");
+                const pending = pendingOfferRef.current;
+                pendingOfferRef.current = null;
+                await pc.setRemoteDescription(new RTCSessionDescription(pending.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                wsRef.current?.send(JSON.stringify({ type: "answer", sdp: answer }));
+                console.log("[webrtc] Sent answer (from pending)");
+              }
             }
-            // Receiver waits for the offer
           } catch (err) {
             console.error("Failed to start WebRTC:", err);
             setState("error");
@@ -259,23 +283,31 @@ export function useMatchConnection() {
 
         case "offer":
           // Receiver gets the offer → create answer
+          console.log("[webrtc] Received offer, pcRef exists:", !!pcRef.current);
           if (pcRef.current) {
             try {
               await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
               const answer = await pcRef.current.createAnswer();
               await pcRef.current.setLocalDescription(answer);
               wsRef.current?.send(JSON.stringify({ type: "answer", sdp: answer }));
+              console.log("[webrtc] Sent answer");
             } catch (err) {
               console.error("Failed to handle offer:", err);
             }
+          } else {
+            // PC not ready yet — queue the offer for when matched handler finishes
+            console.log("[webrtc] PC not ready, queuing offer");
+            pendingOfferRef.current = data;
           }
           break;
 
         case "answer":
           // Caller gets the answer
+          console.log("[webrtc] Received answer, pcRef exists:", !!pcRef.current);
           if (pcRef.current) {
             try {
               await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+              console.log("[webrtc] Remote description set");
             } catch (err) {
               console.error("Failed to handle answer:", err);
             }
