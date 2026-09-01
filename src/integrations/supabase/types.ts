@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -27,6 +25,12 @@ export type Database = {
           subscription_tier: Database["public"]["Enums"]["subscription_tier"]
           updated_at: string
           username: string | null
+          age: number | null
+          bio: string | null
+          mood: string | null
+          is_scholar: boolean | null
+          university: string | null
+          socials: Json | null
         }
         Insert: {
           avatar_url?: string | null
@@ -40,6 +44,12 @@ export type Database = {
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
           username?: string | null
+          age?: number | null
+          bio?: string | null
+          mood?: string | null
+          is_scholar?: boolean | null
+          university?: string | null
+          socials?: Json | null
         }
         Update: {
           avatar_url?: string | null
@@ -53,6 +63,201 @@ export type Database = {
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
           updated_at?: string
           username?: string | null
+          age?: number | null
+          bio?: string | null
+          mood?: string | null
+          is_scholar?: boolean | null
+          university?: string | null
+          socials?: Json | null
+        }
+        Relationships: []
+      }
+      chat_threads: {
+        Row: {
+          id: string
+          user_a: string
+          user_b: string
+          last_message: string | null
+          last_at: string
+          kind: string
+          unread_a: number | null
+          unread_b: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_a: string
+          user_b: string
+          last_message?: string | null
+          last_at?: string
+          kind?: string
+          unread_a?: number | null
+          unread_b?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_a?: string
+          user_b?: string
+          last_message?: string | null
+          last_at?: string
+          kind?: string
+          unread_a?: number | null
+          unread_b?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          id: string
+          thread_id: string
+          sender_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          sender_id: string
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          thread_id?: string
+          sender_id?: string
+          body?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      recent_connects: {
+        Row: {
+          id: string
+          user_id: string
+          other_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          other_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          other_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      moments: {
+        Row: {
+          id: string
+          user_id: string
+          caption: string | null
+          media_url: string | null
+          duration_sec: number | null
+          views: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          caption?: string | null
+          media_url?: string | null
+          duration_sec?: number | null
+          views?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          caption?: string | null
+          media_url?: string | null
+          duration_sec?: number | null
+          views?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      card_swipes: {
+        Row: {
+          id: string
+          user_id: string
+          other_id: string
+          action: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          other_id: string
+          action: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          other_id?: string
+          action?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      coin_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          delta: number
+          reason: string
+          reference_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          delta: number
+          reason: string
+          reference_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          delta?: number
+          reason?: string
+          reference_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      gifts_sent: {
+        Row: {
+          id: string
+          sender_id: string
+          receiver_id: string
+          gift_id: string
+          cost: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sender_id: string
+          receiver_id: string
+          gift_id: string
+          cost: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sender_id?: string
+          receiver_id?: string
+          gift_id?: string
+          cost?: number
+          created_at?: string
         }
         Relationships: []
       }

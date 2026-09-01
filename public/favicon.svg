@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="ff-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6B4CFF"/>
+      <stop offset="100%" stop-color="#3B2AD4"/>
+    </linearGradient>
+    <linearGradient id="ff-face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFE45E"/>
+      <stop offset="100%" stop-color="#FFD60A"/>
+    </linearGradient>
+    <radialGradient id="ff-glow" cx="50%" cy="38%" r="60%">
+      <stop offset="0%" stop-color="#8B6BFF" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#8B6BFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Rounded squircle background -->
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#ff-bg)"/>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#ff-glow)"/>
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+
+  <!-- Frenzy face: rounded yellow squircle with two eyes + wide grin -->
+  <g transform="translate(32 33)">
+    <!-- face -->
+    <ellipse cx="0" cy="0" rx="17" ry="16" fill="url(#ff-face)"/>
+    <ellipse cx="0" cy="-3" rx="17" ry="14" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.2"/>
+
+    <!-- eyes (energetic, slightly tilted = "frenzy") -->
+    <g fill="#1A1400">
+      <ellipse cx="-6.5" cy="-3" rx="2.6" ry="3.4" transform="rotate(-12 -6.5 -3)"/>
+      <ellipse cx="6.5" cy="-3" rx="2.6" ry="3.4" transform="rotate(12 6.5 -3)"/>
+    </g>
+    <!-- eye sparkles -->
+    <g fill="#FFFFFF">
+      <circle cx="-5.6" cy="-4.2" r="0.9"/>
+      <circle cx="7.4" cy="-4.2" r="0.9"/>
+    </g>
+
+    <!-- wide grin -->
+    <path d="M -8 4 Q 0 12 8 4 Q 0 8 -8 4 Z" fill="#1A1400"/>
+    <path d="M -7 5 Q 0 10 7 5" fill="none" stroke="#FF7A00" stroke-width="1.4" stroke-linecap="round"/>
+
+    <!-- cheeks (frenzy flush) -->
+    <circle cx="-11" cy="3" r="2.2" fill="#FF6B9D" opacity="0.55"/>
+    <circle cx="11" cy="3" r="2.2" fill="#FF6B9D" opacity="0.55"/>
+  </g>
+
+  <!-- Frenzy sparkles around the face -->
+  <g fill="#FFD60A">
+    <path d="M 50 14 l 1.2 3.2 l 3.2 1.2 l -3.2 1.2 l -1.2 3.2 l -1.2 -3.2 l -3.2 -1.2 l 3.2 -1.2 z"/>
+    <path d="M 13 48 l 0.9 2.4 l 2.4 0.9 l -2.4 0.9 l -0.9 2.4 l -0.9 -2.4 l -2.4 -0.9 l 2.4 -0.9 z" opacity="0.85"/>
+  </g>
+</svg>
