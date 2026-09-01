@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
-import { useWebcam } from "@/hooks/useWebcam";
 import { getDisplayName } from "@/lib/localUser";
 import { toast } from "sonner";
 import {
@@ -33,11 +32,10 @@ const Match = () => {
   const [seconds, setSeconds] = useState(0);
   const [tipIdx, setTipIdx] = useState(0);
 
-  const { videoRef, status: camStatus, error: camError, start: camStart } = useWebcam();
-  const { state: connState, onlineCount, peerId, peerName, search, cancel, disconnect, setDisplayName } = useMatchConnectionContext();
+  const { state: connState, onlineCount, peerId, peerName, search, cancel, disconnect, setDisplayName, startCamera, localVideoRef } = useMatchConnectionContext();
 
-  // Start webcam immediately on mount
-  useEffect(() => { camStart(); }, [camStart]);
+  // Start webcam immediately on mount (uses the shared match connection stream)
+  useEffect(() => { startCamera(); }, [startCamera]);
 
   // Timer + tips
   useEffect(() => {
@@ -83,14 +81,14 @@ const Match = () => {
 
   const filterCount = countries.length + (gender !== "any" && gender !== "Any" ? 1 : 0) + (scholarOnly ? 1 : 0);
   const ModeIcon = modeIconFor(mode);
-  const camActive = camStatus === "active";
+  const camActive = connState !== "idle" && connState !== "error"; // camera is active once connecting/searching
 
   return (
     <div className="relative min-h-screen flex flex-col bg-app overflow-hidden">
       {/* ── Full-bleed webcam feed ── */}
       <div className="absolute inset-0 overflow-hidden bg-black">
         <video
-          ref={videoRef}
+          ref={localVideoRef}
           autoPlay
           playsInline
           muted
@@ -100,7 +98,7 @@ const Match = () => {
         {!camActive && (
           <div className="absolute inset-0 bg-gradient-to-br from-violet-900 via-fuchsia-900 to-rose-900 flex items-center justify-center">
             <span className="text-white/70 text-sm font-semibold px-6 text-center">
-              {camStatus === "requesting" ? "Starting camera…" : camError ?? "Camera unavailable"}
+              Starting camera…
             </span>
           </div>
         )}

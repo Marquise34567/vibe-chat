@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { countryByCode } from "@/lib/countries";
 import { useTier } from "@/hooks/useTier";
 import { useCoins } from "@/hooks/useCoins";
-import { useWebcam } from "@/hooks/useWebcam";
 import { useContentModeration } from "@/hooks/useContentModeration";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { TIER_FEATURES, Tier } from "@/lib/tiers";
@@ -53,10 +52,11 @@ const ChatRoom = () => {
   const mode = (params.get("mode") as Mode) ?? "solo";
   const { features } = useTier();
   const { coins, spend } = useCoins();
-  const { videoRef: pipVideoRef, status: pipStatus, start: pipStart } = useWebcam();
-  // Remote video ref + peer info come from the shared match connection
+  // Local + remote video refs come from the shared match connection
   // (lives in MatchConnectionProvider so WebRTC survives navigation).
-  const { remoteVideoRef, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend } = useMatchConnectionContext();
+  // The camera stream is started once in the context — no duplicate getUserMedia.
+  const { remoteVideoRef, localVideoRef: pipVideoRef, localStreamRef, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName } = useMatchConnectionContext();
+  const pipStatus = localStreamRef.current ? "active" : "requesting";
   const hasRemoteVideo = !!(remoteVideoRef.current?.srcObject);
 
   // The peer's profile. The match server relays the peer's chosen display
@@ -152,10 +152,10 @@ const ChatRoom = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasRemoteVideo, isBlind, blindRevealed, otherId]);
 
-  // Start PiP webcam for self-view
-  useEffect(() => {
-    if (!camOff) pipStart();
-  }, [pipStart, camOff]);
+  // Camera is already started by the shared match connection context
+  // (startCamera was called in Match.tsx or when the connection was established).
+  // No need to call getUserMedia again here — that would create a second stream
+  // and conflict with the WebRTC tracks.
 
   // Start camera for attention tracking
   useEffect(() => {
@@ -810,12 +810,14 @@ const VideoTile = ({
         )
       ) : (
         <>
-          {/* Remote WebRTC video (real peer stream) — always mounted so ref is available */}
+          {/* Remote WebRTC video (real peer stream) — always mounted so ref is available.
+              NOT muted so we can hear the peer's audio. */}
           {remoteVideoRef && (
             <video
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              muted={false}
               className="absolute inset-0 w-full h-full object-cover"
               style={{ objectPosition: "center top" }}
             />

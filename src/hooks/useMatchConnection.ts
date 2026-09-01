@@ -72,6 +72,7 @@ export function useMatchConnection() {
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null); // self-preview video element
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null); // store stream until video element mounts
   const roleRef = useRef<"caller" | "receiver">("receiver");
@@ -100,13 +101,34 @@ export function useMatchConnection() {
     // Remote stream → attach to video element
     // The video element might not be mounted yet (e.g. during Match→ChatRoom
     // navigation), so we store the stream and poll until it's available.
+    // Audio tracks are included in the stream — the video element must NOT be
+    // muted so the peer's audio plays.
     pc.ontrack = (event) => {
       const [stream] = event.streams;
+      // Merge all incoming tracks into the stored stream
       remoteStreamRef.current = stream;
       const attach = () => {
         if (remoteVideoRef.current && remoteStreamRef.current) {
           remoteVideoRef.current.srcObject = remoteStreamRef.current;
-          remoteVideoRef.current.play().catch(() => {});
+          // Explicitly unmute and play — browsers may block autoplay with audio
+          // unless there was prior user interaction (clicking "Start" counts).
+          remoteVideoRef.current.muted = false;
+          remoteVideoRef.current.play().then(() => {
+            // Ensure audio tracks are enabled
+            remoteStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = true; });
+          }).catch((e) => {
+            // If autoplay with audio is blocked, try muted then unmute after
+            console.warn("[webrtc] Autoplay blocked, retrying muted:", e);
+            remoteVideoRef.current!.muted = true;
+            remoteVideoRef.current!.play().catch(() => {});
+            // Unmute after a short delay (user has interacted by clicking Start)
+            setTimeout(() => {
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.muted = false;
+                remoteVideoRef.current.play().catch(() => {});
+              }
+            }, 500);
+          });
           return true;
         }
         return false;
@@ -139,20 +161,47 @@ export function useMatchConnection() {
   }, []);
 
   // ── Start local camera + mic ──
+  // This is the SINGLE source of truth for the camera stream.
+  // Both self-preview (Match/ChatRoom) and WebRTC use this same stream.
   const startLocalStream = useCallback(async () => {
-    if (localStreamRef.current) return localStreamRef.current;
+    if (localStreamRef.current) {
+      // Re-attach to video element in case it remounted
+      if (localVideoRef.current && localVideoRef.current.srcObject !== localStreamRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.play().catch(() => {});
+      }
+      return localStreamRef.current;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
       });
       localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(() => {});
+      }
       return stream;
     } catch (err) {
       console.error("Failed to get local stream:", err);
       throw err;
     }
   }, []);
+
+  // ── Start camera only (for lobby self-preview, before matching) ──
+  // Can be called early; reuses the same stream as startLocalStream.
+  const startCamera = useCallback(async () => {
+    return startLocalStream();
+  }, [startLocalStream]);
+
+  // ── Re-attach local stream when video element mounts/remounts ──
+  useEffect(() => {
+    if (localStreamRef.current && localVideoRef.current && localVideoRef.current.srcObject !== localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [localVideoRef, state]);
 
   // ── WebSocket message handler ──
   const handleMessage = useCallback(
@@ -473,6 +522,7 @@ export function useMatchConnection() {
     extendRequestFrom,
     extendAccepted,
     localStreamRef,
+    localVideoRef,
     remoteVideoRef,
     connect,
     search,
@@ -483,5 +533,6 @@ export function useMatchConnection() {
     acceptExtend,
     declineExtend,
     setDisplayName,
+    startCamera,
   };
 }
