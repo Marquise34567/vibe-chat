@@ -59,9 +59,10 @@ const Match = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Navigate to chat room when matched with a REAL peer
+  // Navigate to chat room only when WebRTC is actually connected (not just matched)
+  // This prevents showing empty video containers when the peer doesn't respond
   useEffect(() => {
-    if (connState === "matched" && peerId) {
+    if ((connState === "connected" || connState === "matched") && peerId) {
       navigate(`/chat/${peerId}?mode=${mode}`, { replace: true });
     }
   }, [connState, peerId, mode, navigate]);

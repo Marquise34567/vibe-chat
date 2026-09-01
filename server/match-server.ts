@@ -169,6 +169,8 @@ const findMatch = (client: Client): Client | null => {
     if (other.id === client.id) continue;
     if (other.status !== "searching") continue;
     if (other.partnerId) continue; // already matched
+    // Don't match with clients whose WebSocket isn't actually open
+    if (other.ws.readyState !== WebSocket.OPEN) continue;
     if (other.mode !== client.mode) continue;
 
     // ── Skip recently-skipped partners ──
@@ -577,16 +579,27 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
   ws.on("error", () => removeClient(id));
 });
 
-// ── Heartbeat: broadcast online count + clean up stale clients every 15s ──
+// ── Heartbeat: ping all clients + clean up stale/dead connections every 10s ──
 setInterval(() => {
   const now = Date.now();
   let cleaned = 0;
   for (const [id, c] of clients) {
-    if (now - c.joinedAt > 3600000) { // 1 hour timeout
+    // Clean up clients older than 2 minutes (handles ghost connections)
+    if (now - c.joinedAt > 120000) {
       console.log(`Cleaning up stale client ${id}`);
+      removeClient(id);
+      cleaned++;
+      continue;
+    }
+    // Ping to keep connection alive and detect dead sockets
+    if (c.ws.readyState === WebSocket.OPEN) {
+      send(c.ws, { type: "ping" });
+    } else {
+      // WebSocket not open — remove immediately
+      console.log(`Removing dead client ${id} (ws not open)`);
       removeClient(id);
       cleaned++;
     }
   }
   if (cleaned > 0) broadcastOnlineCount();
-}, 15000);
+}, 10000);
