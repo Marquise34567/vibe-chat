@@ -81,6 +81,7 @@ const StartTab = () => {
 
   const friendConnected = lobbyState === "friend-joined";
   const inviteId = searchParams.get("invite");
+  const sponsorSuccess = searchParams.get("sponsor");
 
   // If opened via invite link, join the room
   useEffect(() => {
@@ -88,6 +89,28 @@ const StartTab = () => {
       joinRoom(inviteId);
     }
   }, [inviteId, lobbyState, joinRoom]);
+
+  // Handle Stripe sponsor success redirect
+  useEffect(() => {
+    if (sponsorSuccess === "success") {
+      const label = searchParams.get("label");
+      const link = searchParams.get("link");
+      if (label && link && sponsors.length < 4) {
+        setSponsors([...sponsors, { label, link }]);
+        toast.success("Payment successful! Your sponsor is live! 🎉");
+      }
+      // Clean URL
+      searchParams.delete("sponsor");
+      searchParams.delete("label");
+      searchParams.delete("link");
+      searchParams.delete("days");
+      setSearchParams(searchParams);
+    } else if (sponsorSuccess === "cancelled") {
+      toast.error("Payment cancelled");
+      searchParams.delete("sponsor");
+      setSearchParams(searchParams);
+    }
+  }, [sponsorSuccess]);
 
   useEffect(() => { camStart(); return () => camStop(); }, [camStart, camStop]);
 
@@ -727,12 +750,27 @@ const StartTab = () => {
       {showSponsorSheet && (
         <SponsorSheet
           onClose={() => setShowSponsorSheet(false)}
-          onSubmit={(label, link) => {
-            if (sponsors.length < 4) {
-              setSponsors([...sponsors, { label, link }]);
-              toast.success("Your sponsor box is live! 🎉");
-            } else {
+          onSubmit={async (label, link, days) => {
+            if (sponsors.length >= 4) {
               toast.error("All sponsor slots are full");
+              return;
+            }
+            toast.loading("Redirecting to Stripe…");
+            try {
+              const serverUrl = import.meta.env.VITE_MATCH_SERVER_URL?.replace("ws", "http").replace("wss", "https") ?? "http://localhost:8090";
+              const res = await fetch(`${serverUrl}/api/sponsor-checkout`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ label, link, days }),
+              });
+              const data = await res.json();
+              if (data.url) {
+                window.location.href = data.url;
+              } else {
+                toast.error(data.error || "Payment failed to start");
+              }
+            } catch (err) {
+              toast.error("Could not connect to payment server");
             }
             setShowSponsorSheet(false);
           }}
@@ -1006,7 +1044,7 @@ export default StartTab;
 ═══════════════════════════════════════════════════════════════ */
 const SponsorSheet = ({ onClose, onSubmit }: {
   onClose: () => void;
-  onSubmit: (label: string, link: string) => void;
+  onSubmit: (label: string, link: string, days: number) => void;
 }) => {
   const [label, setLabel] = useState("");
   const [link, setLink] = useState("");
@@ -1108,7 +1146,7 @@ const SponsorSheet = ({ onClose, onSubmit }: {
               const t = label.trim();
               if (!t) { toast.error("Enter a display name"); return; }
               if (!link.trim()) { toast.error("Enter a link or handle"); return; }
-              onSubmit(t, link.trim());
+              onSubmit(t, link.trim(), days);
             }}
             style={{
               width: "100%", height: 52, borderRadius: 26,

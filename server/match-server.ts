@@ -22,10 +22,17 @@
  */
 
 import { WebSocketServer, WebSocket } from "ws";
+import http from "http";
 import type { IncomingMessage } from "http";
+import Stripe from "stripe";
 
 // Railway sets PORT; locally use MATCH_SERVER_PORT or default 8090
 const PORT = parseInt(process.env.PORT ?? process.env.MATCH_SERVER_PORT ?? "8090", 10);
+
+// ── Stripe ──
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+const SPONSOR_PRICE_ID = "price_1UB1KZGpSBEuGOflxD7YoPw7";
+const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.facefrenzy.fun";
 
 // ── Moderation config ──
 const MAX_VIOLATIONS = 3;          // Auto-ban after this many violations
@@ -57,9 +64,59 @@ const clients = new Map<string, Client>();
 const lobbyRooms = new Map<string, { hostId: string; guestId?: string }>();
 // Banned IPs with expiry timestamps
 const bannedIps = new Map<string, number>();
-const wss = new WebSocketServer({ port: PORT });
 
-console.log(`FaceFrenzy match server running on :${PORT}`);
+// ── HTTP server (handles Stripe checkout + upgrades to WebSocket) ──
+const server = http.createServer(async (req, res) => {
+  // CORS headers
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_URL);
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // ── Stripe checkout endpoint ──
+  if (req.method === "POST" && req.url === "/api/sponsor-checkout") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    try {
+      const { label, link, days } = JSON.parse(body);
+      if (!label || !link || !days) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing label, link, or days" }));
+        return;
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{ price: SPONSOR_PRICE_ID, quantity: days }],
+        success_url: `${FRONTEND_URL}/?sponsor=success&label=${encodeURIComponent(label)}&link=${encodeURIComponent(link)}&days=${days}`,
+        cancel_url: `${FRONTEND_URL}/?sponsor=cancelled`,
+        metadata: { label, link, days: String(days) },
+      });
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ url: session.url }));
+    } catch (err: any) {
+      console.error("Stripe checkout error:", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Not found" }));
+});
+
+const wss = new WebSocketServer({ server });
+
+server.listen(PORT, () => {
+  console.log(`FaceFrenzy match server running on :${PORT}`);
+});
 
 // ── Helpers ──
 const send = (ws: WebSocket, msg: object) => {
