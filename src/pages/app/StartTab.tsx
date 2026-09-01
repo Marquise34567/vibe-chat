@@ -71,7 +71,7 @@ const StartTab = () => {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
-  const [sponsors, setSponsors] = useState<{ label: string; link: string }[]>([]);
+  const [sponsors, setSponsors] = useState<{ label: string; link: string; preview?: { title?: string; description?: string; image?: string; favicon?: string } }[]>([]);
   const scholarVerified = getScholarVerified();
 
   const { videoRef, status: camStatus, error: camError, start: camStart, stop: camStop } = useWebcam();
@@ -96,7 +96,17 @@ const StartTab = () => {
       const label = searchParams.get("label");
       const link = searchParams.get("link");
       if (label && link && sponsors.length < 4) {
-        setSponsors([...sponsors, { label, link }]);
+        // Fetch preview metadata from the URL
+        const serverUrl = import.meta.env.VITE_MATCH_SERVER_URL?.replace("ws", "http").replace("wss", "https") ?? "http://localhost:8090";
+        fetch(`${serverUrl}/api/fetch-preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: link }),
+        }).then(r => r.json()).then(preview => {
+          setSponsors([...sponsors, { label, link, preview: preview.title ? preview : undefined }]);
+        }).catch(() => {
+          setSponsors([...sponsors, { label, link }]);
+        });
         toast.success("Payment successful! Your sponsor is live! 🎉");
       }
       // Clean URL
@@ -688,6 +698,7 @@ const StartTab = () => {
         {/* 4 sponsor boxes */}
         {[0, 1, 2, 3].map((i) => {
           const sponsor = sponsors[i];
+          const preview = sponsor?.preview;
           return (
             <button
               key={i}
@@ -699,7 +710,7 @@ const StartTab = () => {
                 }
               }}
               style={{
-                width: 64, height: 64, borderRadius: 14,
+                width: 72, height: 72, borderRadius: 14,
                 background: sponsor
                   ? "linear-gradient(135deg, rgba(255,214,10,0.15), rgba(107,76,255,0.15))"
                   : "rgba(255,255,255,0.04)",
@@ -707,7 +718,7 @@ const StartTab = () => {
                   ? "1px solid rgba(255,214,10,0.3)"
                   : "1px solid rgba(255,255,255,0.08)",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", gap: 2,
+                cursor: "pointer", gap: 3, padding: 4, overflow: "hidden",
                 transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s",
                 backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
               }}
@@ -717,9 +728,19 @@ const StartTab = () => {
               onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
               {sponsor ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#FFD60A", textAlign: "center", padding: "0 4px", lineHeight: 1.2 }}>
-                  {sponsor.label}
-                </span>
+                <>
+                  {/* Preview image or favicon */}
+                  {preview?.image ? (
+                    <img src={preview.image} alt="" style={{ width: 28, height: 28, borderRadius: 7, objectFit: "cover" }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : preview?.favicon ? (
+                    <img src={preview.favicon} alt="" style={{ width: 22, height: 22, borderRadius: 5 }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : null}
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#FFD60A", textAlign: "center", padding: "0 2px", lineHeight: 1.15, maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {preview?.title || sponsor.label}
+                  </span>
+                </>
               ) : (
                 <>
                   <PlusIcon style={{ width: 20, height: 20, color: "rgba(255,255,255,0.25)" }} />
@@ -1049,10 +1070,31 @@ const SponsorSheet = ({ onClose, onSubmit }: {
   const [label, setLabel] = useState("");
   const [link, setLink] = useState("");
   const [days, setDays] = useState(1);
+  const [preview, setPreview] = useState<{ title?: string; description?: string; image?: string; favicon?: string } | null>(null);
+  const [fetchingPreview, setFetchingPreview] = useState(false);
   const PRICE_PER_DAY = 5;
   const total = days * PRICE_PER_DAY;
 
   const dayOptions = [1, 3, 7, 14, 30];
+
+  // Fetch preview when link changes (debounced)
+  useEffect(() => {
+    if (!link.trim() || link.trim().length < 4) { setPreview(null); return; }
+    setFetchingPreview(true);
+    const t = setTimeout(() => {
+      const serverUrl = import.meta.env.VITE_MATCH_SERVER_URL?.replace("ws", "http").replace("wss", "https") ?? "http://localhost:8090";
+      fetch(`${serverUrl}/api/fetch-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: link.trim() }),
+      }).then(r => r.json()).then(data => {
+        setPreview(data);
+        // Auto-fill label if empty
+        if (!label.trim() && data.title) setLabel(data.title.slice(0, 20));
+      }).catch(() => {}).finally(() => setFetchingPreview(false));
+    }, 800);
+    return () => clearTimeout(t);
+  }, [link]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
@@ -1101,6 +1143,40 @@ const SponsorSheet = ({ onClose, onSubmit }: {
               }}
             />
           </div>
+
+          {/* Live preview of how the sponsor box will look */}
+          {(preview || fetchingPreview) && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 14,
+              background: "rgba(255,214,10,0.06)", border: "1px solid rgba(255,214,10,0.15)",
+            }}>
+              {fetchingPreview ? (
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Fetching preview…</span>
+              ) : (
+                <>
+                  {preview?.image ? (
+                    <img src={preview.image} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : preview?.favicon ? (
+                    <img src={preview.favicon} alt="" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : (
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,214,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18 }}>🔗</div>
+                  )}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#FFD60A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {preview?.title || label || "Your sponsor"}
+                    </div>
+                    {preview?.description && (
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {preview.description}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Duration toggle bar */}
           <div>

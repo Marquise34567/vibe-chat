@@ -108,6 +108,90 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── URL preview scraper (OpenGraph metadata) ──
+  if (req.method === "POST" && req.url === "/api/fetch-preview") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    try {
+      const { url } = JSON.parse(body);
+      if (!url) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing url" }));
+        return;
+      }
+
+      // Normalize URL
+      let fetchUrl = url;
+      if (!fetchUrl.startsWith("http")) {
+        // If it's a @handle, try to resolve to a social profile
+        if (fetchUrl.startsWith("@")) {
+          fetchUrl = `https://instagram.com/${fetchUrl.slice(1)}`;
+        } else {
+          fetchUrl = `https://${fetchUrl}`;
+        }
+      }
+
+      // Fetch the page
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const pageRes = await fetch(fetchUrl, {
+        signal: controller.signal,
+        headers: { "User-Agent": "FaceFrenzySponsorBot/1.0" },
+        redirect: "follow",
+      });
+      clearTimeout(timeout);
+
+      const html = await pageRes.text();
+      const getMeta = (prop: string): string | null => {
+        // Try og: and twitter: meta tags
+        const ogMatch = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, "i"));
+        if (ogMatch) return ogMatch[1];
+        const ogMatch2 = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i"));
+        if (ogMatch2) return ogMatch2[1];
+        return null;
+      };
+
+      // Extract favicon
+      const faviconMatch = html.match(/<link[^>]+rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i);
+      let favicon = faviconMatch ? faviconMatch[1] : null;
+      if (favicon && !favicon.startsWith("http")) {
+        const origin = new URL(fetchUrl).origin;
+        favicon = favicon.startsWith("/") ? `${origin}${favicon}` : `${origin}/${favicon}`;
+      }
+      if (!favicon) {
+        favicon = `${new URL(fetchUrl).origin}/favicon.ico`;
+      }
+
+      const title = getMeta("og:title") || getMeta("twitter:title") || html.match(/<title>([^<]+)<\/title>/i)?.[1] || null;
+      const description = getMeta("og:description") || getMeta("twitter:description") || getMeta("description") || null;
+      const image = getMeta("og:image") || getMeta("twitter:image") || null;
+      const siteName = getMeta("og:site_name") || null;
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        title: title?.trim().slice(0, 60) || null,
+        description: description?.trim().slice(0, 120) || null,
+        image: image || null,
+        favicon,
+        siteName: siteName || null,
+        url: fetchUrl,
+      }));
+    } catch (err: any) {
+      // If scraping fails, return minimal data
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        title: null,
+        description: null,
+        image: null,
+        favicon: null,
+        siteName: null,
+        url: url,
+        error: "Could not fetch preview",
+      }));
+    }
+    return;
+  }
+
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "Not found" }));
 });
