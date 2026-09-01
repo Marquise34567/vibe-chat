@@ -1010,6 +1010,11 @@ const SponsorSheet = ({ onClose, onSubmit }: {
 }) => {
   const [label, setLabel] = useState("");
   const [link, setLink] = useState("");
+  const [days, setDays] = useState(1);
+  const PRICE_PER_DAY = 5;
+  const total = days * PRICE_PER_DAY;
+
+  const dayOptions = [1, 3, 7, 14, 30];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
@@ -1058,6 +1063,46 @@ const SponsorSheet = ({ onClose, onSubmit }: {
               }}
             />
           </div>
+
+          {/* Duration toggle bar */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, display: "block" }}>How long should it run?</label>
+            <div style={{ display: "flex", gap: 6, width: "100%" }}>
+              {dayOptions.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  style={{
+                    flex: 1, height: 40, borderRadius: 12,
+                    background: days === d ? "rgba(255,214,10,0.15)" : "rgba(255,255,255,0.04)",
+                    border: days === d ? "1px solid rgba(255,214,10,0.4)" : "1px solid rgba(255,255,255,0.06)",
+                    color: days === d ? "#FFD60A" : "rgba(255,255,255,0.5)",
+                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  {d === 1 ? "1 day" : `${d} days`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cost summary */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 16px", borderRadius: 14,
+            background: "rgba(255,214,10,0.06)", border: "1px solid rgba(255,214,10,0.15)",
+          }}>
+            <div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>${PRICE_PER_DAY}/day x {days} {days === 1 ? "day" : "days"}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Visible to everyone in the lobby</div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#FFD60A", fontVariantNumeric: "tabular-nums" }}>
+              ${total}
+            </div>
+          </div>
+
           <button
             onClick={() => {
               const t = label.trim();
@@ -1075,7 +1120,7 @@ const SponsorSheet = ({ onClose, onSubmit }: {
               marginTop: 4,
             }}
           >
-            Submit Sponsor
+            Pay ${total} & Submit
           </button>
         </div>
       </div>
