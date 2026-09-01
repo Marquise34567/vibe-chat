@@ -162,9 +162,13 @@ const recordViolation = (
  *    select "Asia", you only match with people actually located in Asia.
  */
 const findMatch = (client: Client): Client | null => {
+  // Don't match if client already has a partner
+  if (client.partnerId) return null;
+
   for (const other of clients.values()) {
     if (other.id === client.id) continue;
     if (other.status !== "searching") continue;
+    if (other.partnerId) continue; // already matched
     if (other.mode !== client.mode) continue;
 
     // ── Skip recently-skipped partners ──
@@ -198,6 +202,12 @@ const findMatch = (client: Client): Client | null => {
 };
 
 const pairClients = (a: Client, b: Client) => {
+  // Safety check — don't pair if either already has a partner
+  if (a.partnerId || b.partnerId) {
+    console.log(`pairClients skipped: ${a.id} partner=${a.partnerId}, ${b.id} partner=${b.partnerId}`);
+    return;
+  }
+
   a.status = "matched";
   b.status = "matched";
   a.partnerId = b.id;

@@ -466,6 +466,12 @@ export function useMatchConnection() {
     (params: MatchParams) => {
       paramsRef.current = params;
 
+      // Don't search if already matched or connected
+      if (pcRef.current) {
+        console.log("[webrtc] Already have a peer connection, skipping search");
+        return;
+      }
+
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         connect();
         // connect() will send the search after "connected" message
