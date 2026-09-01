@@ -120,37 +120,48 @@ export function useMatchConnection() {
     }
 
     // Remote stream → attach to video element
-    // The video element might not be mounted yet (e.g. during Match→ChatRoom
-    // navigation), so we store the stream and poll until it's available.
-    // Audio tracks are included in the stream — the video element must NOT be
-    // muted so the peer's audio plays.
+    // ontrack fires once per track (audio + video). We only need to attach once.
+    let attached = false;
     pc.ontrack = (event) => {
       const [stream] = event.streams;
       console.log(`[webrtc] ontrack: ${event.track?.kind}, streams: ${event.streams.length}, tracks in stream: ${stream?.getTracks().length}`);
-      // Merge all incoming tracks into the stored stream
-      remoteStreamRef.current = stream;
+      // Store the stream (same stream for both audio and video tracks)
+      if (!remoteStreamRef.current || remoteStreamRef.current.id !== stream.id) {
+        remoteStreamRef.current = stream;
+        attached = false; // re-attach for new stream
+      }
+      if (attached) return; // already attaching/attached for this stream
+      attached = true;
+
       const attach = () => {
         if (remoteVideoRef.current && remoteStreamRef.current) {
+          // Don't re-set if already set to the same stream
+          if (remoteVideoRef.current.srcObject === remoteStreamRef.current) return true;
           remoteVideoRef.current.srcObject = remoteStreamRef.current;
           // Explicitly unmute and play — browsers may block autoplay with audio
           // unless there was prior user interaction (clicking "Start" counts).
           remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.play().then(() => {
-            // Ensure audio tracks are enabled
-            remoteStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = true; });
-          }).catch((e) => {
-            // If autoplay with audio is blocked, try muted then unmute after
-            console.warn("[webrtc] Autoplay blocked, retrying muted:", e);
-            remoteVideoRef.current!.muted = true;
-            remoteVideoRef.current!.play().catch(() => {});
-            // Unmute after a short delay (user has interacted by clicking Start)
-            setTimeout(() => {
+          const playPromise = remoteVideoRef.current.play();
+          if (playPromise) {
+            playPromise.then(() => {
+              // Ensure audio tracks are enabled
+              remoteStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = true; });
+            }).catch((e) => {
+              // If autoplay with audio is blocked, try muted then unmute after
+              console.warn("[webrtc] Autoplay blocked, retrying muted:", e);
               if (remoteVideoRef.current) {
-                remoteVideoRef.current.muted = false;
+                remoteVideoRef.current.muted = true;
                 remoteVideoRef.current.play().catch(() => {});
+                // Unmute after a short delay (user has interacted by clicking Start)
+                setTimeout(() => {
+                  if (remoteVideoRef.current) {
+                    remoteVideoRef.current.muted = false;
+                    remoteVideoRef.current.play().catch(() => {});
+                  }
+                }, 500);
               }
-            }, 500);
-          });
+            });
+          }
           return true;
         }
         return false;

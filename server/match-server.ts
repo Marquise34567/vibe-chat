@@ -395,10 +395,13 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             c.recentlySkipped.add(partner.id);
             partner.recentlySkipped.add(c.id);
             // Auto-expire skip memory after 60s
-            setTimeout(() => { c.recentlySkipped.delete(partner.id); }, 60000);
+            setTimeout(() => { try { c.recentlySkipped.delete(partner.id); } catch {} }, 60000);
             setTimeout(() => { try { partner.recentlySkipped.delete(c.id); } catch {} }, 60000);
 
-            send(partner.ws, { type: "partner-left", peerId: id });
+            // Only notify partner if their WebSocket is actually open
+            if (partner.ws.readyState === WebSocket.OPEN) {
+              send(partner.ws, { type: "partner-left", peerId: id });
+            }
             partner.status = "searching";
             partner.partnerId = undefined;
           }
@@ -584,22 +587,22 @@ setInterval(() => {
   const now = Date.now();
   let cleaned = 0;
   for (const [id, c] of clients) {
-    // Clean up clients older than 2 minutes (handles ghost connections)
-    if (now - c.joinedAt > 120000) {
-      console.log(`Cleaning up stale client ${id}`);
+    // Remove clients with dead WebSockets immediately
+    if (c.ws.readyState !== WebSocket.OPEN) {
+      console.log(`Removing dead client ${id} (ws not open)`);
       removeClient(id);
       cleaned++;
       continue;
     }
-    // Ping to keep connection alive and detect dead sockets
-    if (c.ws.readyState === WebSocket.OPEN) {
-      send(c.ws, { type: "ping" });
-    } else {
-      // WebSocket not open — remove immediately
-      console.log(`Removing dead client ${id} (ws not open)`);
+    // Clean up searching clients older than 60s (likely ghosts)
+    if (c.status === "searching" && now - c.joinedAt > 60000) {
+      console.log(`Cleaning up stale searching client ${id}`);
       removeClient(id);
       cleaned++;
+      continue;
     }
+    // Ping to keep connection alive
+    send(c.ws, { type: "ping" });
   }
   if (cleaned > 0) broadcastOnlineCount();
 }, 10000);
