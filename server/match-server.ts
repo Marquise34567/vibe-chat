@@ -46,6 +46,7 @@ type Client = {
   status: "searching" | "matched" | "in-call";
   partnerId?: string;
   joinedAt: number;
+  lastSeen: number;         // last time we got a ping/pong/message from this client
   violations: number;
   lastViolationAt: number;
   recentlySkipped: Set<string>; // peer IDs to exclude from re-matching (expires after 60s)
@@ -164,6 +165,7 @@ const recordViolation = (
 const findMatch = (client: Client): Client | null => {
   // Don't match if client already has a partner
   if (client.partnerId) return null;
+  const now = Date.now();
 
   for (const other of clients.values()) {
     if (other.id === client.id) continue;
@@ -171,6 +173,8 @@ const findMatch = (client: Client): Client | null => {
     if (other.partnerId) continue; // already matched
     // Don't match with clients whose WebSocket isn't actually open
     if (other.ws.readyState !== WebSocket.OPEN) continue;
+    // Don't match with clients we haven't heard from in 20s (ghost check)
+    if (now - other.lastSeen > 20000) continue;
     if (other.mode !== client.mode) continue;
 
     // ── Skip recently-skipped partners ──
@@ -283,6 +287,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     countries: [],
     status: "searching",
     joinedAt: Date.now(),
+    lastSeen: Date.now(),
     violations: 0,
     lastViolationAt: 0,
     recentlySkipped: new Set<string>(),
@@ -305,6 +310,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
     const c = clients.get(id);
     if (!c) return;
+    c.lastSeen = Date.now(); // update last seen on every message
 
     switch (msg.type) {
       // ── Register country (sent right after connect) ──
@@ -570,9 +576,14 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         break;
       }
 
-      // ── Ping (keepalive) ──
+      // ── Ping/Pong (keepalive) ──
       case "ping": {
+        c.lastSeen = Date.now();
         send(ws, { type: "pong" });
+        break;
+      }
+      case "pong": {
+        c.lastSeen = Date.now();
         break;
       }
     }
@@ -582,7 +593,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
   ws.on("error", () => removeClient(id));
 });
 
-// ── Heartbeat: ping all clients + clean up stale/dead connections every 10s ──
+// ── Heartbeat: ping all clients + clean up dead connections every 5s ──
 setInterval(() => {
   const now = Date.now();
   let cleaned = 0;
@@ -594,9 +605,9 @@ setInterval(() => {
       cleaned++;
       continue;
     }
-    // Clean up searching clients older than 60s (likely ghosts)
-    if (c.status === "searching" && now - c.joinedAt > 60000) {
-      console.log(`Cleaning up stale searching client ${id}`);
+    // Remove clients we haven't heard from in 20s (ghosts that don't respond to ping)
+    if (now - c.lastSeen > 20000) {
+      console.log(`Removing ghost client ${id} (no activity for ${Math.round((now - c.lastSeen)/1000)}s)`);
       removeClient(id);
       cleaned++;
       continue;
@@ -605,4 +616,4 @@ setInterval(() => {
     send(c.ws, { type: "ping" });
   }
   if (cleaned > 0) broadcastOnlineCount();
-}, 10000);
+}, 5000);

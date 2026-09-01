@@ -405,6 +405,11 @@ export function useMatchConnection() {
           setState("disconnected");
           break;
 
+        case "ping":
+          // Server heartbeat — respond immediately so server knows we're alive
+          wsRef.current?.send(JSON.stringify({ type: "pong" }));
+          break;
+
         case "pong":
           break;
 
