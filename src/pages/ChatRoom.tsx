@@ -423,8 +423,8 @@ const ChatRoom = () => {
         </>
         )}
 
-        {/* Controls bar */}
-        <GlassCard strong className="p-3 flex items-center justify-center gap-2 md:gap-3" interactive={false}>
+        {/* Controls bar — simplified: Mic, Camera, Skip */}
+        <GlassCard strong className="p-3 flex items-center justify-center gap-3 md:gap-4" interactive={false}>
           <GlassCircleButton onClick={() => setMuted((m) => !m)} active={muted} aria-label="Mic">
             {muted ? <MicOff className="w-5 h-5" strokeWidth={2.5} /> : <Mic className="w-5 h-5" strokeWidth={2.5} />}
           </GlassCircleButton>
@@ -433,36 +433,8 @@ const ChatRoom = () => {
               {camOff ? <VideoOff className="w-5 h-5" strokeWidth={2.5} /> : <Video className="w-5 h-5" strokeWidth={2.5} />}
             </GlassCircleButton>
           )}
-          <GlassCircleButton onClick={toggleHd} active={hdOn} aria-label="HD">
-            <Sparkles className="w-5 h-5" strokeWidth={2.5} />
-            {!features.hdVideo && <Lock className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5" strokeWidth={3} />}
-          </GlassCircleButton>
-          {(!isBlind || blindRevealed) && (
-            <GlassCircleButton onClick={toggleTranslate} active={translateOn} aria-label="Translate">
-              <Languages className="w-5 h-5" strokeWidth={2.5} />
-              {!features.liveTranslate && <Lock className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5" strokeWidth={3} />}
-            </GlassCircleButton>
-          )}
-          <GlassCircleButton onClick={() => setShowGifts(true)} aria-label="Gift">
-            <Gift className="w-5 h-5" strokeWidth={2.5} />
-          </GlassCircleButton>
-          <GlassCircleButton onClick={() => setShowGames((v) => !v)} active={showGames} aria-label="Games">
-            <Gamepad2 className="w-5 h-5" strokeWidth={2.5} />
-          </GlassCircleButton>
-          <GlassCircleButton onClick={() => toast("Added to favorites ❤️")} className="bg-primary/15" aria-label="Favorite">
-            <Heart className="w-5 h-5 text-primary" strokeWidth={2.5} />
-          </GlassCircleButton>
-          {(
-            <GlassCircleButton onClick={handleRewind} aria-label="Rewind">
-              <Rewind className="w-5 h-5" strokeWidth={2.5} />
-              {!features.rewindLastSkip && <Lock className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5" strokeWidth={3} />}
-            </GlassCircleButton>
-          )}
           <GlassCircleButton onClick={() => handleSkip()} size="lg" className="bg-primary text-primary-foreground" aria-label="Skip">
             <SkipForward className="w-6 h-6" strokeWidth={2.5} />
-          </GlassCircleButton>
-          <GlassCircleButton onClick={() => toast("Reported. Thanks for keeping FaceFrenzy safe.")} aria-label="Report">
-            <Flag className="w-5 h-5" strokeWidth={2.5} />
           </GlassCircleButton>
         </GlassCard>
 

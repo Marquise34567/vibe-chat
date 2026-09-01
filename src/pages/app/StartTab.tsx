@@ -70,6 +70,8 @@ const StartTab = () => {
   const [genderExpanded, setGenderExpanded] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
+  const [showSponsorSheet, setShowSponsorSheet] = useState(false);
+  const [sponsors, setSponsors] = useState<{ label: string; link: string }[]>([]);
   const scholarVerified = getScholarVerified();
 
   const { videoRef, status: camStatus, error: camError, start: camStart, stop: camStop } = useWebcam();
@@ -660,6 +662,66 @@ const StartTab = () => {
       </div>
 
       {/* ═══════════════════════════════════════════════════
+          SPONSOR BOXES — right side of lobby
+      ═══════════════════════════════════════════════════ */}
+      <div style={{
+        position: "fixed", right: 12, top: "50%", transform: "translateY(-50%)",
+        display: "flex", flexDirection: "column", gap: 8, zIndex: 50,
+      }}>
+        {/* Label */}
+        <div style={{
+          fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.3)",
+          textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", marginBottom: 2,
+        }}>
+          Sponsors
+        </div>
+        {/* 4 sponsor boxes */}
+        {[0, 1, 2, 3].map((i) => {
+          const sponsor = sponsors[i];
+          return (
+            <button
+              key={i}
+              onClick={() => {
+                if (sponsor?.link) {
+                  window.open(sponsor.link.startsWith("http") ? sponsor.link : `https://${sponsor.link}`, "_blank");
+                } else {
+                  setShowSponsorSheet(true);
+                }
+              }}
+              style={{
+                width: 64, height: 64, borderRadius: 14,
+                background: sponsor
+                  ? "linear-gradient(135deg, rgba(255,214,10,0.15), rgba(107,76,255,0.15))"
+                  : "rgba(255,255,255,0.04)",
+                border: sponsor
+                  ? "1px solid rgba(255,214,10,0.3)"
+                  : "1px solid rgba(255,255,255,0.08)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", gap: 2,
+                transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s",
+                backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
+              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
+              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              {sponsor ? (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#FFD60A", textAlign: "center", padding: "0 4px", lineHeight: 1.2 }}>
+                  {sponsor.label}
+                </span>
+              ) : (
+                <>
+                  <PlusIcon style={{ width: 20, height: 20, color: "rgba(255,255,255,0.25)" }} />
+                  <span style={{ fontSize: 7, color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>ADD</span>
+                </>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════
           SHEETS
       ═══════════════════════════════════════════════════ */}
       {showRegionPicker && (
@@ -674,6 +736,20 @@ const StartTab = () => {
       )}
       {showShareSheet && pendingShareUrl && (
         <ShareSheet url={pendingShareUrl} onClose={() => { setShowShareSheet(false); setPendingShareUrl(null); }} />
+      )}
+      {showSponsorSheet && (
+        <SponsorSheet
+          onClose={() => setShowSponsorSheet(false)}
+          onSubmit={(label, link) => {
+            if (sponsors.length < 4) {
+              setSponsors([...sponsors, { label, link }]);
+              toast.success("Your sponsor box is live! 🎉");
+            } else {
+              toast.error("All sponsor slots are full");
+            }
+            setShowSponsorSheet(false);
+          }}
+        />
       )}
     </div>
   );
@@ -937,3 +1013,85 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
 };
 
 export default StartTab;
+
+/* ═══════════════════════════════════════════════════════════════
+   SponsorSheet — submit your app/product/social handle to a sponsor box
+═══════════════════════════════════════════════════════════════ */
+const SponsorSheet = ({ onClose, onSubmit }: {
+  onClose: () => void;
+  onSubmit: (label: string, link: string) => void;
+}) => {
+  const [label, setLabel] = useState("");
+  const [link, setLink] = useState("");
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up"
+        style={{ background: "rgba(20,18,30,0.95)", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "24px 20px 32px", border: "1px solid rgba(255,255,255,0.08)", borderBottom: "none" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 2 }}>Become a Sponsor</h3>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>Get your app, product, or social seen by hundreds daily</p>
+          </div>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 17, background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <X className="w-4 h-4" style={{ color: "#fff" }} />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "block" }}>Display name (shown in box)</label>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="e.g. My App, @yourhandle, yourbrand"
+              maxLength={20}
+              style={{
+                width: "100%", height: 48, borderRadius: 14,
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                color: "#fff", fontSize: 15, fontWeight: 600, padding: "0 16px",
+                outline: "none",
+              }}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "block" }}>Link (app URL, website, or @handle)</label>
+            <input
+              type="text"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://myapp.com or @yourhandle"
+              style={{
+                width: "100%", height: 48, borderRadius: 14,
+                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                color: "#fff", fontSize: 15, fontWeight: 600, padding: "0 16px",
+                outline: "none",
+              }}
+            />
+          </div>
+          <button
+            onClick={() => {
+              const t = label.trim();
+              if (!t) { toast.error("Enter a display name"); return; }
+              if (!link.trim()) { toast.error("Enter a link or handle"); return; }
+              onSubmit(t, link.trim());
+            }}
+            style={{
+              width: "100%", height: 52, borderRadius: 26,
+              background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)",
+              color: "#0A0A0F", fontSize: 16, fontWeight: 800,
+              border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 6px 24px rgba(245,208,0,0.25)",
+              marginTop: 4,
+            }}
+          >
+            Submit Sponsor
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
