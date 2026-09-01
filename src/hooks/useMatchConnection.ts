@@ -198,8 +198,17 @@ export function useMatchConnection() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
+        video: {
+          facingMode: "user",
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 60 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
       localStreamRef.current = stream;
       if (localVideoRef.current) {

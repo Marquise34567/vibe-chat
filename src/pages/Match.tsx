@@ -54,9 +54,13 @@ const Match = () => {
 
   const statusText =
     connState === "connecting" ? "Connecting…" :
-    connState === "matched" ? (peerName ? `Matched with ${peerName}!` : "Match found!") :
+    connState === "connected" ? (peerName ? `Connected with ${peerName}!` : "Connected!") :
+    connState === "matched" ? "Connecting to peer…" :
     connState === "error" ? "Connection issue" :
     "Searching for someone…";
+
+  // Only show "matched" UI when actually connected (not ghost matched)
+  const showMatched = connState === "connected";
 
   return (
     <div className="relative min-h-screen flex flex-col bg-app overflow-hidden">
@@ -79,7 +83,7 @@ const Match = () => {
         <RadarPulse className="mb-6" />
 
         <h2 className="text-2xl font-bold tracking-tight mb-2 text-white">
-          {connState === "matched" ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
+          {showMatched ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
         </h2>
         <p className="text-white/80 text-center mb-1">{statusText}</p>
 

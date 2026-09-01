@@ -19,7 +19,12 @@ export const useWebcam = () => {
         throw new Error("Camera not supported on this device");
       }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: "user",
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 60 },
+        },
         audio: false,
       });
       streamRef.current = stream;
