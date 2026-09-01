@@ -267,8 +267,12 @@ export function useMatchConnection() {
           setState("matched");
 
           // Create peer connection and start WebRTC handshake
+          // Try to get camera, but DON'T fail the whole match if camera fails —
+          // we can still receive the peer's video/audio without sending ours.
           try {
-            await startLocalStream();
+            await startLocalStream().catch((err) => {
+              console.warn("[webrtc] Camera failed, continuing without local stream:", err);
+            });
             console.log(`[webrtc] Matched as ${data.role}. Local stream:`, localStreamRef.current ? `${localStreamRef.current.getTracks().length} tracks` : "null");
             const pc = createPeerConnection();
 
@@ -292,8 +296,8 @@ export function useMatchConnection() {
               }
             }
           } catch (err) {
-            console.error("Failed to start WebRTC:", err);
-            setState("error");
+            console.error("[webrtc] Failed to start WebRTC:", err);
+            // Don't set error state — try to continue
           }
           break;
 
@@ -437,11 +441,23 @@ export function useMatchConnection() {
     };
 
     ws.onclose = () => {
+      console.log("[ws] WebSocket closed");
       if (pcRef.current) {
         pcRef.current.close();
         pcRef.current = null;
       }
-      setState("disconnected");
+      // Auto-reconnect if we were searching or matched (not intentionally disconnected)
+      if (paramsRef.current) {
+        console.log("[ws] Auto-reconnecting in 1s…");
+        setState("connecting");
+        setTimeout(() => {
+          if (wsRef.current?.readyState !== WebSocket.OPEN && paramsRef.current) {
+            connect();
+          }
+        }, 1000);
+      } else {
+        setState("disconnected");
+      }
     };
   }, [handleMessage]);
 

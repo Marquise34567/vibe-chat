@@ -337,7 +337,14 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       case "offer": {
         if (c.partnerId) {
           const partner = clients.get(c.partnerId);
-          if (partner) send(partner.ws, { type: "offer", sdp: msg.sdp, peerId: id });
+          if (partner) {
+            send(partner.ws, { type: "offer", sdp: msg.sdp, peerId: id });
+            console.log(`Signaling offer: ${id} → ${c.partnerId}`);
+          } else {
+            console.log(`Signaling offer: ${id} → ${c.partnerId} (partner not found!)`);
+          }
+        } else {
+          console.log(`Signaling offer: ${id} has no partnerId!`);
         }
         break;
       }
@@ -346,7 +353,14 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       case "answer": {
         if (c.partnerId) {
           const partner = clients.get(c.partnerId);
-          if (partner) send(partner.ws, { type: "answer", sdp: msg.sdp, peerId: id });
+          if (partner) {
+            send(partner.ws, { type: "answer", sdp: msg.sdp, peerId: id });
+            console.log(`Signaling answer: ${id} → ${c.partnerId}`);
+          } else {
+            console.log(`Signaling answer: ${id} → ${c.partnerId} (partner not found!)`);
+          }
+        } else {
+          console.log(`Signaling answer: ${id} has no partnerId!`);
         }
         break;
       }
