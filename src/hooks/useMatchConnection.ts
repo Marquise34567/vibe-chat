@@ -81,11 +81,27 @@ export function useMatchConnection() {
   const countryRef = useRef<string | null>(null);
   const nameRef = useRef<string | null>(null);
 
-  // ── ICE servers (STUN for NAT traversal) ──
+  // ── ICE servers (STUN + TURN for NAT traversal) ──
+  // STUN discovers public IP; TURN relays traffic when P2P fails (symmetric NAT, firewalls, etc.)
   const ICE_SERVERS: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
+    // OpenRelay free TURN servers — relay traffic when P2P fails
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ];
 
   // ── Create RTCPeerConnection ──
