@@ -1,0 +1,14 @@
+Replace scholar onboarding with name picker, add peerName relay, real matchmaking deploy
+
+- AgeGate: replace university/scholar step with monkey.app-style name picker
+- localUser: add getDisplayName/setDisplayName helpers
+- match-server: add name to Client, accept on register/search, relay as peerName in pairClients
+- useMatchConnection: send name on register/search, expose peerName, reset extend state on skip
+- Match.tsx: send display name when searching, show peer name on match
+- ChatRoom.tsx: use peerName from context for name pill and socials sheet
+- Add Dockerfile + railway.json for Railway match server deploy
+- Add recentlySkipped set to prevent immediate re-matching after skip
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

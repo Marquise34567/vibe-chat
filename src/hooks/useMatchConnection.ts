@@ -73,6 +73,7 @@ export function useMatchConnection() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null); // store stream until video element mounts
   const roleRef = useRef<"caller" | "receiver">("receiver");
   const paramsRef = useRef<MatchParams | null>(null);
   const countryRef = useRef<string | null>(null);
@@ -97,11 +98,25 @@ export function useMatchConnection() {
     }
 
     // Remote stream → attach to video element
+    // The video element might not be mounted yet (e.g. during Match→ChatRoom
+    // navigation), so we store the stream and poll until it's available.
     pc.ontrack = (event) => {
       const [stream] = event.streams;
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-        remoteVideoRef.current.play().catch(() => {});
+      remoteStreamRef.current = stream;
+      const attach = () => {
+        if (remoteVideoRef.current && remoteStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+          remoteVideoRef.current.play().catch(() => {});
+          return true;
+        }
+        return false;
+      };
+      if (!attach()) {
+        // Retry every 200ms until the video element mounts (max 10s)
+        const interval = setInterval(() => {
+          if (attach()) clearInterval(interval);
+        }, 200);
+        setTimeout(() => clearInterval(interval), 10000);
       }
     };
 
@@ -237,8 +252,10 @@ export function useMatchConnection() {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = null;
           }
+          remoteStreamRef.current = null;
           setPeerId(null);
           setPeerCountry(null);
+          setPeerName(null);
           setState("disconnected");
           break;
 
@@ -361,6 +378,7 @@ export function useMatchConnection() {
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
+    remoteStreamRef.current = null;
     setPeerId(null);
     setPeerCountry(null);
     setPeerName(null);
@@ -419,6 +437,7 @@ export function useMatchConnection() {
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
+    remoteStreamRef.current = null;
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "leave" }));
