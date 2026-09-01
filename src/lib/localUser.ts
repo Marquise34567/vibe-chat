@@ -5,6 +5,7 @@
 
 const USER_KEY = "ff:local_user";
 const PROFILE_KEY = "ff:local_profile";
+const NAME_KEY = "ff:display_name";
 
 export type LocalProfile = {
   id: string;
@@ -87,4 +88,18 @@ export const updateLocalUserMeta = (meta: Partial<LocalUser["user_metadata"]>) =
   const updated = { ...user, user_metadata: { ...user.user_metadata, ...meta } };
   try { localStorage.setItem(USER_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
   return updated;
+};
+
+// ── Display name (chosen on first visit via AgeGate) ──
+export const getDisplayName = (): string | null => {
+  try { return localStorage.getItem(NAME_KEY); } catch { return null; }
+};
+export const setDisplayName = (name: string) => {
+  try { localStorage.setItem(NAME_KEY, name); } catch { /* ignore */ }
+  // Also sync into the local user + profile so existing reads pick it up
+  updateLocalUserMeta({ display_name: name });
+  saveLocalProfile({ display_name: name });
+};
+export const hasDisplayName = (): boolean => {
+  return !!getDisplayName();
 };

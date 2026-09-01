@@ -43,6 +43,7 @@ type Profile = {
 type Mode = "solo" | "group" | "blind";
 
 const MATCH_SECONDS = 15;
+const EXTEND_SECONDS = 120; // 2 minutes when both users agree to extend
 const BLIND_REVEAL_SECONDS = 30;
 
 const ChatRoom = () => {
@@ -55,16 +56,15 @@ const ChatRoom = () => {
   const { videoRef: pipVideoRef, status: pipStatus, start: pipStart } = useWebcam();
   // Remote video ref + peer info come from the shared match connection
   // (lives in MatchConnectionProvider so WebRTC survives navigation).
-  const { remoteVideoRef, peerId: connPeerId, peerCountry: connPeerCountry, skip: connSkip, disconnect: connDisconnect } = useMatchConnectionContext();
+  const { remoteVideoRef, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend } = useMatchConnectionContext();
   const hasRemoteVideo = !!(remoteVideoRef.current?.srcObject);
 
-  // The peer's profile. The match server currently issues random peer IDs
-  // (not Supabase user IDs), so we only know what the server tells us:
-  // the peer's country. No fake name/socials/age/etc.
-  const other: Profile | null = connPeerCountry
+  // The peer's profile. The match server relays the peer's chosen display
+  // name + country. No fake name/socials/age/etc.
+  const other: Profile | null = (connPeerCountry || connPeerName)
     ? {
         id: otherId ?? connPeerId ?? "peer",
-        display_name: null,
+        display_name: connPeerName,
         gender: null,
         country: connPeerCountry,
         interests: null,
@@ -91,6 +91,7 @@ const ChatRoom = () => {
   const [showGifts, setShowGifts] = useState(false);
   const [showSocials, setShowSocials] = useState(false);
   const [showGames, setShowGames] = useState(false);
+  const [skipping, setSkipping] = useState(false); // transition state before returning to matching
   const lastSkippedRef = useRef<string | null>(null);
 
   // Blind date state
@@ -198,24 +199,57 @@ const ChatRoom = () => {
   }, [translateOn, hasRemoteVideo]);
 
   const handleSkip = (auto = false) => {
+    if (skipping) return; // prevent double-skip during delay
     if (otherId) { lastSkippedRef.current = otherId; setLastSkipped(otherId); addRecentlySeen(otherId); }
+    if (auto) toast("Time's up — finding someone new…");
     // Tell the match server to skip and search for a new real peer
     connSkip();
-    if (auto) toast("Time's up — next!");
-    navigate("/match?mode=" + mode, { replace: true });
+    // Show a brief transition overlay, then navigate to matching
+    setSkipping(true);
+    setTimeout(() => {
+      navigate("/match?mode=" + mode, { replace: true });
+    }, 1200);
   };
 
   const handleExtend = () => {
-    if (extendRequested) {
-      setExtended(true);
-      toast.success("Chat extended! Enjoy 🎉");
-      return;
-    }
+    if (extendRequested) return; // already requested
     setExtendRequested(true);
-    toast("Extend requested — waiting for them too…");
-    // NOTE: real extend requires a server round-trip (partner must confirm).
-    // For now we only extend locally; do not fake the partner's acceptance.
+    requestExtend();
+    toast("Extend requested — waiting for their answer…");
   };
+
+  // ── Partner accepted the extend request ──
+  useEffect(() => {
+    if (connExtendAccepted && !extended) {
+      setExtended(true);
+      setExtendRequested(false);
+      setRemaining(EXTEND_SECONDS);
+      toast.success("Chat extended! 2 minutes added 🎉");
+    }
+  }, [connExtendAccepted, extended]);
+
+  // ── Partner declined the extend request ──
+  useEffect(() => {
+    if (extendRequested && extendRequestFrom === null && !connExtendAccepted && !extended) {
+      // Only show decline if we had requested and got no acceptance
+      // (extendRequestFrom is null when declined, but also initially — guard with extendRequested)
+    }
+  }, [extendRequestFrom, extendRequested, connExtendAccepted, extended]);
+
+  // ── Partner sent us an extend request — show the prompt ──
+  // (extendRequestFrom is set by the hook when partner sends extend-request)
+
+  // ── Partner left/skipped — transition back to matching with a delay ──
+  useEffect(() => {
+    if (connState === "disconnected" && !skipping) {
+      toast("Your partner left — finding someone new…");
+      setSkipping(true);
+      const t = setTimeout(() => {
+        navigate("/match?mode=" + mode, { replace: true });
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [connState, skipping, mode, navigate]);
 
   const handleRewind = () => {
     if (!features.rewindLastSkip) { toast.error("Rewind is a VIP feature."); return; }
@@ -492,6 +526,87 @@ const ChatRoom = () => {
         }}>
           <Flag className="w-4 h-4" style={{ color: "#fff", flexShrink: 0 }} />
           <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{moderationWarning}</span>
+        </div>
+      )}
+
+      {/* ── Skip transition overlay — brief delay before returning to matching ── */}
+      {skipping && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 300,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
+          background: "rgba(5,5,8,0.85)", backdropFilter: "blur(12px)",
+          animation: "ff-slide-up 0.3s ease",
+        }}>
+          <div style={{ width: 56, height: 56, borderRadius: 28, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <SkipForward style={{ width: 28, height: 28, color: "#FFD60A" }} />
+          </div>
+          <span style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Finding someone new…</span>
+          <div style={{ width: 120, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+            <div style={{ width: "100%", height: "100%", background: "#FFD60A", animation: "ff-shimmer 1.2s ease-in-out" }} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Extend request modal — partner wants to keep talking ── */}
+      {extendRequestFrom && !skipping && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 300,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
+          animation: "ff-slide-up 0.3s ease",
+        }}>
+          <div style={{
+            width: "85%", maxWidth: 340, borderRadius: 24, padding: 28,
+            background: "linear-gradient(160deg, #14142A 0%, #0A0A14 100%)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center",
+          }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 32,
+              background: "linear-gradient(135deg, rgba(255,77,141,0.2), rgba(124,92,255,0.2))",
+              border: "1px solid rgba(255,77,141,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              animation: "ff-core-pulse 1.5s ease-in-out infinite",
+            }}>
+              <Heart style={{ width: 28, height: 28, color: "#FF4D8D" }} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Extend the chat?</h3>
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>
+                Your partner wants to keep talking. Extend for 2 more minutes?
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 10, width: "100%" }}>
+              <button onClick={declineExtend}
+                style={{
+                  flex: 1, height: 48, borderRadius: 24,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.6)", fontSize: 15, fontWeight: 700, cursor: "pointer",
+                  transition: "transform 0.15s ease",
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                No thanks
+              </button>
+              <button onClick={acceptExtend}
+                style={{
+                  flex: 1, height: 48, borderRadius: 24,
+                  background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)",
+                  color: "#0A0A0F", fontSize: 15, fontWeight: 800, border: "none", cursor: "pointer",
+                  boxShadow: "0 6px 20px rgba(245,208,0,0.3)",
+                  transition: "transform 0.15s ease",
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
+                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                Let's talk!
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

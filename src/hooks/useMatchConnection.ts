@@ -65,6 +65,9 @@ export function useMatchConnection() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [peerId, setPeerId] = useState<string | null>(null);
   const [peerCountry, setPeerCountry] = useState<string | null>(null);
+  const [peerName, setPeerName] = useState<string | null>(null);
+  const [extendRequestFrom, setExtendRequestFrom] = useState<string | null>(null);
+  const [extendAccepted, setExtendAccepted] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -73,6 +76,7 @@ export function useMatchConnection() {
   const roleRef = useRef<"caller" | "receiver">("receiver");
   const paramsRef = useRef<MatchParams | null>(null);
   const countryRef = useRef<string | null>(null);
+  const nameRef = useRef<string | null>(null);
 
   // ── ICE servers (STUN for NAT traversal) ──
   const ICE_SERVERS: RTCIceServer[] = [
@@ -140,15 +144,15 @@ export function useMatchConnection() {
     async (data: any) => {
       switch (data.type) {
         case "connected":
-          // Server assigned us an ID — register our country, then search if params set
+          // Server assigned us an ID — register our country + name, then search if params set
           setOnlineCount(data.onlineCount ?? 0);
           detectCountry().then((country) => {
             countryRef.current = country;
             if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({ type: "register", country }));
+              wsRef.current.send(JSON.stringify({ type: "register", country, name: nameRef.current }));
             }
             if (paramsRef.current) {
-              wsRef.current?.send(JSON.stringify({ type: "search", ...paramsRef.current }));
+              wsRef.current?.send(JSON.stringify({ type: "search", ...paramsRef.current, name: nameRef.current }));
               setState("searching");
             }
           });
@@ -167,6 +171,7 @@ export function useMatchConnection() {
         case "matched":
           setPeerId(data.peerId);
           setPeerCountry(data.peerCountry ?? null);
+          setPeerName(data.peerName ?? null);
           roleRef.current = data.role;
           setState("matched");
 
@@ -272,6 +277,22 @@ export function useMatchConnection() {
 
         case "pong":
           break;
+
+        case "extend-request":
+          // Partner wants to extend — show prompt to this user
+          setExtendRequestFrom(data.peerId ?? "partner");
+          break;
+
+        case "extend-accepted":
+          // Both users agreed — extend the call
+          setExtendAccepted(true);
+          setExtendRequestFrom(null);
+          break;
+
+        case "extend-declined":
+          // Partner declined the extend request
+          setExtendRequestFrom(null);
+          break;
       }
     },
     [createPeerConnection, startLocalStream]
@@ -319,14 +340,19 @@ export function useMatchConnection() {
         connect();
         // connect() will send the search after "connected" message
       } else {
-        wsRef.current.send(JSON.stringify({ type: "search", ...params }));
+        wsRef.current.send(JSON.stringify({ type: "search", ...params, name: nameRef.current }));
         setState("searching");
       }
     },
     [connect]
   );
 
-  // ── Skip current partner and search again ──
+  // ── Set the display name to send to the server on register/search ──
+  const setDisplayName = useCallback((name: string | null) => {
+    nameRef.current = name;
+  }, []);
+
+  // ── Skip current partner (does NOT auto-search — client navigates to Match view) ──
   const skip = useCallback(() => {
     if (pcRef.current) {
       pcRef.current.close();
@@ -337,10 +363,39 @@ export function useMatchConnection() {
     }
     setPeerId(null);
     setPeerCountry(null);
+    setPeerName(null);
+    setExtendRequestFrom(null);
+    setExtendAccepted(false);
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "skip" }));
     }
+    // Set to searching immediately so the UI transitions
+    setState("searching");
+  }, []);
+
+  // ── Request to extend the call with current partner ──
+  const requestExtend = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "extend-request" }));
+    }
+  }, []);
+
+  // ── Accept partner's extend request ──
+  const acceptExtend = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "extend-accept" }));
+    }
+    setExtendAccepted(true);
+    setExtendRequestFrom(null);
+  }, []);
+
+  // ── Decline partner's extend request ──
+  const declineExtend = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "extend-decline" }));
+    }
+    setExtendRequestFrom(null);
   }, []);
 
   // ── Cancel search ──
@@ -395,6 +450,9 @@ export function useMatchConnection() {
     onlineCount,
     peerId,
     peerCountry,
+    peerName,
+    extendRequestFrom,
+    extendAccepted,
     localStreamRef,
     remoteVideoRef,
     connect,
@@ -402,5 +460,9 @@ export function useMatchConnection() {
     skip,
     cancel,
     disconnect,
+    requestExtend,
+    acceptExtend,
+    declineExtend,
+    setDisplayName,
   };
 }

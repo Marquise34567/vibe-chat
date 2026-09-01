@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { useWebcam } from "@/hooks/useWebcam";
+import { getDisplayName } from "@/lib/localUser";
 import { toast } from "sonner";
 import {
   RadarPulse,
@@ -33,7 +34,7 @@ const Match = () => {
   const [tipIdx, setTipIdx] = useState(0);
 
   const { videoRef, status: camStatus, error: camError, start: camStart } = useWebcam();
-  const { state: connState, onlineCount, peerId, search, cancel, disconnect } = useMatchConnectionContext();
+  const { state: connState, onlineCount, peerId, peerName, search, cancel, disconnect, setDisplayName } = useMatchConnectionContext();
 
   // Start webcam immediately on mount
   useEffect(() => { camStart(); }, [camStart]);
@@ -49,6 +50,8 @@ const Match = () => {
   // NOTE: do NOT disconnect on unmount — the connection lives in the
   // MatchConnectionProvider so WebRTC survives navigation to /chat/:otherId.
   useEffect(() => {
+    // Send our display name so the peer sees it when matched (monkey.app style)
+    setDisplayName(getDisplayName());
     search({
       mode,
       gender: gender === "Any" ? "any" : gender,
@@ -74,7 +77,7 @@ const Match = () => {
   const statusText =
     connState === "connecting" ? "Connecting to match server…" :
     connState === "searching" ? (onlineCount > 1 ? `Searching… ${onlineCount} online` : "Searching for someone to match with…") :
-    connState === "matched" ? "Match found! Connecting…" :
+    connState === "matched" ? (peerName ? `Matched with ${peerName}! Connecting…` : "Match found! Connecting…") :
     connState === "error" ? "Connection issue — check the match server is running" :
     "Searching…";
 
@@ -120,7 +123,7 @@ const Match = () => {
         <RadarPulse className="mb-6" />
 
         <h2 className="text-2xl font-bold tracking-tight mb-2 text-white">
-          {connState === "matched" ? "Match found!" : "Finding your match"}
+          {connState === "matched" ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
         </h2>
         <p className="text-white/80 text-center mb-1">{statusText}</p>
         <p className="text-sm text-white/60">{TIPS[tipIdx]}</p>

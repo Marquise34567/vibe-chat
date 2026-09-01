@@ -38,6 +38,7 @@ type Client = {
   id: string;
   ip: string;
   country: string | null;   // ISO 3166-1 alpha-2 code, e.g. "US", "BR", "JP"
+  name: string | null;      // display name chosen by the user (monkey.app style)
   mode: string;             // solo | group | blind | duo
   gender: string;           // any | woman | man
   scholarOnly: boolean;
@@ -47,6 +48,7 @@ type Client = {
   joinedAt: number;
   violations: number;
   lastViolationAt: number;
+  recentlySkipped: Set<string>; // peer IDs to exclude from re-matching (expires after 60s)
 };
 
 // ── State ──
@@ -165,6 +167,10 @@ const findMatch = (client: Client): Client | null => {
     if (other.status !== "searching") continue;
     if (other.mode !== client.mode) continue;
 
+    // ── Skip recently-skipped partners ──
+    if (client.recentlySkipped.has(other.id)) continue;
+    if (other.recentlySkipped.has(client.id)) continue;
+
     // ── Gender compatibility ──
     // If client wants women, other must be a woman (gender = "woman")
     // If client wants men, other must be a man (gender = "man")
@@ -198,10 +204,10 @@ const pairClients = (a: Client, b: Client) => {
   b.partnerId = a.id;
 
   // One is the caller (initiator), the other the receiver
-  send(a.ws, { type: "matched", role: "caller", peerId: b.id, peerCountry: b.country });
-  send(b.ws, { type: "matched", role: "receiver", peerId: a.id, peerCountry: a.country });
+  send(a.ws, { type: "matched", role: "caller", peerId: b.id, peerCountry: b.country, peerName: b.name });
+  send(b.ws, { type: "matched", role: "receiver", peerId: a.id, peerCountry: a.country, peerName: a.name });
 
-  console.log(`Matched ${a.id} (${a.country}) ↔ ${b.id} (${b.country}) [mode: ${a.mode}]`);
+  console.log(`Matched ${a.id} (${a.name}, ${a.country}) ↔ ${b.id} (${b.name}, ${b.country}) [mode: ${a.mode}]`);
 };
 
 const removeClient = (id: string) => {
@@ -258,6 +264,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     ws, id,
     ip,
     country: null,
+    name: null,
     mode: "solo",
     gender: "any",
     scholarOnly: false,
@@ -266,6 +273,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     joinedAt: Date.now(),
     violations: 0,
     lastViolationAt: 0,
+    recentlySkipped: new Set<string>(),
   };
   clients.set(id, client);
 
@@ -290,7 +298,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       // ── Register country (sent right after connect) ──
       case "register": {
         c.country = msg.country ?? null;
-        console.log(`Client ${id} registered country: ${c.country}`);
+        c.name = msg.name ?? c.name;
+        console.log(`Client ${id} registered country: ${c.country} name: ${c.name}`);
         break;
       }
 
@@ -301,6 +310,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         c.gender = msg.gender ?? "any";
         c.scholarOnly = msg.scholarOnly ?? false;
         c.countries = msg.countries ?? [];
+        if (msg.name) c.name = msg.name;
         c.partnerId = undefined;
 
         console.log(`Client ${id} searching: mode=${c.mode} gender=${c.gender} countries=${c.countries.join(",") || "global"} scholar=${c.scholarOnly}`);
@@ -355,6 +365,13 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         if (c.partnerId) {
           const partner = clients.get(c.partnerId);
           if (partner) {
+            // Both sides remember this peer so they don't immediately re-match
+            c.recentlySkipped.add(partner.id);
+            partner.recentlySkipped.add(c.id);
+            // Auto-expire skip memory after 60s
+            setTimeout(() => { c.recentlySkipped.delete(partner.id); }, 60000);
+            setTimeout(() => { try { partner.recentlySkipped.delete(c.id); } catch {} }, 60000);
+
             send(partner.ws, { type: "partner-left", peerId: id });
             partner.status = "searching";
             partner.partnerId = undefined;
@@ -364,12 +381,43 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         c.partnerId = undefined;
         send(ws, { type: "skipped" });
 
-        // Immediately try to find a new match
-        const match = findMatch(c);
-        if (match) {
-          pairClients(c, match);
-        } else {
-          send(ws, { type: "searching", onlineCount: clients.size });
+        // Don't immediately match — let the client navigate to the Match
+        // searching view and re-search from there (like Monkey app).
+        // Just confirm the skip; the client's search() call will trigger findMatch.
+        send(ws, { type: "searching", onlineCount: clients.size });
+        break;
+      }
+
+      // ── Extend request: ask partner if they want to keep talking ──
+      case "extend-request": {
+        if (c.partnerId) {
+          const partner = clients.get(c.partnerId);
+          if (partner) {
+            send(partner.ws, { type: "extend-request", peerId: id });
+          }
+        }
+        break;
+      }
+
+      // ── Extend accepted: both users get notified ──
+      case "extend-accept": {
+        if (c.partnerId) {
+          const partner = clients.get(c.partnerId);
+          if (partner) {
+            send(partner.ws, { type: "extend-accepted", peerId: id });
+          }
+          send(ws, { type: "extend-accepted", peerId: c.partnerId });
+        }
+        break;
+      }
+
+      // ── Extend declined: notify partner ──
+      case "extend-decline": {
+        if (c.partnerId) {
+          const partner = clients.get(c.partnerId);
+          if (partner) {
+            send(partner.ws, { type: "extend-declined", peerId: id });
+          }
         }
         break;
       }
