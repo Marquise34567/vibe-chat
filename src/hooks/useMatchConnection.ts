@@ -233,6 +233,7 @@ export function useMatchConnection() {
   // ── WebSocket message handler ──
   const handleMessage = useCallback(
     async (data: any) => {
+      console.log(`[ws] Received: ${data.type}`, data.peerId ? `peer=${data.peerId}` : '');
       switch (data.type) {
         case "connected":
           // Server assigned us an ID — register our country + name, then search if params set
@@ -417,6 +418,11 @@ export function useMatchConnection() {
   );
 
   // ── Connect to match server ──
+  // Use a ref for handleMessage so the WebSocket always uses the latest version
+  // (avoids stale closure issues if handleMessage identity changes)
+  const handleMessageRef = useRef(handleMessage);
+  useEffect(() => { handleMessageRef.current = handleMessage; }, [handleMessage]);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -430,7 +436,7 @@ export function useMatchConnection() {
 
     ws.onmessage = (event) => {
       try {
-        handleMessage(JSON.parse(event.data));
+        handleMessageRef.current(JSON.parse(event.data));
       } catch {
         // ignore parse errors
       }
@@ -459,7 +465,7 @@ export function useMatchConnection() {
         setState("disconnected");
       }
     };
-  }, [handleMessage]);
+  }, []);
 
   // ── Start searching for a match ──
   const search = useCallback(
