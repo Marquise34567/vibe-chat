@@ -60,10 +60,20 @@ const ChatRoom = () => {
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
   // Poll to detect when streams get attached to video elements
+  // Also force the remote video to stay unmuted so we can hear the peer
   useEffect(() => {
     const check = () => {
       setPipActive(!!(pipVideoRef.current?.srcObject));
       setHasRemoteVideo(!!(remoteVideoRef.current?.srcObject));
+      // Force remote video unmuted + playing
+      if (remoteVideoRef.current?.srcObject) {
+        if (remoteVideoRef.current.muted) {
+          remoteVideoRef.current.muted = false;
+        }
+        if (remoteVideoRef.current.paused) {
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      }
     };
     check();
     const interval = setInterval(check, 300);

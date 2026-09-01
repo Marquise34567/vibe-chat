@@ -139,30 +139,15 @@ export function useMatchConnection() {
           // Don't re-set if already set to the same stream
           if (remoteVideoRef.current.srcObject === remoteStreamRef.current) return true;
           remoteVideoRef.current.srcObject = remoteStreamRef.current;
-          // Explicitly unmute and play — browsers may block autoplay with audio
-          // unless there was prior user interaction (clicking "Start" counts).
+          // Force unmute — the user already interacted by clicking "Start Video Chat"
+          // so autoplay with audio is allowed by the browser.
           remoteVideoRef.current.muted = false;
-          const playPromise = remoteVideoRef.current.play();
-          if (playPromise) {
-            playPromise.then(() => {
-              // Ensure audio tracks are enabled
-              remoteStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = true; });
-            }).catch((e) => {
-              // If autoplay with audio is blocked, try muted then unmute after
-              console.warn("[webrtc] Autoplay blocked, retrying muted:", e);
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.muted = true;
-                remoteVideoRef.current.play().catch(() => {});
-                // Unmute after a short delay (user has interacted by clicking Start)
-                setTimeout(() => {
-                  if (remoteVideoRef.current) {
-                    remoteVideoRef.current.muted = false;
-                    remoteVideoRef.current.play().catch(() => {});
-                  }
-                }, 500);
-              }
-            });
-          }
+          // Ensure all audio tracks are enabled
+          remoteStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = true; });
+          remoteVideoRef.current.play().catch((e) => {
+            console.warn("[webrtc] play() failed, will retry:", e);
+          });
+          console.log("[webrtc] Remote stream attached, muted:", remoteVideoRef.current.muted, "audio tracks:", remoteStreamRef.current.getAudioTracks().length);
           return true;
         }
         return false;
