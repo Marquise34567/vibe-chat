@@ -173,8 +173,8 @@ const findMatch = (client: Client): Client | null => {
     if (other.partnerId) continue; // already matched
     // Don't match with clients whose WebSocket isn't actually open
     if (other.ws.readyState !== WebSocket.OPEN) continue;
-    // Don't match with clients we haven't heard from in 20s (ghost check)
-    if (now - other.lastSeen > 20000) continue;
+    // Don't match with clients we haven't heard from in 5s (ghost check)
+    if (now - other.lastSeen > 5000) continue;
     if (other.mode !== client.mode) continue;
 
     // ── Skip recently-skipped partners ──
@@ -605,8 +605,8 @@ setInterval(() => {
       cleaned++;
       continue;
     }
-    // Remove clients we haven't heard from in 20s (ghosts that don't respond to ping)
-    if (now - c.lastSeen > 20000) {
+    // Remove clients we haven't heard from in 10s (ghosts that don't respond to ping)
+    if (now - c.lastSeen > 10000) {
       console.log(`Removing ghost client ${id} (no activity for ${Math.round((now - c.lastSeen)/1000)}s)`);
       removeClient(id);
       cleaned++;

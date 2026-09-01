@@ -76,6 +76,7 @@ export function useMatchConnection() {
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null); // store stream until video element mounts
   const pendingOfferRef = useRef<any>(null); // queue offer if pc isn't ready yet
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const roleRef = useRef<"caller" | "receiver">("receiver");
   const paramsRef = useRef<MatchParams | null>(null);
   const countryRef = useRef<string | null>(null);
@@ -448,6 +449,14 @@ export function useMatchConnection() {
 
     ws.onopen = () => {
       console.log("Connected to match server");
+      // Start sending pings every 3s so the server knows we're alive
+      // (server removes clients not seen in 5s)
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = setInterval(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 3000);
     };
 
     ws.onmessage = (event) => {
@@ -464,6 +473,7 @@ export function useMatchConnection() {
 
     ws.onclose = () => {
       console.log("[ws] WebSocket closed");
+      if (pingIntervalRef.current) { clearInterval(pingIntervalRef.current); pingIntervalRef.current = null; }
       if (pcRef.current) {
         pcRef.current.close();
         pcRef.current = null;
