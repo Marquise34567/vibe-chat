@@ -56,8 +56,21 @@ const ChatRoom = () => {
   // (lives in MatchConnectionProvider so WebRTC survives navigation).
   // The camera stream is started once in the context — no duplicate getUserMedia.
   const { remoteVideoRef, localVideoRef: pipVideoRef, localStreamRef, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName } = useMatchConnectionContext();
-  const pipStatus = localStreamRef.current ? "active" : "requesting";
-  const hasRemoteVideo = !!(remoteVideoRef.current?.srcObject);
+  const [pipActive, setPipActive] = useState(false);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
+
+  // Poll to detect when streams get attached to video elements
+  useEffect(() => {
+    const check = () => {
+      setPipActive(!!(pipVideoRef.current?.srcObject));
+      setHasRemoteVideo(!!(remoteVideoRef.current?.srcObject));
+    };
+    check();
+    const interval = setInterval(check, 300);
+    return () => clearInterval(interval);
+  }, [pipVideoRef, remoteVideoRef]);
+
+  const pipStatus = pipActive ? "active" : "requesting";
 
   // The peer's profile. The match server relays the peer's chosen display
   // name + country. No fake name/socials/age/etc.
@@ -802,7 +815,7 @@ const VideoTile = ({
             {pipStatus !== "active" && (
               <div className="absolute inset-0 bg-gradient-to-br from-accent to-secondary flex items-center justify-center">
                 <span className="text-white/90 text-sm font-semibold">
-                  {pipStatus === "requesting" ? "Starting camera…" : "📹 you"}
+                  Starting camera…
                 </span>
               </div>
             )}

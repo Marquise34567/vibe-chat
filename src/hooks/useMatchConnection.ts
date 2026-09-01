@@ -235,12 +235,20 @@ export function useMatchConnection() {
   }, [startLocalStream]);
 
   // ── Re-attach local stream when video element mounts/remounts ──
+  // The video element changes when navigating Match → ChatRoom, but the ref
+  // object identity stays the same, so we poll to detect when a new <video>
+  // element is assigned and attach the stream.
   useEffect(() => {
-    if (localStreamRef.current && localVideoRef.current && localVideoRef.current.srcObject !== localStreamRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
-      localVideoRef.current.play().catch(() => {});
-    }
-  }, [localVideoRef, state]);
+    const check = () => {
+      if (localStreamRef.current && localVideoRef.current && localVideoRef.current.srcObject !== localStreamRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.play().catch(() => {});
+      }
+    };
+    check();
+    const interval = setInterval(check, 500);
+    return () => clearInterval(interval);
+  }, [state]);
 
   // ── WebSocket message handler ──
   const handleMessage = useCallback(
