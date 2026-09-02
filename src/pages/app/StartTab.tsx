@@ -423,6 +423,14 @@ const StartTab = () => {
       <div style={{ flex: 1, position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
         {/* Big mode label */}
         <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease", textAlign: "center" }}>
+          {/* Brand wordmark — matches tab title */}
+          <div style={{
+            fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px",
+            color: "#FFD60A", textShadow: "0 2px 16px rgba(255,214,10,0.3)",
+            marginBottom: 6,
+          }}>
+            FaceFrenzy
+          </div>
           <h1 style={{
             fontSize: 56, fontWeight: 900, letterSpacing: "-2px", lineHeight: 1,
             color: "#fff", textShadow: "0 4px 24px rgba(0,0,0,0.5)",
