@@ -1,0 +1,62 @@
+# FaceFrenzy
+
+> FaceFrenzy is the #1 Omegle alternative — random live video chat with real humans worldwide. Pick countries, set your vibe, meet your people. No bots, no mockups, just real 1-on-1 and group video conversations.
+
+FaceFrenzy is a free random video chat platform that connects you with real people for live 1-on-1 and group video conversations. It is designed as a modern, Gen-Z-focused alternative to Omegle and Chatroulette.
+
+## Key Features
+
+- **Real human matchmaking**: WebSocket-based matching connects you only with currently online, real participants — no bots, no blank screens, no mockups.
+- **1-on-1 video chat (solo mode)**: Instant pairing with another real person for a private video conversation.
+- **Group video chat (group mode)**: Dynamic tile layout for 3–4 person group conversations.
+- **Blind mode (voice first)**: Voice-first matching where cameras reveal after 30 seconds — get to know someone before seeing them.
+- **Country and region filtering**: Choose who you connect with by region.
+- **Display names**: Pick your own display name; your matched partner sees it during the chat.
+- **Skip and rematch**: Not feeling the vibe? Skip to instantly find a new match.
+- **WebRTC peer-to-peer**: Video and audio go directly between participants for zero-lag, high-quality HD video (up to 1080p).
+- **Sponsor placements**: Businesses and creators can pay to display their app, product, website, or social handle in sponsor boxes on the lobby.
+- **Age-gated and 18+**: All users must confirm they are 18+ before entering.
+- **Cross-device**: Works on desktop and mobile browsers with camera and microphone access.
+
+## How It Works
+
+1. Confirm you are 18+ and pick a display name.
+2. Choose a mode: solo (1-on-1), group, or blind (voice first).
+3. The match server finds another real, currently online participant.
+4. A WebRTC peer-to-peer connection is established directly between you and your match — video and audio never pass through a server.
+5. Chat, talk, and skip to find a new match anytime.
+
+## Technology
+
+- Frontend: React, Vite, TypeScript, Tailwind CSS
+- Backend: Node.js WebSocket match server (Railway), Supabase (auth, profiles)
+- Real-time video: WebRTC peer-to-peer
+- Payments: Stripe for sponsor placements
+- Deployed at https://www.facefrenzy.fun
+
+## Pages
+
+- [Home / Lobby](https://www.facefrenzy.fun/): Mode picker, webcam preview, sponsor boxes, and start button.
+- [Match / Searching](https://www.facefrenzy.fun/match): Radar animation while the server finds a real match.
+- [Chat Room](https://www.facefrenzy.fun/chat): Live 1-on-1 or group video chat with controls for skip, mute, and camera toggle.
+
+## Links
+
+- [Website](https://www.facefrenzy.fun)
+- [Sponsor a placement](https://www.facefrenzy.fun)
+- [Privacy](https://www.facefrenzy.fun)
+- [Terms](https://www.facefrenzy.fun)
+
+## FAQ
+
+**Is FaceFrenzy free?**
+Yes, video chat is completely free. Sponsor placements are paid.
+
+**Is FaceFrenzy like Omegle?**
+Yes — FaceFrenzy is a modern alternative to Omegle with real-human-only matching, multiple chat modes, and HD video.
+
+**Are the people real?**
+Yes. FaceFrenzy only matches you with currently connected, real participants. There are no bots or mockups.
+
+**Do I need to download an app?**
+No. FaceFrenzy works directly in your browser on desktop and mobile.
