@@ -99,6 +99,7 @@ const server = http.createServer(async (req, res) => {
             product_data: {
               name: `Sponsor Box — ${days} day${days > 1 ? "s" : ""}`,
               description: `FaceFrenzy sponsor box for "${label}"`,
+              tax_code: "txcd_10000000", // general - digital services
             },
             unit_amount: 500, // $5.00 per day
           },
