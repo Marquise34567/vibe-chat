@@ -700,23 +700,31 @@ const StartTab = () => {
       </div>
 
       {/* ═══════════════════════════════════════════════════
-          SPONSOR BOXES — right side of lobby
+          SPONSOR BOXES — right side of lobby, prominent
       ═══════════════════════════════════════════════════ */}
       <div style={{
-        position: "fixed", right: 12, top: "50%", transform: "translateY(-50%)",
-        display: "flex", flexDirection: "column", gap: 8, zIndex: 50,
+        position: "fixed", right: 14, top: "50%", transform: "translateY(-50%)",
+        display: "flex", flexDirection: "column", gap: 10, zIndex: 50,
       }}>
-        {/* Label */}
+        {/* Header */}
         <div style={{
-          fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.3)",
-          textTransform: "uppercase", letterSpacing: 1.5, textAlign: "center", marginBottom: 2,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 2, marginBottom: 4,
         }}>
-          Sponsors
+          <div style={{
+            fontSize: 11, fontWeight: 900, color: "#FFD60A",
+            textTransform: "uppercase", letterSpacing: 2, textAlign: "center",
+            textShadow: "0 1px 8px rgba(255,214,10,0.4)",
+          }}>
+            Sponsors
+          </div>
+          <div style={{ width: 24, height: 2, borderRadius: 1, background: "rgba(255,214,10,0.4)" }} />
         </div>
+
         {/* 4 sponsor boxes */}
         {[0, 1, 2, 3].map((i) => {
           const sponsor = sponsors[i];
           const preview = sponsor?.preview;
+          const isEmpty = !sponsor;
           return (
             <button
               key={i}
@@ -728,46 +736,84 @@ const StartTab = () => {
                 }
               }}
               style={{
-                width: 72, height: 72, borderRadius: 14,
+                width: 88, height: 88, borderRadius: 16,
                 background: sponsor
-                  ? "linear-gradient(135deg, rgba(255,214,10,0.15), rgba(107,76,255,0.15))"
-                  : "rgba(255,255,255,0.04)",
+                  ? "linear-gradient(135deg, rgba(255,214,10,0.18), rgba(107,76,255,0.12))"
+                  : "rgba(255,255,255,0.03)",
                 border: sponsor
-                  ? "1px solid rgba(255,214,10,0.3)"
-                  : "1px solid rgba(255,255,255,0.08)",
+                  ? "1.5px solid rgba(255,214,10,0.35)"
+                  : "1px dashed rgba(255,255,255,0.12)",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", gap: 3, padding: 4, overflow: "hidden",
-                transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s",
+                cursor: "pointer", gap: 4, padding: 6, overflow: "hidden",
+                transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.3s",
                 backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                boxShadow: sponsor ? "0 4px 20px rgba(255,214,10,0.1)" : "none",
+                position: "relative",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.06)";
+                if (isEmpty) e.currentTarget.style.borderColor = "rgba(255,214,10,0.4)";
+              }}
               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                if (isEmpty) e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+              }}
             >
               {sponsor ? (
                 <>
                   {/* Preview image or favicon */}
                   {preview?.image ? (
-                    <img src={preview.image} alt="" style={{ width: 28, height: 28, borderRadius: 7, objectFit: "cover" }}
+                    <img src={preview.image} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : preview?.favicon ? (
-                    <img src={preview.favicon} alt="" style={{ width: 22, height: 22, borderRadius: 5 }}
+                    <img src={preview.favicon} alt="" style={{ width: 28, height: 28, borderRadius: 6 }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  ) : null}
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#FFD60A", textAlign: "center", padding: "0 2px", lineHeight: 1.15, maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  ) : (
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(255,214,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔗</div>
+                  )}
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#FFD60A", textAlign: "center", padding: "0 2px", lineHeight: 1.15, maxWidth: 76, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {preview?.title || sponsor.label}
                   </span>
+                  {/* Sponsored badge */}
+                  <span style={{ position: "absolute", top: 3, right: 3, fontSize: 6, fontWeight: 700, color: "rgba(255,214,10,0.5)", textTransform: "uppercase", letterSpacing: 0.5 }}>ad</span>
                 </>
               ) : (
                 <>
-                  <PlusIcon style={{ width: 20, height: 20, color: "rgba(255,255,255,0.25)" }} />
-                  <span style={{ fontSize: 7, color: "rgba(255,255,255,0.2)", fontWeight: 600 }}>ADD</span>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 14,
+                    background: "rgba(255,214,10,0.08)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <PlusIcon style={{ width: 16, height: 16, color: "rgba(255,214,10,0.4)" }} />
+                  </div>
+                  <span style={{ fontSize: 8, color: "rgba(255,214,10,0.4)", fontWeight: 700, textAlign: "center", lineHeight: 1.2 }}>
+                    Your ad<br />here
+                  </span>
                 </>
               )}
             </button>
           );
         })}
+
+        {/* CTA below boxes */}
+        <button
+          onClick={() => setShowSponsorSheet(true)}
+          style={{
+            width: 88, padding: "6px 0", borderRadius: 10,
+            background: "rgba(255,214,10,0.1)", border: "1px solid rgba(255,214,10,0.2)",
+            color: "#FFD60A", fontSize: 9, fontWeight: 800, cursor: "pointer",
+            textTransform: "uppercase", letterSpacing: 0.5,
+            transition: "transform 0.2s ease, background 0.2s ease",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.background = "rgba(255,214,10,0.18)"; }}
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = "rgba(255,214,10,0.1)"; }}
+        >
+          Become a Sponsor
+        </button>
       </div>
 
       {/* ═══════════════════════════════════════════════════
