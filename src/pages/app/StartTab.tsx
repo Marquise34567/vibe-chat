@@ -71,7 +71,17 @@ const StartTab = () => {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
-  const [sponsors, setSponsors] = useState<{ label: string; link: string; preview?: { title?: string; description?: string; image?: string; favicon?: string } }[]>([]);
+  const [sponsors, setSponsors] = useState<{ label: string; link: string; preview?: { title?: string; description?: string; image?: string; favicon?: string } }[]>(() => {
+    try {
+      const saved = localStorage.getItem("ff_sponsors");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Persist sponsors to localStorage whenever they change
+  useEffect(() => {
+    try { localStorage.setItem("ff_sponsors", JSON.stringify(sponsors)); } catch {}
+  }, [sponsors]);
   const scholarVerified = getScholarVerified();
 
   const { videoRef, status: camStatus, error: camError, start: camStart, stop: camStop } = useWebcam();
@@ -95,19 +105,27 @@ const StartTab = () => {
     if (sponsorSuccess === "success") {
       const label = searchParams.get("label");
       const link = searchParams.get("link");
-      if (label && link && sponsors.length < 4) {
-        // Fetch preview metadata from the URL
+      if (label && link) {
+        // Add sponsor IMMEDIATELY (before preview fetch) so it shows right away
+        const newSponsor = { label, link };
+        setSponsors((prev) => {
+          if (prev.length >= 4) return prev;
+          if (prev.some(s => s.link === link)) return prev; // don't double-add
+          return [...prev, newSponsor];
+        });
+        toast.success("Payment successful! Your sponsor is live! 🎉");
+
+        // Fetch preview in background and update the sponsor with it
         const serverUrl = import.meta.env.VITE_MATCH_SERVER_URL?.replace("ws", "http").replace("wss", "https") ?? "http://localhost:8090";
         fetch(`${serverUrl}/api/fetch-preview`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: link }),
         }).then(r => r.json()).then(preview => {
-          setSponsors([...sponsors, { label, link, preview: preview.title ? preview : undefined }]);
-        }).catch(() => {
-          setSponsors([...sponsors, { label, link }]);
-        });
-        toast.success("Payment successful! Your sponsor is live! 🎉");
+          if (preview.title || preview.image || preview.favicon) {
+            setSponsors((prev) => prev.map(s => s.link === link ? { ...s, preview } : s));
+          }
+        }).catch(() => {});
       }
       // Clean URL
       searchParams.delete("sponsor");
