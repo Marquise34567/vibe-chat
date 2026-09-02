@@ -90,9 +90,20 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const totalCents = days * 500; // $5/day = 500 cents/day
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
-        line_items: [{ price: SPONSOR_PRICE_ID, quantity: days }],
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Sponsor Box — ${days} day${days > 1 ? "s" : ""}`,
+              description: `FaceFrenzy sponsor box for "${label}"`,
+            },
+            unit_amount: 500, // $5.00 per day
+          },
+          quantity: days,
+        }],
         success_url: `${FRONTEND_URL}/?sponsor=success&label=${encodeURIComponent(label)}&link=${encodeURIComponent(link)}&days=${days}`,
         cancel_url: `${FRONTEND_URL}/?sponsor=cancelled`,
         metadata: { label, link, days: String(days) },
