@@ -29,14 +29,19 @@ const Match = () => {
   }, []);
 
   // Start searching via WebSocket on mount.
+  // Runs every time Match mounts (including after skip navigates back here).
   useEffect(() => {
     setDisplayName(getDisplayName());
-    search({
-      mode,
-      gender: gender === "Any" ? "any" : gender,
-      scholarOnly,
-      countries,
-    });
+    // Small delay to let the skip transition settle
+    const t = setTimeout(() => {
+      search({
+        mode,
+        gender: gender === "Any" ? "any" : gender,
+        scholarOnly,
+        countries,
+      });
+    }, 100);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
