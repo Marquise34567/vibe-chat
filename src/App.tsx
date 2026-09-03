@@ -18,6 +18,11 @@ import Match from "./pages/Match";
 import ChatRoom from "./pages/ChatRoom";
 import Plus from "./pages/Plus";
 import NotFound from "./pages/NotFound";
+import OmegleAlternative from "./pages/seo/OmegleAlternative";
+import TalkToStrangers from "./pages/seo/TalkToStrangers";
+import Safety from "./pages/seo/Safety";
+import { VSOmeTV, VSEmeraldChat, VSChatroulette, VSMonkey } from "./pages/seo/vs/VSPages";
+import IsOmegleBack from "./pages/blog/IsOmegleBack";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +63,16 @@ const App = () => {
                 <Route path="/chat/:otherId" element={<ChatRoom />} />
               </Route>
               <Route path="/plus" element={<Plus />} />
+
+              {/* SEO / landing pages */}
+              <Route path="/omegle-alternative" element={<OmegleAlternative />} />
+              <Route path="/talk-to-strangers" element={<TalkToStrangers />} />
+              <Route path="/safety" element={<Safety />} />
+              <Route path="/vs/ometv" element={<VSOmeTV />} />
+              <Route path="/vs/emerald-chat" element={<VSEmeraldChat />} />
+              <Route path="/vs/chatroulette" element={<VSChatroulette />} />
+              <Route path="/vs/monkey" element={<VSMonkey />} />
+              <Route path="/blog/is-omegle-back" element={<IsOmegleBack />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
