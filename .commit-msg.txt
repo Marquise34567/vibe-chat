@@ -1,13 +1,9 @@
-Stack video tiles vertically on mobile + add SEO pages
+Fix mobile video layout: use CSS media queries instead of JS hook
 
-VideoTileLayout now uses useIsMobile to switch flex direction:
-- 2 people: top/bottom on mobile, left/right on desktop
-- 3 people: stranger on top row, you+friend on bottom row (mobile)
-- 4 people: 2x2 grid on mobile, 2v2 stacked on desktop
-
-Also adds SEO pages (omegle-alternative, talk-to-strangers, safety,
-vs/ometv, vs/emerald-chat, vs/chatroulette, vs/monkey, blog/is-omegle-back),
-serverless sitemap/robots endpoints, and updated metadata.
+Switched from useIsMobile JS hook to Tailwind responsive classes
+(flex-col md:flex-row, h-1/2 md:w-1/2). This fixes the side-by-side
+layout persisting on mobile due to the hook's initial false state
+and avoids the flash of incorrect layout on first render.
 
 Generated with [Devin](https://devin.ai)
 

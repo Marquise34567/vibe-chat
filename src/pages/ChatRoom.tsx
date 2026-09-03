@@ -14,7 +14,7 @@ import { GlassCard, GlassCircleButton, GlassSheet } from "@/components/glass";
 import { GamePicker } from "@/components/games/GamePicker";
 import { AttentionCheck } from "@/components/AttentionCheck";
 import { useAttentionTracking } from "@/hooks/useAttentionTracking";
-import { useIsMobile } from "@/hooks/use-mobile";
+
 import { toast } from "sonner";
 import {
   MicIcon as Mic, MicOffIcon as MicOff, CameraIcon as Video, CameraOffIcon as VideoOff,
@@ -657,8 +657,6 @@ const VideoTileLayout = ({
   mode, groupSize, other, otherId, camOff, pipVideoRef, pipStatus, remoteVideoRef,
   c, otherBadge, otherSocials, translateOn, caption, onSocials,
 }: VideoTileLayoutProps) => {
-  const isMobile = useIsMobile();
-
   // Build the participant list based on mode
   const otherPerson: TilePerson = {
     id: otherId ?? "other",
@@ -677,27 +675,22 @@ const VideoTileLayout = ({
   // Group mode is dynamic: 2, 3, or 4 people. Solo is always 2. Blind is 2.
   const participantCount = mode === "group" ? Math.min(Math.max(groupSize, 2), 4) : 2;
 
-  // Shared container style — switches axis based on viewport.
-  // Portrait phones are tall, so we stack tiles top/bottom; desktop keeps the
-  // side-by-side layout that was already there.
-  const containerStyle: React.CSSProperties = {
-    background: "#111119",
-    flexDirection: isMobile ? "column" : "row",
-  };
+  // Responsive layout via Tailwind classes — no JS viewport detection needed.
+  // Mobile (portrait): tiles stack top/bottom (flex-col).
+  // Desktop (md+):     tiles sit side-by-side (flex-row), original behavior.
+  const containerClass =
+    "relative flex-1 rounded-2xl overflow-hidden flex flex-col md:flex-row gap-0.5 items-stretch";
 
   if (participantCount === 2) {
-    // ── 2 people: 50/50 split — left/right on desktop, top/bottom on mobile ──
-    const halfStyle: React.CSSProperties = isMobile
-      ? { height: "50%", position: "relative" }
-      : { width: "50%", position: "relative" };
+    // ── 2 people: 50/50 split — top/bottom on mobile, left/right on desktop ──
     return (
-      <div className="relative flex-1 rounded-2xl overflow-hidden flex gap-0.5 items-stretch" style={containerStyle}>
+      <div className={containerClass} style={{ background: "#111119" }}>
         {/* Other person (stranger) */}
-        <div style={halfStyle}>
+        <div className="h-1/2 md:h-auto md:w-1/2 relative">
           <VideoTile person={otherPerson} gradientSeed={otherId ?? "x"} remoteVideoRef={remoteVideoRef} translateOn={translateOn} caption={caption} onSocials={onSocials} />
         </div>
         {/* You */}
-        <div style={halfStyle}>
+        <div className="h-1/2 md:h-auto md:w-1/2 relative">
           <VideoTile person={you} camOff={camOff} pipVideoRef={pipVideoRef} pipStatus={pipStatus} />
         </div>
       </div>
@@ -706,29 +699,20 @@ const VideoTileLayout = ({
 
   if (participantCount === 3) {
     // ── 3 people (group of 3) ──
-    // Desktop: stranger gets own full-height 50% container on the left,
-    //          you + friend side-by-side on the right (50%).
-    // Mobile:  stranger gets the top 50% row, you + friend share the bottom 50%
-    //          row side-by-side. This keeps the stranger tile large and avoids
-    //          three vertically stacked tiles becoming too short on a phone.
-    const mainAxisStyle: React.CSSProperties = isMobile
-      ? { height: "50%", position: "relative" }
-      : { width: "50%", position: "relative" };
-    const subContainerStyle: React.CSSProperties = isMobile
-      ? { height: "50%", display: "flex", gap: 2 }
-      : { width: "50%", display: "flex", gap: 2 };
+    // Desktop: stranger full-height on left 50%, you + friend side-by-side on right 50%.
+    // Mobile:  stranger on top 50% row, you + friend share bottom 50% row side-by-side.
     return (
-      <div className="relative flex-1 rounded-2xl overflow-hidden flex gap-0.5 items-stretch" style={containerStyle}>
+      <div className={containerClass} style={{ background: "#111119" }}>
         {/* Stranger — own full container */}
-        <div style={mainAxisStyle}>
+        <div className="h-1/2 md:h-auto md:w-1/2 relative">
           <VideoTile person={otherPerson} gradientSeed={otherId ?? "x"} remoteVideoRef={remoteVideoRef} translateOn={translateOn} caption={caption} onSocials={onSocials} />
         </div>
         {/* You + friend side by side */}
-        <div style={subContainerStyle}>
-          <div style={{ width: "50%", position: "relative" }}>
+        <div className="h-1/2 md:h-auto md:w-1/2 flex gap-0.5">
+          <div className="w-1/2 relative">
             <VideoTile person={you} camOff={camOff} pipVideoRef={pipVideoRef} pipStatus={pipStatus} />
           </div>
-          <div style={{ width: "50%", position: "relative" }}>
+          <div className="w-1/2 relative">
             <VideoTile person={{ id: "friend", name: "Friend", isFriend: true }} gradientSeed="friend" />
           </div>
         </div>
@@ -738,32 +722,25 @@ const VideoTileLayout = ({
 
   // ── 4 people (group of 4) ──
   // Desktop: 2v2 — 50/50 left/right, each side stacked top/bottom 50/50.
-  // Mobile:  2x2 grid — two rows of two tiles. Stranger's team on top,
-  //          your team on bottom. Keeps every tile usable on a portrait screen
-  //          instead of cramming four narrow columns.
-  const sideStyle: React.CSSProperties = isMobile
-    ? { height: "50%", display: "flex", gap: 2 }
-    : { width: "50%", display: "flex", flexDirection: "column", gap: 2 };
-  const tileHalfStyle: React.CSSProperties = isMobile
-    ? { width: "50%", position: "relative" }
-    : { height: "50%", position: "relative" };
+  // Mobile:  2x2 grid — two rows of two tiles. Stranger's team on top row,
+  //          your team on bottom row.
   return (
-    <div className="relative flex-1 rounded-2xl overflow-hidden flex gap-0.5 items-stretch" style={containerStyle}>
+    <div className={containerClass} style={{ background: "#111119" }}>
       {/* Stranger's team: stranger + their friend */}
-      <div style={sideStyle}>
-        <div style={tileHalfStyle}>
+      <div className="h-1/2 md:h-auto md:w-1/2 flex flex-row md:flex-col gap-0.5">
+        <div className="w-1/2 md:w-auto md:h-1/2 relative">
           <VideoTile person={otherPerson} gradientSeed={otherId ?? "x"} remoteVideoRef={remoteVideoRef} translateOn={translateOn} caption={caption} onSocials={onSocials} />
         </div>
-        <div style={tileHalfStyle}>
+        <div className="w-1/2 md:w-auto md:h-1/2 relative">
           <VideoTile person={{ id: "stranger-friend", name: "Their Friend", isFriend: true }} gradientSeed="stranger-friend" />
         </div>
       </div>
       {/* Your team: you + your friend */}
-      <div style={sideStyle}>
-        <div style={tileHalfStyle}>
+      <div className="h-1/2 md:h-auto md:w-1/2 flex flex-row md:flex-col gap-0.5">
+        <div className="w-1/2 md:w-auto md:h-1/2 relative">
           <VideoTile person={you} camOff={camOff} pipVideoRef={pipVideoRef} pipStatus={pipStatus} />
         </div>
-        <div style={tileHalfStyle}>
+        <div className="w-1/2 md:w-auto md:h-1/2 relative">
           <VideoTile person={{ id: "friend", name: "Friend", isFriend: true }} gradientSeed="friend" />
         </div>
       </div>
