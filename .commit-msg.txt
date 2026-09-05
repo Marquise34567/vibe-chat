@@ -1,4 +1,4 @@
-Add Google Analytics GA4 tag (G-NQSCTN0175) to index.html
+Add Dashly analytics script to index.html
 
 Generated with [Devin](https://devin.ai)
 
