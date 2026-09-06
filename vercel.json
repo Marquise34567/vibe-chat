@@ -6,6 +6,14 @@
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/robots.txt", "destination": "/api/robots" },
+    { "source": "/omegle-alternative", "destination": "/api/ssr" },
+    { "source": "/talk-to-strangers", "destination": "/api/ssr" },
+    { "source": "/safety", "destination": "/api/ssr" },
+    { "source": "/vs/ometv", "destination": "/api/ssr" },
+    { "source": "/vs/emerald-chat", "destination": "/api/ssr" },
+    { "source": "/vs/chatroulette", "destination": "/api/ssr" },
+    { "source": "/vs/monkey", "destination": "/api/ssr" },
+    { "source": "/blog/is-omegle-back", "destination": "/api/ssr" },
     { "source": "/((?!llms.txt|facefrenzy2026.txt).*)", "destination": "/" }
   ],
   "headers": [
