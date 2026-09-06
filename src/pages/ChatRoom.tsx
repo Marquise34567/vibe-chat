@@ -380,22 +380,37 @@ const ChatRoom = () => {
             </div>
           ) : (
             /* ── Tile layout based on participant count ── */
-            <VideoTileLayout
-              mode={mode}
-              groupSize={parseInt(params.get("groupSize") ?? "2", 10) || 2}
-              other={other}
-              otherId={otherId}
-              camOff={camOff}
-              pipVideoRef={pipVideoRef}
-              pipStatus={pipStatus}
-              remoteVideoRef={remoteVideoRef}
-              c={c}
-              otherBadge={otherBadge}
-              otherSocials={otherSocials}
-              translateOn={translateOn}
-              caption={caption}
-              onSocials={() => setShowSocials(true)}
-            />
+            <div className="relative flex-1">
+              <VideoTileLayout
+                mode={mode}
+                groupSize={parseInt(params.get("groupSize") ?? "2", 10) || 2}
+                other={other}
+                otherId={otherId}
+                camOff={camOff}
+                pipVideoRef={pipVideoRef}
+                pipStatus={pipStatus}
+                remoteVideoRef={remoteVideoRef}
+                c={c}
+                otherBadge={otherBadge}
+                otherSocials={otherSocials}
+                translateOn={translateOn}
+                caption={caption}
+                onSocials={() => setShowSocials(true)}
+              />
+              {/* FaceFrenzy watermark — like Omegle's, bottom-right of video stage */}
+              <div className="absolute bottom-2 right-2 pointer-events-none select-none z-10">
+                <span
+                  className="font-black tracking-tight text-white/70 text-sm md:text-base drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
+                  style={{
+                    fontFamily: "Unbounded, system-ui, sans-serif",
+                    letterSpacing: "-0.04em",
+                    textShadow: "0 0 12px rgba(107,76,255,0.4)",
+                  }}
+                >
+                  face<span className="text-white/50">frenzy</span>
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Timer — below the video tiles */}
