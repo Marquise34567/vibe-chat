@@ -380,7 +380,7 @@ const ChatRoom = () => {
             </div>
           ) : (
             /* ── Tile layout based on participant count ── */
-            <div className="relative flex-1">
+            <div className="relative flex-1 flex flex-col">
               <VideoTileLayout
                 mode={mode}
                 groupSize={parseInt(params.get("groupSize") ?? "2", 10) || 2}
