@@ -10,16 +10,26 @@ export const SEOPage = ({
   subtitle,
   children,
   faqSchema,
+  articleSchema,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
   faqSchema?: object[];
+  articleSchema?: object;
 }) => {
   const navigate = useNavigate();
 
   return (
     <div style={{ minHeight: "100dvh", background: "#050508", color: "#fff", display: "flex", flexDirection: "column" }}>
+      {/* Article schema */}
+      {articleSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+        />
+      )}
+
       {/* FAQ schema */}
       {faqSchema && (
         <script
@@ -182,3 +192,59 @@ export const faqToJson = (items: { q: string; a: string }[]) =>
     name: item.q,
     acceptedAnswer: { "@type": "Answer" as const, text: item.a },
   }));
+
+// ── Article byline (named author + last updated date for E-E-A-T) ──
+export const ArticleMeta = ({ author, role, updated }: { author: string; role: string; updated: string }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #7C5CFF, #FF4D8D)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{author.charAt(0)}</span>
+    </div>
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{author}</div>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{role} · Updated {updated}</div>
+    </div>
+  </div>
+);
+
+// ── Build Article schema for JSON-LD ──
+export const buildArticleSchema = ({
+  headline,
+  description,
+  author,
+  authorUrl,
+  datePublished,
+  dateModified,
+  url,
+}: {
+  headline: string;
+  description: string;
+  author: string;
+  authorUrl?: string;
+  datePublished: string;
+  dateModified: string;
+  url: string;
+}) => ({
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline,
+  description,
+  author: {
+    "@type": "Person",
+    name: author,
+    ...(authorUrl ? { url: authorUrl } : {}),
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "FaceFrenzy",
+    logo: {
+      "@type": "ImageObject",
+      url: "https://www.facefrenzy.fun/favicon.svg",
+    },
+  },
+  datePublished,
+  dateModified,
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": url,
+  },
+});
