@@ -62,6 +62,90 @@ const SEO_ROUTES: Record<string, SeoMeta> = {
     description:
       "Is Omegle coming back in 2026? The full story and the best Omegle alternatives to use right now — FaceFrenzy, free random video chat with real people.",
   },
+  "/vs/bazoocam": {
+    path: "/vs/bazoocam",
+    title: "Bazoocam Alternative — Better Than Bazoocam? | FaceFrenzy",
+    description:
+      "Looking for a Bazoocam alternative? FaceFrenzy is free random video chat with real people — no bots, AI moderated, 16+, group and blind modes. No signup.",
+  },
+  "/vs/chatspin": {
+    path: "/vs/chatspin",
+    title: "Chatspin Alternative — Better Than Chatspin? | FaceFrenzy",
+    description:
+      "Looking for a Chatspin alternative? FaceFrenzy is free random video chat with real people — no bots, no paywall, AI moderated, 16+, group and blind modes.",
+  },
+  "/vs/chatrandom": {
+    path: "/vs/chatrandom",
+    title: "Chatrandom Alternative — Better Than Chatrandom? | FaceFrenzy",
+    description:
+      "Looking for a Chatrandom alternative? FaceFrenzy is free random video chat with real people — no bots, AI moderated, 16+, group and blind modes. No signup.",
+  },
+  "/vs/shagle": {
+    path: "/vs/shagle",
+    title: "Shagle Alternative — Better Than Shagle? | FaceFrenzy",
+    description:
+      "Looking for a Shagle alternative? FaceFrenzy is free random video chat with real people — no bots, no paywall, AI moderated, 16+, group and blind modes.",
+  },
+  "/vs/camsurf": {
+    path: "/vs/camsurf",
+    title: "CamSurf Alternative — Better Than CamSurf? | FaceFrenzy",
+    description:
+      "Looking for a CamSurf alternative? FaceFrenzy is free random video chat with real people — no bots, AI moderated, 16+, group and blind modes. No signup.",
+  },
+  "/vs/joingy": {
+    path: "/vs/joingy",
+    title: "Joingy Alternative — Better Than Joingy? | FaceFrenzy",
+    description:
+      "Looking for a Joingy alternative? FaceFrenzy is free random video chat with real people — no bots, AI moderated, 16+, group and blind modes. No signup.",
+  },
+  "/blog/what-happened-to-omegle": {
+    path: "/blog/what-happened-to-omegle",
+    title: "What Happened to Omegle? (2026) — Why It Shut Down & What Replaced It",
+    description:
+      "What happened to Omegle? Omegle shut down permanently in November 2023. Here's the full story of why it closed, what happened to its users, and what replaced it.",
+  },
+  "/blog/best-random-video-chat-2026": {
+    path: "/blog/best-random-video-chat-2026",
+    title: "Best Random Video Chat Sites 2026 — Ranked & Reviewed | FaceFrenzy",
+    description:
+      "The best random video chat sites in 2026, ranked by safety, features, and bot-free experience. See why FaceFrenzy is the #1 Omegle alternative.",
+  },
+  "/blog/how-to-stay-safe": {
+    path: "/blog/how-to-stay-safe",
+    title: "How to Stay Safe on Random Video Chat (2026 Guide) | FaceFrenzy",
+    description:
+      "How to stay safe on random video chat in 2026. Privacy tips, red flags to watch for, and how to choose a safe platform. Complete safety guide from FaceFrenzy.",
+  },
+  "/blog/omegle-alternative-no-signup": {
+    path: "/blog/omegle-alternative-no-signup",
+    title: "Omegle Alternative No Signup — Free Video Chat Without Registration | FaceFrenzy",
+    description:
+      "Omegle alternative with no signup required. Free random video chat without registration — no email, no account. AI moderated, 16+, zero bots. Start in seconds.",
+  },
+  "/free-omegle-alternative": {
+    path: "/free-omegle-alternative",
+    title: "Free Omegle Alternative — 100% Free Random Video Chat | FaceFrenzy",
+    description:
+      "The best free Omegle alternative. 100% free random video chat with real people — no bots, no paywall, no signup. AI moderated, 16+, group and blind modes.",
+  },
+  "/anonymous-video-chat": {
+    path: "/anonymous-video-chat",
+    title: "Anonymous Video Chat — Free, No Signup, No Tracking | FaceFrenzy",
+    description:
+      "Free anonymous video chat with strangers worldwide. No signup, no email, no tracking. AI moderated, 16+, WebRTC encrypted. Start chatting in seconds.",
+  },
+  "/random-cam-chat": {
+    path: "/random-cam-chat",
+    title: "Random Cam Chat — Free Webcam Chat with Strangers | FaceFrenzy",
+    description:
+      "Free random cam chat with strangers worldwide. No signup, no bots, AI moderated. Webcam chat with real people in seconds. 16+, group and blind modes.",
+  },
+  "/1v1-video-chat": {
+    path: "/1v1-video-chat",
+    title: "1v1 Video Chat — Free 1-on-1 Random Video Call | FaceFrenzy",
+    description:
+      "Free 1v1 video chat with random strangers. No bots, no signup, AI moderated. Start a 1-on-1 random video call in seconds. 16+, HD quality, works in browser.",
+  },
 };
 
 // Edge function that serves the SPA index.html with per-route <title>,

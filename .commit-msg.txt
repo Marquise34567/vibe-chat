@@ -1,0 +1,24 @@
+Add 14 new SEO pages targeting low-competition keywords
+
+Landing pages (4):
+- /free-omegle-alternative
+- /anonymous-video-chat
+- /random-cam-chat
+- /1v1-video-chat
+
+Competitor VS pages (6):
+- /vs/bazoocam, /vs/chatspin, /vs/chatrandom
+- /vs/shagle, /vs/camsurf, /vs/joingy
+
+Blog posts (4):
+- /blog/what-happened-to-omegle
+- /blog/best-random-video-chat-2026
+- /blog/how-to-stay-safe
+- /blog/omegle-alternative-no-signup
+
+Also updates SSR metadata, sitemap, vercel.json routes,
+and SEO page footer links to include all new pages.
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

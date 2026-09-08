@@ -9,7 +9,21 @@ export default function handler(req, res) {
   <url><loc>https://www.facefrenzy.fun/vs/emerald-chat</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://www.facefrenzy.fun/vs/chatroulette</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://www.facefrenzy.fun/vs/monkey</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/vs/bazoocam</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/vs/chatspin</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/vs/chatrandom</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/vs/shagle</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/vs/camsurf</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/vs/joingy</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.facefrenzy.fun/free-omegle-alternative</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.facefrenzy.fun/anonymous-video-chat</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.facefrenzy.fun/random-cam-chat</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.facefrenzy.fun/1v1-video-chat</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.facefrenzy.fun/blog/is-omegle-back</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.facefrenzy.fun/blog/what-happened-to-omegle</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.facefrenzy.fun/blog/best-random-video-chat-2026</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.facefrenzy.fun/blog/how-to-stay-safe</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.facefrenzy.fun/blog/omegle-alternative-no-signup</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
 </urlset>`;
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");

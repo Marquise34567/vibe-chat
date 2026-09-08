@@ -71,12 +71,27 @@ export const SEOPage = ({
       <footer style={{ padding: "24px 20px", borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: "center" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginBottom: 12 }}>
           <FooterLink href="/omegle-alternative" label="Omegle Alternative" navigate={navigate} />
+          <FooterLink href="/free-omegle-alternative" label="Free Omegle Alternative" navigate={navigate} />
           <FooterLink href="/talk-to-strangers" label="Talk to Strangers" navigate={navigate} />
+          <FooterLink href="/anonymous-video-chat" label="Anonymous Video Chat" navigate={navigate} />
+          <FooterLink href="/random-cam-chat" label="Random Cam Chat" navigate={navigate} />
+          <FooterLink href="/1v1-video-chat" label="1v1 Video Chat" navigate={navigate} />
           <FooterLink href="/safety" label="Safety" navigate={navigate} />
           <FooterLink href="/vs/ometv" label="OmeTV Alternative" navigate={navigate} />
           <FooterLink href="/vs/emerald-chat" label="Emerald Chat Alternative" navigate={navigate} />
           <FooterLink href="/vs/chatroulette" label="Chatroulette Alternative" navigate={navigate} />
           <FooterLink href="/vs/monkey" label="Monkey App Alternative" navigate={navigate} />
+          <FooterLink href="/vs/bazoocam" label="Bazoocam Alternative" navigate={navigate} />
+          <FooterLink href="/vs/chatspin" label="Chatspin Alternative" navigate={navigate} />
+          <FooterLink href="/vs/chatrandom" label="Chatrandom Alternative" navigate={navigate} />
+          <FooterLink href="/vs/shagle" label="Shagle Alternative" navigate={navigate} />
+          <FooterLink href="/vs/camsurf" label="CamSurf Alternative" navigate={navigate} />
+          <FooterLink href="/vs/joingy" label="Joingy Alternative" navigate={navigate} />
+          <FooterLink href="/blog/is-omegle-back" label="Is Omegle Back?" navigate={navigate} />
+          <FooterLink href="/blog/what-happened-to-omegle" label="What Happened to Omegle" navigate={navigate} />
+          <FooterLink href="/blog/best-random-video-chat-2026" label="Best Random Video Chat 2026" navigate={navigate} />
+          <FooterLink href="/blog/how-to-stay-safe" label="How to Stay Safe" navigate={navigate} />
+          <FooterLink href="/blog/omegle-alternative-no-signup" label="Omegle Alternative No Signup" navigate={navigate} />
         </div>
         <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>© 2026 FaceFrenzy. Random video chat with real people. 16+ only.</p>
       </footer>

@@ -21,8 +21,16 @@ import NotFound from "./pages/NotFound";
 import OmegleAlternative from "./pages/seo/OmegleAlternative";
 import TalkToStrangers from "./pages/seo/TalkToStrangers";
 import Safety from "./pages/seo/Safety";
-import { VSOmeTV, VSEmeraldChat, VSChatroulette, VSMonkey } from "./pages/seo/vs/VSPages";
+import { VSOmeTV, VSEmeraldChat, VSChatroulette, VSMonkey, VSBazoocam, VSChatspin, VSChatrandom, VSShagle, VSCamSurf, VSJoingy } from "./pages/seo/vs/VSPages";
 import IsOmegleBack from "./pages/blog/IsOmegleBack";
+import WhatHappenedToOmegle from "./pages/blog/WhatHappenedToOmegle";
+import BestRandomVideoChat2026 from "./pages/blog/BestRandomVideoChat2026";
+import HowToStaySafe from "./pages/blog/HowToStaySafe";
+import OmegleAlternativeNoSignup from "./pages/blog/OmegleAlternativeNoSignup";
+import FreeOmegleAlternative from "./pages/seo/FreeOmegleAlternative";
+import AnonymousVideoChat from "./pages/seo/AnonymousVideoChat";
+import RandomCamChat from "./pages/seo/RandomCamChat";
+import OneOnOneVideoChat from "./pages/seo/OneOnOneVideoChat";
 
 const queryClient = new QueryClient();
 
@@ -72,7 +80,21 @@ const App = () => {
               <Route path="/vs/emerald-chat" element={<VSEmeraldChat />} />
               <Route path="/vs/chatroulette" element={<VSChatroulette />} />
               <Route path="/vs/monkey" element={<VSMonkey />} />
+              <Route path="/vs/bazoocam" element={<VSBazoocam />} />
+              <Route path="/vs/chatspin" element={<VSChatspin />} />
+              <Route path="/vs/chatrandom" element={<VSChatrandom />} />
+              <Route path="/vs/shagle" element={<VSShagle />} />
+              <Route path="/vs/camsurf" element={<VSCamSurf />} />
+              <Route path="/vs/joingy" element={<VSJoingy />} />
               <Route path="/blog/is-omegle-back" element={<IsOmegleBack />} />
+              <Route path="/blog/what-happened-to-omegle" element={<WhatHappenedToOmegle />} />
+              <Route path="/blog/best-random-video-chat-2026" element={<BestRandomVideoChat2026 />} />
+              <Route path="/blog/how-to-stay-safe" element={<HowToStaySafe />} />
+              <Route path="/blog/omegle-alternative-no-signup" element={<OmegleAlternativeNoSignup />} />
+              <Route path="/free-omegle-alternative" element={<FreeOmegleAlternative />} />
+              <Route path="/anonymous-video-chat" element={<AnonymousVideoChat />} />
+              <Route path="/random-cam-chat" element={<RandomCamChat />} />
+              <Route path="/1v1-video-chat" element={<OneOnOneVideoChat />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
