@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /match
-Disallow: /chat/
-
-Sitemap: https://www.facefrenzy.fun/sitemap.xml

@@ -1,15 +1,11 @@
-Rewrite all 5 blog posts with 2026 ranking structure
+Fix sitemap not fetching in Google Search Console
 
-- Direct-answer leads in first 80 words
-- Self-contained answer blocks under each H2 (134-167 words)
-- Named entities (Leif K-Brooks, OmeTV, Monkey, specific traffic numbers)
-- Named author (Maya Chen, Random Video Chat Analyst) with byline
-- Article schema (JSON-LD) on every blog post
-- FAQPage schema preserved
-- "Updated September 2026" date markers for freshness signal
-- Sub-question coverage for query fan-out
-- Original data (industry traffic figures, platform comparisons)
-- Internal cross-linking between blog posts and landing pages
+- Remove static public/sitemap.xml and public/robots.txt so Vercel
+  serves them from the /api/sitemap and /api/robots serverless functions
+  instead (static files were overriding the rewrites, adding a
+  Content-Disposition header that confused Google's fetcher)
+- Add lastmod dates to every sitemap URL (Google uses lastmod to
+  determine when content changed)
 
 Generated with [Devin](https://devin.ai)
 
