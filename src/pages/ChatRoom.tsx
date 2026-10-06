@@ -14,6 +14,8 @@ import { GlassCard, GlassCircleButton, GlassSheet } from "@/components/glass";
 import { GamePicker } from "@/components/games/GamePicker";
 import { AttentionCheck } from "@/components/AttentionCheck";
 import { useAttentionTracking } from "@/hooks/useAttentionTracking";
+import { HalloweenOverlay } from "@/components/HalloweenOverlay";
+import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
 
 import { toast } from "sonner";
 import {
@@ -206,7 +208,7 @@ const ChatRoom = () => {
     if (!isBlind || blindRevealed) return;
     if (blindCountdown <= 0) {
       setBlindRevealed(true);
-      toast.success("🎈 Balloon popped! Cameras revealed!");
+      toast.success(isHalloweenSeason() ? "🎃 Pumpkin smashed! Cameras revealed!" : "🎈 Balloon popped! Cameras revealed!");
       setBalloonPopped(true);
       return;
     }
@@ -314,10 +316,15 @@ const ChatRoom = () => {
   const isGroup = mode === "group";
   const otherSocials = other?.socials ?? {};
 
+  const spooky = isHalloweenSeason();
+
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#0B0B14", color: "#fff" }}>
+    <div className="min-h-screen flex flex-col relative" style={{ background: "#0B0B14", color: "#fff" }}>
       {/* Hidden canvas for attention tracking (reads frames from the pip webcam video) */}
       <canvas ref={canvasRef} width={160} height={120} className="hidden" />
+
+      {/* Spooky season — subtle particles floating over the call UI */}
+      {spooky && <HalloweenOverlay zIndex={20} density={6} dimmed />}
 
       {/* Top bar */}
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
@@ -360,9 +367,12 @@ const ChatRoom = () => {
           {isBlind && !blindRevealed ? (
             <div className="relative flex-1 rounded-2xl overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-violet-900 via-fuchsia-900 to-rose-900" />
+              {spooky && (
+                <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 80%, ${HALLOWEEN.pumpkin}22 0%, transparent 60%)` }} />
+              )}
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
                 <div className={`text-8xl mb-4 transition-all duration-500 ${balloonPopped ? "scale-0 opacity-0" : "animate-float"}`}>
-                  🎈
+                  {spooky ? "🎃" : "🎈"}
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Blind Date</h2>
                 <p className="text-white/80 mb-4">Audio only — get to know them first!</p>
@@ -375,7 +385,7 @@ const ChatRoom = () => {
                     <div key={i} className="w-1.5 bg-white/60 rounded-full animate-wave" style={{ animationDelay: `${i * 0.1}s`, height: "100%" }} />
                   ))}
                 </div>
-                <p className="text-white/60 text-xs mt-4">Cameras reveal when the balloon pops 🎉</p>
+                <p className="text-white/60 text-xs mt-4">{spooky ? "Cameras reveal when the pumpkin smashes 🎃" : "Cameras reveal when the balloon pops 🎉"}</p>
               </div>
             </div>
           ) : (

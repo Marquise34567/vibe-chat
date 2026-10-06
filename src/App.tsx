@@ -17,6 +17,7 @@ import ProfileTab from "./pages/app/ProfileTab";
 import Match from "./pages/Match";
 import ChatRoom from "./pages/ChatRoom";
 import Plus from "./pages/Plus";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import OmegleAlternative from "./pages/seo/OmegleAlternative";
 import TalkToStrangers from "./pages/seo/TalkToStrangers";
@@ -31,6 +32,7 @@ import FreeOmegleAlternative from "./pages/seo/FreeOmegleAlternative";
 import AnonymousVideoChat from "./pages/seo/AnonymousVideoChat";
 import RandomCamChat from "./pages/seo/RandomCamChat";
 import OneOnOneVideoChat from "./pages/seo/OneOnOneVideoChat";
+import BestOmegleAlternatives from "./pages/seo/BestOmegleAlternatives";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +73,7 @@ const App = () => {
                 <Route path="/chat/:otherId" element={<ChatRoom />} />
               </Route>
               <Route path="/plus" element={<Plus />} />
+              <Route path="/admin" element={<Admin />} />
 
               {/* SEO / landing pages */}
               <Route path="/omegle-alternative" element={<OmegleAlternative />} />
@@ -95,6 +98,7 @@ const App = () => {
               <Route path="/anonymous-video-chat" element={<AnonymousVideoChat />} />
               <Route path="/random-cam-chat" element={<RandomCamChat />} />
               <Route path="/1v1-video-chat" element={<OneOnOneVideoChat />} />
+              <Route path="/best-omegle-alternatives" element={<BestOmegleAlternatives />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>

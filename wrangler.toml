@@ -1,0 +1,23 @@
+name = "facefrenzy-match"
+main = "worker/match-worker.ts"
+compatibility_date = "2025-09-17"
+
+[vars]
+FRONTEND_URL = "https://www.facefrenzy.fun"
+
+# STRIPE_SECRET_KEY is set via: npx wrangler secret put STRIPE_SECRET_KEY
+# ADMIN_KEY (optional) protects /api/analytics + /api/insights:
+#   npx wrangler secret put ADMIN_KEY
+# If unset, the endpoints are open (fine for dev, restrict before launch).
+
+# Workers AI — powers /api/insights (Llama summarizes matchmaking analytics)
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "MATCHMAKER"
+class_name = "Matchmaker"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Matchmaker"]

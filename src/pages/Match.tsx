@@ -3,6 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { getDisplayName } from "@/lib/localUser";
 import { RadarPulse, CloseIcon } from "@/components/MatchIcons";
+import { HalloweenOverlay } from "@/components/HalloweenOverlay";
+import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
+import { recordMatch, matchesLeft } from "@/lib/limits";
+import { useTier } from "@/hooks/useTier";
+import { toast } from "sonner";
 
 type Mode = "solo" | "group" | "blind";
 
@@ -16,8 +21,18 @@ const Match = () => {
   const scholarOnly = params.get("scholar") === "true";
 
   const [seconds, setSeconds] = useState(0);
+  const { tier, loading: tierLoading } = useTier();
 
   const { state: connState, onlineCount, peerId, peerName, search, cancel, setDisplayName, startCamera, localVideoRef } = useMatchConnectionContext();
+
+  // Hard paywall — free users hit the daily match cap → bounce to /plus
+  useEffect(() => {
+    if (tierLoading) return;
+    if (tier === "free" && matchesLeft() <= 0) {
+      toast.error("You're out of free matches for today");
+      navigate("/plus?reason=limit", { replace: true });
+    }
+  }, [tier, tierLoading, navigate]);
 
   // Start webcam immediately on mount (uses the shared match connection stream)
   useEffect(() => { startCamera(); }, [startCamera]);
@@ -31,6 +46,8 @@ const Match = () => {
   // Start searching via WebSocket on mount.
   // Runs every time Match mounts (including after skip navigates back here).
   useEffect(() => {
+    if (tierLoading) return; // wait for tier to resolve before deciding
+    if (tier === "free" && matchesLeft() <= 0) return; // capped — paywall redirect handles UX
     setDisplayName(getDisplayName());
     // Small delay to let the skip transition settle
     const t = setTimeout(() => {
@@ -43,11 +60,12 @@ const Match = () => {
     }, 100);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tier, tierLoading]);
 
   // Navigate to chat room ONLY when WebRTC is actually connected
   useEffect(() => {
     if (connState === "connected" && peerId) {
+      recordMatch();
       navigate(`/chat/${peerId}?mode=${mode}`, { replace: true });
     }
   }, [connState, peerId, mode, navigate]);
@@ -84,8 +102,11 @@ const Match = () => {
       </div>
 
       {/* ── Centered search content ── */}
+      {/* Spooky season particles above the dimmed camera */}
+      {isHalloweenSeason() && <HalloweenOverlay zIndex={5} density={10} />}
+
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full">
-        <div style={{ filter: "drop-shadow(0 0 30px rgba(124,92,255,0.5))" }}>
+        <div style={{ filter: `drop-shadow(0 0 30px ${isHalloweenSeason() ? HALLOWEEN.pumpkin + "88" : "rgba(124,92,255,0.5)"})` }}>
           <RadarPulse className="mb-8" />
         </div>
 

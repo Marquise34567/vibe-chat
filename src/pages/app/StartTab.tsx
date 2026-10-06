@@ -11,8 +11,16 @@ import {
   CameraRetryIcon as RefreshCw, ChevronRightIcon as ChevronRight,
   ScholarIcon as GraduationCap, UserIcon as User, UserCircleIcon as UserCircle,
   PlayIcon, SoloModeIcon, DuoModeIcon, GroupModeIcon, BlindModeIcon,
-  PlusIcon,
+  PlusIcon, LockIcon as Lock,
 } from "@/components/FaceFrenzyIcons";
+import { HalloweenOverlay, FrightBadge } from "@/components/HalloweenOverlay";
+import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
+import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
+import { useTier } from "@/hooks/useTier";
+import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
+import { getLocalProfile } from "@/lib/localUser";
+import { normalizeGender } from "../../../shared/analytics";
+import { apiBase } from "@/lib/config";
 
 /* ═══════════════════════════════════════════════════════════════
    FaceFrenzy Lobby — "You Are The Lobby"
@@ -71,6 +79,12 @@ const StartTab = () => {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
+  const [paywall, setPaywall] = useState<PaywallReason | null>(null);
+  const { tier, features, setTier, loading: tierLoading } = useTier();
+  const isPaid = tier !== "free";
+  const canPickGender = features.canFilterByGender;
+  // Free tier: worldwide only. Paid: pick any region.
+  const canPickRegions = features.maxCountryFilters === -1;
   const [sponsors, setSponsors] = useState<{ label: string; link: string; preview?: { title?: string; description?: string; image?: string; favicon?: string } }[]>(() => {
     try {
       const saved = localStorage.getItem("ff_sponsors");
@@ -140,6 +154,42 @@ const StartTab = () => {
     }
   }, [sponsorSuccess]);
 
+  // Handle Plus/VIP subscription return from Stripe Checkout.
+  // We verify the session server-side before granting the tier.
+  const plusStatus = searchParams.get("plus");
+  useEffect(() => {
+    if (plusStatus === "success") {
+      const sessionId = searchParams.get("session_id");
+      if (sessionId) {
+        toast.loading("Verifying your subscription…");
+        fetch(`${apiBase()}/api/plus-verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+        }).then((r) => r.json()).then((d) => {
+          toast.dismiss();
+          if (d.ok) {
+            const t = d.tier === "vip" ? "vip" : "plus";
+            setTier(t);
+            toast.success(`Welcome to FaceFrenzy ${t === "vip" ? "VIP 👑" : "Plus ⭐"} — enjoy!`);
+          } else {
+            toast.error("Payment isn't confirmed yet — refresh in a moment if you were charged");
+          }
+        }).catch(() => {
+          toast.dismiss();
+          toast.error("Could not verify payment — check your connection");
+        });
+      }
+      searchParams.delete("plus");
+      searchParams.delete("session_id");
+      setSearchParams(searchParams);
+    } else if (plusStatus === "cancelled") {
+      toast.error("Checkout cancelled");
+      searchParams.delete("plus");
+      setSearchParams(searchParams);
+    }
+  }, [plusStatus]);
+
   useEffect(() => { camStart(); return () => camStop(); }, [camStart, camStop]);
 
   // ── Decorative counters (fake baseline + real server count) ──
@@ -173,7 +223,7 @@ const StartTab = () => {
           // Register country so server knows our location
           fetch("https://ipapi.co/json/").then((r) => r.json()).then((d) => {
             if (d.country_code && ws?.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: "register", country: d.country_code.toUpperCase() }));
+              ws.send(JSON.stringify({ type: "register", country: d.country_code.toUpperCase(), selfGender: normalizeGender(getLocalProfile().gender) }));
             }
           }).catch(() => {});
         };
@@ -200,6 +250,12 @@ const StartTab = () => {
   }, []);
 
   const startMatch = () => {
+    // Hard paywall — free tier daily match cap (defer while tier resolves;
+    // Match.tsx re-checks authoritatively before searching)
+    if (!tierLoading && isMatchLimitHit(isPaid)) {
+      setPaywall("limit");
+      return;
+    }
     const sp = new URLSearchParams();
     sp.set("mode", friendConnected ? "duo" : mode);
     sp.set("groupSize", friendConnected ? "2" : mode === "solo" ? "2" : "3");
@@ -222,6 +278,7 @@ const StartTab = () => {
 
   const accent = modeMeta[mode].accent;
   const isBlind = mode === "blind";
+  const spooky = isHalloweenSeason();
 
   // Scan self-preview in lobby for NSFW — warn but don't kill camera
   useEffect(() => {
@@ -351,6 +408,14 @@ const StartTab = () => {
       {/* Accent tint at bottom */}
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40%", zIndex: 2, pointerEvents: "none", background: `linear-gradient(0deg, ${accent}12 0%, transparent 100%)` }} />
 
+      {/* Spooky season vignette — pumpkin glow bottom + purple haze top */}
+      {spooky && (
+        <>
+          <div style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none", background: `radial-gradient(ellipse 120% 50% at 50% 115%, ${HALLOWEEN.pumpkin}26 0%, transparent 60%), radial-gradient(ellipse 90% 40% at 50% -10%, ${HALLOWEEN.purple}33 0%, transparent 65%)` }} />
+          <HalloweenOverlay zIndex={3} />
+        </>
+      )}
+
       {/* ═══════════════════════════════════════════════════
           LAYER 2 — Top bar (floating glass)
       ═══════════════════════════════════════════════════ */}
@@ -423,13 +488,18 @@ const StartTab = () => {
       <div style={{ flex: 1, position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
         {/* Big mode label */}
         <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease", textAlign: "center" }}>
+          {spooky && <div style={{ marginBottom: 10 }}><FrightBadge /></div>}
           {/* Brand wordmark — matches tab title */}
-          <div style={{
-            fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px",
-            color: "#FFD60A", textShadow: "0 2px 16px rgba(255,214,10,0.3)",
-            marginBottom: 6,
-          }}>
-            FaceFrenzy
+          <div
+            className={spooky ? "ff-spooky-glow" : undefined}
+            style={{
+              fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px",
+              color: spooky ? HALLOWEEN.pumpkin : "#FFD60A",
+              textShadow: spooky ? undefined : "0 2px 16px rgba(255,214,10,0.3)",
+              marginBottom: 6,
+            }}
+          >
+            {spooky ? "🎃 FaceFrenzy" : "FaceFrenzy"}
           </div>
           <h1 style={{
             fontSize: 56, fontWeight: 900, letterSpacing: "-2px", lineHeight: 1,
@@ -449,7 +519,7 @@ const StartTab = () => {
             fontSize: 13, color: "rgba(255,255,255,0.45)", fontWeight: 600,
             textShadow: "0 2px 12px rgba(0,0,0,0.5)",
           }}>
-            The #1 Omegle Alternative
+            {spooky ? "The spookiest Omegle alternative" : "The #1 Omegle Alternative"}
           </p>
         </div>
 
@@ -532,8 +602,14 @@ const StartTab = () => {
                   { id: "both" as Gender, label: "Both", icon: "♀♂" },
                   { id: "girls" as Gender, label: "Girls", icon: "♀" },
                   { id: "guys" as Gender, label: "Guys", icon: "♂" },
-                ].map((g) => (
-                  <button key={g.id} onClick={() => { setGender(g.id); setGenderExpanded(false); }}
+                ].map((g) => {
+                  const locked = !canPickGender && g.id !== "both";
+                  return (
+                  <button key={g.id}
+                    onClick={() => {
+                      if (locked) { setGenderExpanded(false); setPaywall("gender"); return; }
+                      setGender(g.id); setGenderExpanded(false);
+                    }}
                     style={{
                       height: "100%", border: "none", padding: "0 14px",
                       background: gender === g.id ? "rgba(255,214,10,0.15)" : "transparent",
@@ -541,11 +617,14 @@ const StartTab = () => {
                       fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", transition: "all 0.2s ease",
                       display: "flex", alignItems: "center", gap: 4,
                       transform: gender === g.id ? "scale(1.05)" : "scale(1)",
+                      opacity: locked ? 0.55 : 1,
                     }}>
                     <span style={{ fontSize: 13, opacity: 0.7 }}>{g.icon}</span>
                     {g.label}
+                    {locked && <Lock style={{ width: 10, height: 10, color: "#FFD60A" }} />}
                   </button>
-                ))
+                  );
+                })
               ) : (
                 <button onClick={() => setGenderExpanded(true)}
                   style={{
@@ -704,6 +783,19 @@ const StartTab = () => {
               </button>
             )}
           </div>
+
+          {/* Free-tier remaining matches — nudges toward Plus */}
+          {!isPaid && (
+            <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>
+              {matchesLeft() > 0 ? (
+                <span>{matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: "#FFD60A", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button></span>
+              ) : (
+                <button onClick={() => setPaywall("limit")} style={{ color: "#FF6B6B", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
+                  Out of free matches today — unlock Plus
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -828,14 +920,25 @@ const StartTab = () => {
           SHEETS
       ═══════════════════════════════════════════════════ */}
       {showRegionPicker && (
-        <RegionPickerSheet region={region} setRegion={setRegion} onClose={() => setShowRegionPicker(false)} />
+        <RegionPickerSheet
+          region={region}
+          setRegion={setRegion}
+          onClose={() => setShowRegionPicker(false)}
+          canPickRegions={canPickRegions}
+          onLocked={() => { setShowRegionPicker(false); setPaywall("region"); }}
+        />
       )}
       {showSettings && (
         <SettingsSheet
           onClose={() => setShowSettings(false)} gender={gender} setGender={setGender}
           scholarOnly={scholarOnly} setScholarOnly={setScholarOnly} scholarVerified={scholarVerified}
           camStatus={camStatus} camError={camError} onRetryCam={camStart}
+          canPickGender={canPickGender}
+          onLockedGender={() => { setShowSettings(false); setPaywall("gender"); }}
         />
+      )}
+      {paywall && (
+        <PaywallSheet reason={paywall} onClose={() => setPaywall(null)} />
       )}
       {showShareSheet && pendingShareUrl && (
         <ShareSheet url={pendingShareUrl} onClose={() => { setShowShareSheet(false); setPendingShareUrl(null); }} />
@@ -876,7 +979,7 @@ const StartTab = () => {
 /* ═══════════════════════════════════════════════════════════════
    RegionPickerSheet
 ═══════════════════════════════════════════════════════════════ */
-const RegionPickerSheet = ({ region, setRegion, onClose }: { region: Region; setRegion: (r: Region) => void; onClose: () => void; }) => {
+const RegionPickerSheet = ({ region, setRegion, onClose, canPickRegions, onLocked }: { region: Region; setRegion: (r: Region) => void; onClose: () => void; canPickRegions: boolean; onLocked: () => void; }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up"
@@ -891,23 +994,26 @@ const RegionPickerSheet = ({ region, setRegion, onClose }: { region: Region; set
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {REGIONS.map((r) => {
             const selected = region === r.id;
+            const locked = !canPickRegions && r.id !== "worldwide";
             return (
-              <button key={r.id} onClick={() => { setRegion(r.id); onClose(); }}
+              <button key={r.id} onClick={() => { if (locked) { onLocked(); return; } setRegion(r.id); onClose(); }}
                 style={{
                   height: 58, padding: "0 16px", borderRadius: 16,
                   background: selected ? "rgba(255,214,0,0.10)" : "rgba(255,255,255,0.03)",
                   border: selected ? "1px solid rgba(255,214,0,0.25)" : "1px solid rgba(255,255,255,0.05)",
                   cursor: "pointer", transition: "all 0.2s ease",
                   display: "flex", alignItems: "center", justifyContent: "space-between",
+                  opacity: locked ? 0.55 : 1,
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 42, height: 42, borderRadius: 12, background: selected ? "rgba(255,214,0,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{r.flag}</div>
                   <div style={{ textAlign: "left" }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: selected ? "#FFD60A" : "#fff" }}>{r.label}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{r.countries.length === 0 ? "No filter" : `${r.countries.length} countries`}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{r.countries.length === 0 ? "No filter" : locked ? "Plus only" : `${r.countries.length} countries`}</div>
                   </div>
                 </div>
-                {selected && (
+                {locked && <Lock style={{ width: 15, height: 15, color: "#FFD60A" }} />}
+                {selected && !locked && (
                   <div style={{ width: 24, height: 24, borderRadius: 12, background: "#FFD60A", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
@@ -926,10 +1032,12 @@ const RegionPickerSheet = ({ region, setRegion, onClose }: { region: Region; set
 ═══════════════════════════════════════════════════════════════ */
 const SettingsSheet = ({
   onClose, gender, setGender, scholarOnly, setScholarOnly, scholarVerified, camStatus, camError, onRetryCam,
+  canPickGender, onLockedGender,
 }: {
   onClose: () => void; gender: Gender; setGender: (g: Gender) => void;
   scholarOnly: boolean; setScholarOnly: (v: boolean) => void; scholarVerified: boolean;
   camStatus: string; camError: string | null; onRetryCam: () => void;
+  canPickGender: boolean; onLockedGender: () => void;
 }) => {
   const genders: { id: Gender; label: string }[] = [
     { id: "both", label: "Both" }, { id: "girls", label: "Girls" }, { id: "guys", label: "Guys" },
@@ -948,20 +1056,25 @@ const SettingsSheet = ({
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Show me</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-            {genders.map((g) => (
-              <button key={g.id} onClick={() => setGender(g.id)}
+            {genders.map((g) => {
+              const locked = !canPickGender && g.id !== "both";
+              return (
+              <button key={g.id} onClick={() => { if (locked) { onLockedGender(); return; } setGender(g.id); }}
                 style={{
                   height: 44, borderRadius: 14,
                   background: gender === g.id ? "rgba(255,214,0,0.15)" : "rgba(255,255,255,0.04)",
                   border: gender === g.id ? "1px solid rgba(255,214,0,0.3)" : "1px solid rgba(255,255,255,0.06)",
                   color: gender === g.id ? "#FFD60A" : "#EDEDED", fontSize: 14, fontWeight: 600, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.2s ease",
+                  opacity: locked ? 0.55 : 1,
                 }}>
                 {g.id === "both" && <UserCircle className="w-3.5 h-3.5" />}
                 {(g.id === "girls" || g.id === "guys") && <User className="w-3.5 h-3.5" />}
                 {g.label}
+                {locked && <Lock style={{ width: 11, height: 11, color: "#FFD60A" }} />}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div style={{ marginBottom: 24 }}>

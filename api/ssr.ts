@@ -146,6 +146,12 @@ const SEO_ROUTES: Record<string, SeoMeta> = {
     description:
       "Free 1v1 video chat with random strangers. No bots, no signup, AI moderated. Start a 1-on-1 random video call in seconds. 16+, HD quality, works in browser.",
   },
+  "/best-omegle-alternatives": {
+    path: "/best-omegle-alternatives",
+    title: "10 Best Omegle Alternatives in 2026 — Sites Like Omegle, Ranked | FaceFrenzy",
+    description:
+      "The 10 best Omegle alternatives in 2026, ranked. Sites like Omegle that still work — free random video chat, no signup, no bots. See why FaceFrenzy ranks #1.",
+  },
 };
 
 // Edge function that serves the SPA index.html with per-route <title>,

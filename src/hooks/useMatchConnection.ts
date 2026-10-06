@@ -13,6 +13,8 @@
  */
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { getLocalProfile } from "@/lib/localUser";
+import { normalizeGender } from "../../shared/analytics";
 
 const MATCH_SERVER_URL =
   (import.meta as any).env?.VITE_MATCH_SERVER_URL ?? "ws://localhost:8090";
@@ -81,6 +83,8 @@ export function useMatchConnection() {
   const paramsRef = useRef<MatchParams | null>(null);
   const countryRef = useRef<string | null>(null);
   const nameRef = useRef<string | null>(null);
+  // User's own gender (from profile) — sent for matchmaking analytics
+  const selfGender = () => normalizeGender(getLocalProfile().gender);
 
   // ── ICE servers (STUN + TURN for NAT traversal) ──
   // STUN discovers public IP; TURN relays traffic when P2P fails (symmetric NAT, firewalls, etc.)
@@ -255,10 +259,10 @@ export function useMatchConnection() {
           detectCountry().then((country) => {
             countryRef.current = country;
             if (wsRef.current?.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({ type: "register", country, name: nameRef.current }));
+              wsRef.current.send(JSON.stringify({ type: "register", country, name: nameRef.current, selfGender: selfGender() }));
             }
             if (paramsRef.current) {
-              wsRef.current?.send(JSON.stringify({ type: "search", ...paramsRef.current, name: nameRef.current }));
+              wsRef.current?.send(JSON.stringify({ type: "search", ...paramsRef.current, name: nameRef.current, selfGender: selfGender() }));
               setState("searching");
             }
           });
@@ -510,7 +514,7 @@ export function useMatchConnection() {
         connect();
         // connect() will send the search after "connected" message
       } else {
-        wsRef.current.send(JSON.stringify({ type: "search", ...params, name: nameRef.current }));
+        wsRef.current.send(JSON.stringify({ type: "search", ...params, name: nameRef.current, selfGender: selfGender() }));
         setState("searching");
       }
     },

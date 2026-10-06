@@ -38,7 +38,18 @@ export const useTier = () => {
 
   const setTierDirect = (next: Tier) => {
     setTier(next);
-    if (isLocal) saveLocalProfile({ subscription_tier: next });
+    if (isLocal) {
+      saveLocalProfile({ subscription_tier: next });
+    } else if (user) {
+      // Persist to the profiles table for signed-in users
+      void supabase
+        .from("profiles")
+        .update({ subscription_tier: next })
+        .eq("id", user.id)
+        .then(({ error }) => {
+          if (error) console.warn("Failed to persist tier to Supabase:", error.message);
+        });
+    }
   };
 
   return { tier, features: TIER_FEATURES[tier], loading, refresh, setTier: setTierDirect };

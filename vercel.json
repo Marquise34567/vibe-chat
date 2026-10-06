@@ -23,6 +23,7 @@
     { "source": "/anonymous-video-chat", "destination": "/api/ssr" },
     { "source": "/random-cam-chat", "destination": "/api/ssr" },
     { "source": "/1v1-video-chat", "destination": "/api/ssr" },
+    { "source": "/best-omegle-alternatives", "destination": "/api/ssr" },
     { "source": "/blog/is-omegle-back", "destination": "/api/ssr" },
     { "source": "/blog/what-happened-to-omegle", "destination": "/api/ssr" },
     { "source": "/blog/best-random-video-chat-2026", "destination": "/api/ssr" },

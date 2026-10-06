@@ -9,6 +9,7 @@ export default function handler(req, res) {
     { loc: "https://www.facefrenzy.fun/anonymous-video-chat", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/random-cam-chat", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/1v1-video-chat", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
+    { loc: "https://www.facefrenzy.fun/best-omegle-alternatives", priority: "0.9", freq: "weekly", lastmod: "2026-09-23" },
     { loc: "https://www.facefrenzy.fun/safety", priority: "0.7", freq: "monthly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/vs/ometv", priority: "0.7", freq: "monthly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/vs/emerald-chat", priority: "0.7", freq: "monthly", lastmod: "2026-09-01" },

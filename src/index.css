@@ -994,3 +994,116 @@
   }
   .ff-close-bar, .ff-back-stem, .ff-back-head { stroke-dashoffset: 0 !important; }
 }
+
+/* ============================================================
+   HALLOWEEN — "Fright Fest" seasonal overlay (Oct 1 – Nov 3)
+   ============================================================ */
+
+/* Rising particles (pumpkins, candy, spiders) — float up & fade */
+.ff-rise {
+  position: absolute;
+  bottom: -8%;
+  display: inline-block;
+  opacity: 0;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+  animation-name: ff-rise-up;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes ff-rise-up {
+  0%   { transform: translateY(0) translateX(0) rotate(-8deg); opacity: 0; }
+  8%   { opacity: 0.9; }
+  50%  { transform: translateY(-55vh) translateX(var(--drift, 30px)) rotate(10deg); }
+  92%  { opacity: 0.75; }
+  100% { transform: translateY(-110vh) translateX(0) rotate(-6deg); opacity: 0; }
+}
+
+/* Ghosts — horizontal drift with a spooky bob */
+.ff-ghost {
+  position: absolute;
+  display: inline-block;
+  opacity: 0.55;
+  filter: drop-shadow(0 0 10px rgba(139,47,201,0.35)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+  animation-name: ff-ghost-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes ff-ghost-drift {
+  0%, 100% { transform: translateX(0) translateY(0) scaleX(1); }
+  25%      { transform: translateX(calc(var(--drift, 40px) * 0.5)) translateY(-14px) scaleX(1); }
+  50%      { transform: translateX(var(--drift, 40px)) translateY(0) scaleX(-1); }
+  75%      { transform: translateX(calc(var(--drift, 40px) * 0.5)) translateY(10px) scaleX(-1); }
+}
+
+/* Bats — flap across the top of the screen */
+.ff-bat {
+  position: absolute;
+  display: inline-block;
+  opacity: 0.8;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+  animation-name: ff-bat-fly;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes ff-bat-fly {
+  0%   { transform: translateX(-15vw) translateY(0) rotate(-6deg); opacity: 0; }
+  10%  { opacity: 0.8; }
+  45%  { transform: translateX(calc(var(--drift, 50px) + 20vw)) translateY(-26px) rotate(6deg); }
+  55%  { transform: translateX(calc(var(--drift, 50px) + 24vw)) translateY(6px) rotate(-4deg); }
+  90%  { opacity: 0.8; }
+  100% { transform: translateX(calc(var(--drift, 50px) + 48vw)) translateY(-10px) rotate(5deg); opacity: 0; }
+}
+
+/* Cobwebs — two radial lines + arcs in the top corners */
+.ff-web {
+  position: absolute;
+  top: 0;
+  width: 110px;
+  height: 110px;
+  opacity: 0.28;
+  background:
+    radial-gradient(circle at 0 0, transparent 18px, rgba(255,255,255,0.5) 18.5px, transparent 19.5px),
+    radial-gradient(circle at 0 0, transparent 38px, rgba(255,255,255,0.4) 38.5px, transparent 39.5px),
+    radial-gradient(circle at 0 0, transparent 60px, rgba(255,255,255,0.35) 60.5px, transparent 61.5px),
+    radial-gradient(circle at 0 0, transparent 84px, rgba(255,255,255,0.3) 84.5px, transparent 85.5px),
+    conic-gradient(from 0deg at 0 0,
+      rgba(255,255,255,0.45) 0deg, transparent 1deg,
+      transparent 17deg, rgba(255,255,255,0.4) 18deg, transparent 19deg,
+      transparent 39deg, rgba(255,255,255,0.4) 40deg, transparent 41deg,
+      transparent 62deg, rgba(255,255,255,0.4) 63deg, transparent 64deg,
+      transparent 88deg, rgba(255,255,255,0.45) 89deg, transparent 90deg);
+  pointer-events: none;
+}
+.ff-web-tl { left: 0; }
+.ff-web-tr { right: 0; transform: scaleX(-1); }
+
+/* Moon glow breathe */
+@keyframes ff-moon-glow {
+  0%, 100% { box-shadow: 0 0 60px 18px rgba(255,117,24,0.2), 0 0 24px 6px rgba(255,247,220,0.25); }
+  50%      { box-shadow: 0 0 80px 26px rgba(255,117,24,0.32), 0 0 30px 10px rgba(255,247,220,0.35); }
+}
+
+/* Fog drift */
+@keyframes ff-fog {
+  0%, 100% { transform: translateX(-3%); opacity: 0.7; }
+  50%      { transform: translateX(3%);  opacity: 1; }
+}
+
+/* Flickering candle-light text glow for spooky headlines */
+.ff-spooky-glow {
+  text-shadow:
+    0 0 14px rgba(255,117,24,0.55),
+    0 0 40px rgba(255,117,24,0.25),
+    0 2px 10px rgba(0,0,0,0.7);
+  animation: ff-candle 3.2s ease-in-out infinite;
+}
+@keyframes ff-candle {
+  0%, 100% { text-shadow: 0 0 14px rgba(255,117,24,0.55), 0 0 40px rgba(255,117,24,0.25), 0 2px 10px rgba(0,0,0,0.7); }
+  42%      { text-shadow: 0 0 18px rgba(255,117,24,0.7), 0 0 52px rgba(255,117,24,0.35), 0 2px 10px rgba(0,0,0,0.7); }
+  58%      { text-shadow: 0 0 10px rgba(255,117,24,0.45), 0 0 30px rgba(255,117,24,0.2), 0 2px 10px rgba(0,0,0,0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-rise, .ff-ghost, .ff-bat, .ff-spooky-glow { animation: none !important; }
+  .ff-rise { display: none; }
+}

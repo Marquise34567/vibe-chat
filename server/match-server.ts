@@ -25,14 +25,31 @@ import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import type { IncomingMessage } from "http";
 import Stripe from "stripe";
+import {
+  MatchAnalytics, emptyStats, bumpDay, normalizeGender,
+  analyticsView, heuristicInsights,
+} from "../shared/analytics";
 
 // Railway sets PORT; locally use MATCH_SERVER_PORT or default 8090
 const PORT = parseInt(process.env.PORT ?? process.env.MATCH_SERVER_PORT ?? "8090", 10);
 
-// ── Stripe ──
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "");
+// ── Stripe (optional in dev — endpoints 503 without a key) ──
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
 const SPONSOR_PRICE_ID = "price_1UB1KZGpSBEuGOflxD7YoPw7";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.facefrenzy.fun";
+const ADMIN_KEY = process.env.ADMIN_KEY ?? ""; // optional — protects /api/analytics + /api/insights
+
+// ── Subscription pricing (mirrors worker/match-worker.ts) ──
+const PLUS_PRICES: Record<string, { amount: number; interval: "week" | "month" | "year"; name: string }> = {
+  "plus-weekly":  { amount: 199,  interval: "week",  name: "FaceFrenzy Plus — Weekly" },
+  "plus-monthly": { amount: 499,  interval: "month", name: "FaceFrenzy Plus — Monthly" },
+  "plus-yearly":  { amount: 2999, interval: "year",  name: "FaceFrenzy Plus — Yearly" },
+  "vip-weekly":   { amount: 399,  interval: "week",  name: "FaceFrenzy VIP — Weekly" },
+  "vip-monthly":  { amount: 999,  interval: "month", name: "FaceFrenzy VIP — Monthly" },
+  "vip-yearly":   { amount: 5999, interval: "year",  name: "FaceFrenzy VIP — Yearly" },
+};
 
 // ── Moderation config ──
 const MAX_VIOLATIONS = 3;          // Auto-ban after this many violations
@@ -52,6 +69,10 @@ type Client = {
   countries: string[];      // region filter — only match people in these countries
   status: "searching" | "matched" | "in-call";
   partnerId?: string;
+  matchedAt?: number;             // when the current call started (call-duration stats)
+  selfGender: string | null;      // user's own gender (analytics bucket)
+  countryCounted?: boolean;       // analytics: already counted in byCountry
+  genderCounted?: boolean;        // analytics: already counted in byGender
   joinedAt: number;
   lastSeen: number;         // last time we got a ping/pong/message from this client
   violations: number;
@@ -65,11 +86,57 @@ const lobbyRooms = new Map<string, { hostId: string; guestId?: string }>();
 // Banned IPs with expiry timestamps
 const bannedIps = new Map<string, number>();
 
+// ── Analytics (in-memory; the production DO persists to storage) ──
+const stats: MatchAnalytics = emptyStats();
+
+const trackCountry = (c: Client) => {
+  if (c.country && !c.countryCounted) {
+    c.countryCounted = true;
+    stats.byCountry[c.country] = (stats.byCountry[c.country] ?? 0) + 1;
+  }
+};
+
+const trackGender = (c: Client) => {
+  if (c.selfGender && !c.genderCounted) {
+    c.genderCounted = true;
+    stats.byGender[c.selfGender] = (stats.byGender[c.selfGender] ?? 0) + 1;
+  }
+};
+
+/** Call ended — accumulate call duration. */
+const endCall = (c: Client) => {
+  if (c.matchedAt) {
+    stats.totalCalls++;
+    stats.totalCallMs += Date.now() - c.matchedAt;
+    c.matchedAt = undefined;
+  }
+};
+
+const liveCounts = () => {
+  let searching = 0, inCall = 0;
+  for (const c of clients.values()) {
+    if (c.status === "searching") searching++;
+    else inCall++;
+  }
+  return { online: clients.size, searching, inCall };
+};
+
+const adminOk = (req: IncomingMessage): boolean => {
+  if (!ADMIN_KEY) return true; // no key configured → open (local dev)
+  const key = new URL(req.url ?? "/", "http://x").searchParams.get("key");
+  return key === ADMIN_KEY;
+};
+
 // ── HTTP server (handles Stripe checkout + upgrades to WebSocket) ──
 const server = http.createServer(async (req, res) => {
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", FRONTEND_URL);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  // CORS headers — allow prod frontend + localhost dev origins
+  const origin = req.headers.origin ?? "";
+  const allow =
+    origin === FRONTEND_URL || /^https?:\/\/localhost(:\d+)?$/.test(origin)
+      ? origin || FRONTEND_URL
+      : FRONTEND_URL;
+  res.setHeader("Access-Control-Allow-Origin", allow);
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
@@ -78,37 +145,64 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── Stripe checkout endpoint ──
+  // ── Stripe checkout — one endpoint for both purchase types:
+  //    { label, link, days } → one-time sponsor box payment
+  //    { plan }              → Plus/VIP recurring subscription
   if (req.method === "POST" && req.url === "/api/sponsor-checkout") {
     let body = "";
     for await (const chunk of req) body += chunk;
     try {
-      const { label, link, days } = JSON.parse(body);
-      if (!label || !link || !days) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Missing label, link, or days" }));
-        return;
-      }
+      if (!stripe) throw new Error("Stripe not configured (STRIPE_SECRET_KEY missing)");
+      const { label, link, days, plan } = JSON.parse(body);
 
-      const totalCents = days * 500; // $5/day = 500 cents/day
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        line_items: [{
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Sponsor Box — ${days} day${days > 1 ? "s" : ""}`,
-              description: `FaceFrenzy sponsor box for "${label}"`,
-              tax_code: "txcd_10000000", // general - digital services
+      let session;
+      if (plan) {
+        const price = PLUS_PRICES[plan];
+        if (!price) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Unknown plan" }));
+          return;
+        }
+        session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              product_data: { name: price.name, tax_code: "txcd_10000000" },
+              recurring: { interval: price.interval },
+              unit_amount: price.amount,
             },
-            unit_amount: 500, // $5.00 per day
-          },
-          quantity: days,
-        }],
-        success_url: `${FRONTEND_URL}/?sponsor=success&label=${encodeURIComponent(label)}&link=${encodeURIComponent(link)}&days=${days}`,
-        cancel_url: `${FRONTEND_URL}/?sponsor=cancelled`,
-        metadata: { label, link, days: String(days) },
-      });
+            quantity: 1,
+          }],
+          success_url: `${FRONTEND_URL}/?plus=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${FRONTEND_URL}/?plus=cancelled`,
+          metadata: { plan, tier: plan.startsWith("vip") ? "vip" : "plus" },
+        });
+      } else {
+        if (!label || !link || !days) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing label, link, days, or plan" }));
+          return;
+        }
+        session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `Sponsor Box — ${days} day${days > 1 ? "s" : ""}`,
+                description: `FaceFrenzy sponsor box for "${label}"`,
+                tax_code: "txcd_10000000", // general - digital services
+              },
+              unit_amount: 500, // $5.00 per day
+            },
+            quantity: days,
+          }],
+          success_url: `${FRONTEND_URL}/?sponsor=success&label=${encodeURIComponent(label)}&link=${encodeURIComponent(link)}&days=${days}`,
+          cancel_url: `${FRONTEND_URL}/?sponsor=cancelled`,
+          metadata: { label, link, days: String(days) },
+        });
+      }
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ url: session.url }));
@@ -120,12 +214,72 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── URL preview scraper (OpenGraph metadata) ──
-  if (req.method === "POST" && req.url === "/api/fetch-preview") {
+  // ── Verify a completed checkout session before granting the tier ──
+  if (req.method === "POST" && req.url === "/api/plus-verify") {
     let body = "";
     for await (const chunk of req) body += chunk;
     try {
-      const { url } = JSON.parse(body);
+      if (!stripe) throw new Error("Stripe not configured (STRIPE_SECRET_KEY missing)");
+      const { session_id } = JSON.parse(body);
+      if (!session_id || typeof session_id !== "string" || !session_id.startsWith("cs_")) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing or invalid session_id" }));
+        return;
+      }
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+      const paid =
+        session.payment_status === "paid" ||
+        session.status === "complete" ||
+        session.payment_status === "no_payment_required";
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(
+        paid
+          ? { ok: true, tier: session.metadata?.tier ?? "plus", plan: session.metadata?.plan }
+          : { ok: false, status: session.status }
+      ));
+    } catch (err: any) {
+      console.error("Plus verify error:", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // ── Analytics snapshot — who uses it, from where, how long ──
+  if (req.method === "GET" && req.url?.startsWith("/api/analytics")) {
+    if (!adminOk(req)) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unauthorized" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(analyticsView(stats, liveCounts())));
+    return;
+  }
+
+  // ── AI insights — heuristic engine locally (Workers AI in production) ──
+  if (req.method === "GET" && req.url?.startsWith("/api/insights")) {
+    if (!adminOk(req)) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unauthorized" }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      insights: heuristicInsights(stats, liveCounts()),
+      source: "heuristic",
+      stats: analyticsView(stats, liveCounts()),
+    }));
+    return;
+  }
+
+  // ── URL preview scraper (OpenGraph metadata) ──
+  if (req.method === "POST" && req.url === "/api/fetch-preview") {
+    let body = "";
+    let url: string | undefined;
+    for await (const chunk of req) body += chunk;
+    try {
+      url = JSON.parse(body).url;
       if (!url) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Missing url" }));
@@ -197,7 +351,7 @@ const server = http.createServer(async (req, res) => {
         image: null,
         favicon: null,
         siteName: null,
-        url: url,
+        url: url ?? null,
         error: "Could not fetch preview",
       }));
     }
@@ -261,6 +415,7 @@ const recordViolation = (
   if (Date.now() - client.lastViolationAt < VIOLATION_COOLDOWN_MS) return;
   client.lastViolationAt = Date.now();
   client.violations += 1;
+  stats.violations++;
 
   console.log(
     `[moderation] Violation #${client.violations} for ${clientId}: ` +
@@ -279,6 +434,7 @@ const recordViolation = (
   if (client.violations >= MAX_VIOLATIONS) {
     // Ban + disconnect
     banIp(client.ip, `${nsfwClass} x${client.violations}`);
+    stats.bans++;
 
     // Notify partner
     if (client.partnerId) {
@@ -287,6 +443,7 @@ const recordViolation = (
         send(partner.ws, { type: "partner-banned", peerId: clientId });
         partner.status = "searching";
         partner.partnerId = undefined;
+        endCall(partner);
       }
     }
 
@@ -371,6 +528,12 @@ const pairClients = (a: Client, b: Client) => {
   b.status = "matched";
   a.partnerId = b.id;
   b.partnerId = a.id;
+  a.matchedAt = Date.now();
+  b.matchedAt = a.matchedAt;
+
+  // ── Analytics ──
+  stats.totalMatches++;
+  bumpDay(stats, "matches");
 
   // One is the caller (initiator), the other the receiver
   send(a.ws, { type: "matched", role: "caller", peerId: b.id, peerCountry: b.country, peerName: b.name });
@@ -390,8 +553,14 @@ const removeClient = (id: string) => {
       send(partner.ws, { type: "partner-left", peerId: id });
       partner.status = "searching";
       partner.partnerId = undefined;
+      endCall(partner);
     }
   }
+
+  // ── Analytics: session + call duration ──
+  endCall(client);
+  stats.sessionsEnded++;
+  stats.totalSessionMs += Date.now() - client.joinedAt;
 
   // Clean up lobby rooms
   for (const [rid, room] of lobbyRooms) {
@@ -444,8 +613,13 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     violations: 0,
     lastViolationAt: 0,
     recentlySkipped: new Set<string>(),
+    selfGender: null,
   };
   clients.set(id, client);
+
+  // ── Analytics: new connection ──
+  stats.totalConnections++;
+  bumpDay(stats, "connections");
 
   // Send assigned ID + real online count
   send(ws, { type: "connected", id, onlineCount: clients.size });
@@ -470,7 +644,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       case "register": {
         c.country = msg.country ?? null;
         c.name = msg.name ?? c.name;
-        console.log(`Client ${id} registered country: ${c.country} name: ${c.name}`);
+        if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
+        trackCountry(c);
+        trackGender(c);
+        console.log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"}`);
         break;
       }
 
@@ -482,7 +659,13 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         c.scholarOnly = msg.scholarOnly ?? false;
         c.countries = msg.countries ?? [];
         if (msg.name) c.name = msg.name;
+        if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
         c.partnerId = undefined;
+
+        // ── Analytics ──
+        stats.totalSearches++;
+        stats.byMode[c.mode] = (stats.byMode[c.mode] ?? 0) + 1;
+        trackGender(c);
 
         console.log(`Client ${id} searching: mode=${c.mode} gender=${c.gender} countries=${c.countries.join(",") || "global"} scholar=${c.scholarOnly}`);
 
@@ -563,8 +746,11 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             }
             partner.status = "searching";
             partner.partnerId = undefined;
+            endCall(partner);
           }
         }
+        stats.skips++;
+        endCall(c);
         c.status = "searching";
         c.partnerId = undefined;
         send(ws, { type: "skipped" });
@@ -618,8 +804,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             send(partner.ws, { type: "partner-left", peerId: id });
             partner.status = "searching";
             partner.partnerId = undefined;
+            endCall(partner);
           }
         }
+        endCall(c);
         c.status = "in-call";
         c.partnerId = undefined;
         break;
