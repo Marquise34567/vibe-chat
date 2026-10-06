@@ -9,6 +9,7 @@ import { MatchConnectionProvider } from "@/contexts/MatchConnectionContext";
 import { AppShell } from "@/components/AppShell";
 import { AgeGate } from "@/components/AgeGate";
 import { getAgeVerified } from "@/lib/verification";
+import { isHalloweenSeason } from "@/lib/halloween";
 import StartTab from "./pages/app/StartTab";
 import ChatsTab from "./pages/app/ChatsTab";
 import MomentsTab from "./pages/app/MomentsTab";
@@ -40,6 +41,12 @@ const App = () => {
   const [ageOk, setAgeOk] = useState(getAgeVerified());
 
   useEffect(() => { setAgeOk(getAgeVerified()); }, []);
+
+  // Fright Fest — re-skin the whole app during spooky season
+  useEffect(() => {
+    document.body.classList.toggle("ff-halloween", isHalloweenSeason());
+    return () => document.body.classList.remove("ff-halloween");
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

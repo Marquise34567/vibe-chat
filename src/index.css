@@ -1103,6 +1103,29 @@
   58%      { text-shadow: 0 0 10px rgba(255,117,24,0.45), 0 0 30px rgba(255,117,24,0.2), 0 2px 10px rgba(0,0,0,0.7); }
 }
 
+/* ── Fright Fest global reskin ──
+   body.ff-halloween is toggled by App.tsx during spooky season.
+   Re-skins the whole app: pumpkin accents, haunted backgrounds. */
+body.ff-halloween {
+  --primary: 24 95% 53%;                 /* pumpkin */
+  --ring: 24 95% 53%;
+  --accent: 271 76% 53%;                 /* witch purple */
+  --highlight: 28 100% 55%;              /* ember orange (gold badges/accents) */
+  --glass-stroke: rgba(255, 140, 60, 0.18);
+  --bg-lobby: #0B0612;
+  --bg-lobby-glow: #4B1770;
+}
+body.ff-halloween .bg-app {
+  background:
+    radial-gradient(ellipse 120% 55% at 50% -8%, rgba(139,47,201,0.30) 0%, transparent 55%),
+    radial-gradient(ellipse 110% 50% at 50% 112%, rgba(255,117,24,0.18) 0%, transparent 55%),
+    linear-gradient(180deg, #0B0612 0%, #140B22 50%, #0B0612 100%);
+}
+body.ff-halloween .btn-primary {
+  background: linear-gradient(135deg, #FFB347, #FF7518 60%, #E5540A);
+  box-shadow: 0 6px 24px rgba(255,117,24,0.45), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ff-rise, .ff-ghost, .ff-bat, .ff-spooky-glow { animation: none !important; }
   .ff-rise { display: none; }
