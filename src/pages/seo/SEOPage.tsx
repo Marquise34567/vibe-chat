@@ -197,6 +197,125 @@ export const faqToJson = (items: { q: string; a: string }[]) =>
     acceptedAnswer: { "@type": "Answer" as const, text: item.a },
   }));
 
+// ── Advertorial listicle primitives (numbered rows, visual tiles, CTAs) ──
+
+/** Big CTA button used inside listicle rows + banners */
+export const ListicleCTA = ({ label = "Start Video Chat — Free" }: { label?: string }) => {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate("/")}
+      style={{
+        marginTop: 10, padding: "11px 24px", borderRadius: 24,
+        background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)",
+        color: "#0A0A0F", fontSize: 14, fontWeight: 800, border: "none", cursor: "pointer",
+        boxShadow: "0 4px 18px rgba(245,208,0,0.3)",
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+/**
+ * Numbered listicle row — visual tile on the left, rank badge,
+ * headline + copy on the right (advertorial style).
+ */
+export const ListicleItem = ({
+  n,
+  icon,
+  title,
+  accent = "#7C5CFF",
+  children,
+  cta = false,
+}: {
+  n: number;
+  icon: string;
+  title: ReactNode;
+  accent?: string;
+  children: ReactNode;
+  cta?: boolean;
+}) => (
+  <div style={{ display: "flex", gap: 14, marginBottom: 26, alignItems: "flex-start" }}>
+    {/* Visual tile + rank badge */}
+    <div style={{ position: "relative", flexShrink: 0, width: "clamp(92px, 27vw, 130px)" }}>
+      <div
+        style={{
+          width: "100%", aspectRatio: "4/5", borderRadius: 16,
+          background: `linear-gradient(160deg, ${accent} 0%, ${accent}88 55%, #0A0A14 130%)`,
+          border: "1px solid rgba(255,255,255,0.10)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          gap: 6, boxShadow: `0 8px 28px ${accent}33`,
+        }}
+      >
+        <span style={{ fontSize: "clamp(30px, 9vw, 42px)", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" }}>{icon}</span>
+      </div>
+      <div
+        style={{
+          position: "absolute", top: -9, right: -9, width: 30, height: 30, borderRadius: "50%",
+          background: "linear-gradient(180deg, #FFE45E, #F5D000)", color: "#0A0A0F",
+          fontWeight: 900, fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 3px 10px rgba(0,0,0,0.5)",
+        }}
+      >
+        {n}
+      </div>
+    </div>
+
+    {/* Copy */}
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <h3 style={{ fontSize: "clamp(16px, 4.4vw, 19px)", fontWeight: 800, color: "#fff", marginBottom: 6, lineHeight: 1.2 }}>
+        {title}
+      </h3>
+      <div style={{ fontSize: 14, color: "rgba(255,255,255,0.62)", lineHeight: 1.55 }}>
+        {children}
+      </div>
+      {cta && <ListicleCTA />}
+    </div>
+  </div>
+);
+
+/** Full-width promo banner — like the quiz/discount banner in advertorials */
+export const ListicleBanner = ({
+  title,
+  subtitle,
+  cta = "Try FaceFrenzy Free",
+}: {
+  title: string;
+  subtitle: string;
+  cta?: string;
+}) => {
+  const navigate = useNavigate();
+  return (
+    <div
+      style={{
+        borderRadius: 20, padding: "28px 22px", margin: "34px 0", textAlign: "center",
+        background: "linear-gradient(160deg, #2A1B6B 0%, #7C5CFF 55%, #FF4D8D 130%)",
+        border: "1px solid rgba(255,255,255,0.14)",
+        boxShadow: "0 16px 48px rgba(124,92,255,0.3)",
+      }}
+    >
+      <div style={{ fontSize: "clamp(18px, 5vw, 22px)", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px", marginBottom: 6 }}>
+        {title}
+      </div>
+      <p style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 16, lineHeight: 1.45 }}>
+        {subtitle}
+      </p>
+      <button
+        onClick={() => navigate("/")}
+        style={{
+          padding: "13px 32px", borderRadius: 26,
+          background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)",
+          color: "#0A0A0F", fontSize: 15, fontWeight: 800, border: "none", cursor: "pointer",
+          boxShadow: "0 6px 22px rgba(0,0,0,0.35)",
+        }}
+      >
+        {cta}
+      </button>
+    </div>
+  );
+};
+
 // ── Article byline (named author + last updated date for E-E-A-T) ──
 export const ArticleMeta = ({ author, role, updated }: { author: string; role: string; updated: string }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>

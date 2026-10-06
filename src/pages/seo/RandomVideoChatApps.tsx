@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "./SEOPage";
+import { SEOPage, Section, H2, P, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema, ListicleItem, ListicleBanner } from "./SEOPage";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
@@ -45,12 +45,10 @@ const RandomVideoChatApps = () => {
       <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
-        <H2>The best random video chat app isn't an app — it's FaceFrenzy</H2>
-        <P>Here's the twist in this list: the best "app" for random video chat in 2026 doesn't need to be downloaded. FaceFrenzy runs natively in your browser — mobile or desktop — and reaches a real person faster than most native apps take to install. Open the site, allow camera, done. Under 10 seconds to a live face-to-face conversation with a stranger anywhere in the world. It out-features every native app too: classic 1-on-1 matching, group video chat with 3-4 people (no major app has this), and blind mode where you talk voice-first before cameras reveal. AI moderation keeps it clean in real time, the 16+ age gate keeps it safer than the free-for-all apps, and it's all free. The rest of this list covers the actual apps and sites worth your time.</P>
+        <P>Here's the twist in this list: the best "app" for random video chat in 2026 doesn't need to be downloaded at all. We tested every option on the metric that matters most — time-to-first-real-conversation.</P>
       </Section>
 
       <Section>
-        <H2>All random video chat apps compared</H2>
         <ComparisonTable rows={[
           { name: "FaceFrenzy", bots: "No", age: "16+", mods: "AI", signup: "None", free: "Yes", highlight: true },
           { name: "OmeTV", bots: "Some", age: "18+", mods: "Manual", signup: "Optional", free: "Yes" },
@@ -65,41 +63,50 @@ const RandomVideoChatApps = () => {
         ]} />
       </Section>
 
-      <Section>
-        <H2>#1: FaceFrenzy — instant video chat, no download</H2>
-        <P>FaceFrenzy wins this list on the metric that matters most: time-to-first-real-conversation. Native apps make you download 100+MB, create an account, verify an email, and accept permissions before you see a face. FaceFrenzy skips all of it — the browser is the app. On mobile you get a fullscreen camera stage, floating glass controls, and thumb-reach skip. It's anonymous by default and AI-moderated in real time, which is why there are no bots: fake accounts can't survive the live-camera check. Three modes cover every mood — solo for the classic loop, group for chaos with friends, blind for voice-first mystery. Country filters, instant skip, peer-to-peer WebRTC video for zero lag. Free, no signup, works everywhere.</P>
-      </Section>
+      <ListicleItem n={1} icon="⚡" accent="#7C5CFF" cta title="FaceFrenzy — instant video chat, no download">
+        FaceFrenzy wins this list on the metric that matters most: time-to-first-real-conversation. Native apps make you download 100+MB, create an account, verify an email, and accept permissions before you see a face. FaceFrenzy skips all of it — the browser is the app. On mobile you get a fullscreen camera stage, floating glass controls, and thumb-reach skip. It's anonymous by default and AI-moderated in real time, which is why there are no bots. Three modes cover every mood — solo for the classic loop, group for chaos with friends, blind for voice-first mystery. Free, no signup, works everywhere.
+      </ListicleItem>
 
-      <Section>
-        <H2>#2: OmeTV — the biggest app by raw numbers</H2>
-        <P><A to="/vs/ometv">OmeTV</A> is the most-downloaded random video chat app and the traffic leader — you'll never wait for a match. It's free and works without an account on web, though the app experience is better. The limits: strictly 1-on-1, no filters, manual moderation only, and some bots during off-peak hours. Pure volume, minimal evolution.</P>
-      </Section>
+      <ListicleItem n={2} icon="📺" accent="#2563EB" title="OmeTV — the biggest app by raw numbers">
+        <A to="/vs/ometv">OmeTV</A> is the most-downloaded random video chat app and the traffic leader — you'll never wait for a match. It's free and works without an account on web, though the app experience is better. The limits: strictly 1-on-1, no filters, manual moderation only, and some bots during off-peak hours. Pure volume, minimal evolution.
+      </ListicleItem>
 
-      <Section>
-        <H2>#3: Monkey App — the Gen Z favorite</H2>
-        <P><A to="/vs/monkey">Monkey App</A> nailed the mobile-native design language — Snapchat-style interface, short timed chats, swipe mechanics. It requires a download and an account, stays 1-on-1 only, and nudges toward paid filters. Great if you want a real app icon on your home screen; unnecessary if you just want to chat now.</P>
-      </Section>
+      <ListicleItem n={3} icon="🐵" accent="#EAB308" title="Monkey App — the Gen Z favorite">
+        <A to="/vs/monkey">Monkey App</A> nailed the mobile-native design language — Snapchat-style interface, short timed chats, swipe mechanics. It requires a download and an account, stays 1-on-1 only, and nudges toward paid filters. Great if you want a real app icon on your home screen; unnecessary if you just want to chat now.
+      </ListicleItem>
 
-      <Section>
-        <H2>#4: Azar — the dating-adjacent heavyweight</H2>
-        <P>Azar is huge globally — hundreds of millions of downloads — but it's really a video dating app wearing random chat clothes. Gender filters, regions, and anything useful sit behind coins and subscriptions, profiles are mandatory, and the vibe is closer to Tinder than Omegle. If you want dating, it works; if you want spontaneous anonymous chat, it's the wrong app.</P>
-      </Section>
+      <ListicleBanner
+        title="No install. No account. Just tap and talk."
+        subtitle="FaceFrenzy is the only top random video chat app that works instantly in your browser — try it free right now."
+      />
 
-      <Section>
-        <H2>#5: Emerald Chat — the karma system</H2>
-        <P><A to="/vs/emerald-chat">Emerald Chat</A> bet on reputation — karma scores, interest matching, community flags. It works as a browser app, but requires an account, the user base is modest, and the filters people actually want are premium.</P>
-      </Section>
+      <ListicleItem n={4} icon="❤️" accent="#DC2626" title="Azar — the dating-adjacent heavyweight">
+        Azar is huge globally — hundreds of millions of downloads — but it's really a video dating app wearing random chat clothes. Gender filters, regions, and anything useful sit behind coins and subscriptions, profiles are mandatory, and the vibe is closer to Tinder than Omegle.
+      </ListicleItem>
 
-      <Section>
-        <H2>#6-10: Everyone else</H2>
-        <UL>
-          <LI><strong><A to="/vs/chatspin">Chatspin</A></strong> — decent apps, signup required, filters paywalled. The "free" tier is a funnel.</LI>
-          <LI><strong><A to="/vs/shagle">Shagle</A></strong> — virtual gifts and masks; account required; dating-skewed.</LI>
-          <LI><strong><A to="/vs/chatrandom">Chatrandom</A></strong> — niche chatrooms (including gay chat) are its differentiator; signup friction drags it down.</LI>
-          <LI><strong><A to="/vs/camsurf">CamSurf</A></strong> — clean and lightweight, but the small user base makes off-peak matching slow.</LI>
-          <LI><strong><A to="/vs/chatroulette">Chatroulette</A></strong> — the legend, still free and signup-free — but mostly bots now. See <A to="/best-chatroulette-alternatives">better Chatroulette alternatives</A>.</LI>
-        </UL>
-      </Section>
+      <ListicleItem n={5} icon="💚" accent="#059669" title="Emerald Chat — the karma system">
+        <A to="/vs/emerald-chat">Emerald Chat</A> bet on reputation — karma scores, interest matching, community flags. It works as a browser app, but requires an account, the user base is modest, and the filters people actually want are premium.
+      </ListicleItem>
+
+      <ListicleItem n={6} icon="💬" accent="#DB2777" title="Chatspin — polished but gated">
+        <A to="/vs/chatspin">Chatspin</A> has decent apps, but signup is required and filters are paywalled. The "free" tier is a funnel.
+      </ListicleItem>
+
+      <ListicleItem n={7} icon="🎁" accent="#0284C7" title="Shagle — gifts over substance">
+        <A to="/vs/shagle">Shagle</A> offers virtual gifts and masks, but it's dating-skewed and key features are locked behind an account and payment.
+      </ListicleItem>
+
+      <ListicleItem n={8} icon="🎲" accent="#7C3AED" title="Chatrandom — niche rooms">
+        <A to="/vs/chatrandom">Chatrandom</A> differentiates with niche chatrooms (including gay chat), but signup friction undermines the point of random chat.
+      </ListicleItem>
+
+      <ListicleItem n={9} icon="🏄" accent="#0D9488" title="CamSurf — clean and quiet">
+        <A to="/vs/camsurf">CamSurf</A> is lightweight with a family-friendly pitch, but the small user base makes off-peak matching slow.
+      </ListicleItem>
+
+      <ListicleItem n={10} icon="🎰" accent="#64748B" title="Chatroulette — the legend, still standing">
+        <A to="/vs/chatroulette">Chatroulette</A> is still free and signup-free — but mostly bots now. For the full picture see <A to="/best-chatroulette-alternatives">the best Chatroulette alternatives</A>.
+      </ListicleItem>
 
       <Section>
         <H2>How to pick a random video chat app</H2>

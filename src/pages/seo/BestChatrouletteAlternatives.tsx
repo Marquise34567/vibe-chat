@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "./SEOPage";
+import { SEOPage, Section, H2, P, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema, ListicleItem, ListicleBanner } from "./SEOPage";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
@@ -45,12 +45,10 @@ const BestChatrouletteAlternatives = () => {
       <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
-        <H2>The best Chatroulette alternative in 2026 is FaceFrenzy</H2>
-        <P>Chatroulette pioneered random video chat back in 2009 — but a decade and a half later the site is mostly bots, fake webcam loops, and zero moderation. Every Chatroulette alternative on this list was tested for one thing above all: do you actually get matched with real people? FaceFrenzy is the best Chatroulette alternative because it keeps everything that made the original fun — instant random matching, no signup, completely free — while solving the problems that killed it: AI moderation scans camera feeds in real time, a 16+ age gate keeps minors off, and bot accounts can't survive the live-video check. You also get modes Chatroulette never had: group video chat with 3-4 strangers and blind mode, where you talk voice-first before cameras reveal. Here's the full ranking.</P>
+        <P>Chatroulette pioneered random video chat back in 2009 — but a decade and a half later the site is mostly bots, fake webcam loops, and zero moderation. Every Chatroulette alternative on this list was tested for one thing above all: do you actually get matched with real people? Here's the full ranking.</P>
       </Section>
 
       <Section>
-        <H2>All Chatroulette alternatives compared</H2>
         <ComparisonTable rows={[
           { name: "FaceFrenzy", bots: "No", age: "16+", mods: "AI", signup: "None", free: "Yes", highlight: true },
           { name: "OmeTV", bots: "Some", age: "18+", mods: "Manual", signup: "Optional", free: "Yes" },
@@ -65,45 +63,54 @@ const BestChatrouletteAlternatives = () => {
         ]} />
       </Section>
 
-      <Section>
-        <H2>#1: FaceFrenzy — Chatroulette's spirit, minus the bots</H2>
-        <P>FaceFrenzy is the best site like Chatroulette in 2026 because it fixes the three things that ruined the original. First, bots: every connection is a real person with a live camera — the platform's verification layer makes scripted webcam loops impossible. Second, safety: AI scans video feeds in real time and auto-bans offenders, with one-tap reporting on top — where Chatroulette relies on a report queue that bad actors ignore. Third, features: beyond the classic match-and-skip loop you get gender and country filters, group video chat for 3-4 people, and blind mode (voice-only for 30 seconds, then the reveal). It's all free, all in the browser, no account or download needed. If you remember what Chatroulette felt like in 2010, this is that — but it actually works.</P>
-      </Section>
+      <ListicleItem n={1} icon="⚡" accent="#7C5CFF" cta title="FaceFrenzy — Chatroulette's spirit, minus the bots">
+        FaceFrenzy is the best site like Chatroulette in 2026 because it fixes the three things that ruined the original. First, bots: every connection is a real person with a live camera — scripted webcam loops can't survive the live-video check. Second, safety: AI scans feeds in real time and auto-bans offenders, with one-tap reporting on top. Third, features: beyond the classic match-and-skip loop you get gender and country filters, group video chat for 3-4 people, and blind mode (voice-only for 30 seconds, then the reveal). Free, no account, no download. If you remember what Chatroulette felt like in 2010, this is that — but it actually works.
+      </ListicleItem>
 
-      <Section>
-        <H2>#2: OmeTV — the biggest pool of strangers</H2>
-        <P><A to="/vs/ometv">OmeTV</A> pulls the most traffic of any random video chat site — tens of millions of visits per quarter — so matching is instant at any hour. It's free and works without an account. The tradeoffs: strictly 1-on-1, no filters or extra modes, manual moderation only, and bots still slip through during off-peak hours. If sheer volume is what you want, OmeTV is the answer — but it's the same experience Chatroulette offered, just with more people.</P>
-      </Section>
+      <ListicleItem n={2} icon="📺" accent="#2563EB" title={<>OmeTV — the biggest pool of strangers</>}>
+        <A to="/vs/ometv">OmeTV</A> pulls the most traffic of any random video chat site — tens of millions of visits per quarter — so matching is instant at any hour. It's free and works without an account. The tradeoffs: strictly 1-on-1, no filters or extra modes, manual moderation only, and bots still slip through during off-peak hours. If sheer volume is what you want, OmeTV delivers — but it's the same experience Chatroulette offered, just with more people.
+      </ListicleItem>
 
-      <Section>
-        <H2>#3: Monkey App — mobile-first, but locked behind a download</H2>
-        <P><A to="/vs/monkey">Monkey App</A> reimagined random video chat for Gen Z with a Snapchat-style interface and short timed chats. It's the most polished mobile experience in the category — but it requires an app install, an account, and it's 1-on-1 only. If you want an app specifically, Monkey is the pick; if you want the same vibe with zero install, FaceFrenzy does it in the browser.</P>
-      </Section>
+      <ListicleItem n={3} icon="🐵" accent="#EAB308" title="Monkey App — mobile-first, but locked behind a download">
+        <A to="/vs/monkey">Monkey App</A> reimagined random video chat for Gen Z with a Snapchat-style interface and short timed chats. It's the most polished mobile experience in the category — but it requires an app install, an account, and it's 1-on-1 only. If you want an app specifically, Monkey is the pick; if you want the same vibe with zero install, FaceFrenzy does it in the browser.
+      </ListicleItem>
 
-      <Section>
-        <H2>#4: Emerald Chat — interest matching, paywalled</H2>
-        <P><A to="/vs/emerald-chat">Emerald Chat</A> tries to be the civilized Chatroulette — interest tags, karma scores, and a cleaner community. In practice you need an account, the user base is smaller than the leaders, and key features like gender filters are behind a subscription. Good intentions, real friction.</P>
-      </Section>
+      <ListicleBanner
+        title="Skip the list — FaceFrenzy is #1 for a reason"
+        subtitle="Real people only. No bots, no signup, no download. One tap and you're on camera with a stranger."
+      />
 
-      <Section>
-        <H2>#5-9: The middle of the pack</H2>
-        <UL>
-          <LI><strong><A to="/vs/chatspin">Chatspin</A></strong> — polished mobile apps, but requires signup and gates gender/location filters behind premium.</LI>
-          <LI><strong><A to="/vs/shagle">Shagle</A></strong> — virtual gifts and filters, dating-skewed, account required, core features paid.</LI>
-          <LI><strong><A to="/vs/chatrandom">Chatrandom</A></strong> — themed chat rooms and gay chat differentiate it, but signup + paywall friction kills the spontaneity.</LI>
-          <LI><strong><A to="/vs/camsurf">CamSurf</A></strong> — simple and family-friendly in pitch, but the smaller user base means slow matching at off-peak hours.</LI>
-          <LI><strong><A to="/vs/joingy">Joingy</A></strong> — one of the few with text-only random chat, but dated UI and thin moderation.</LI>
-        </UL>
-      </Section>
+      <ListicleItem n={4} icon="💚" accent="#059669" title="Emerald Chat — interest matching, paywalled">
+        <A to="/vs/emerald-chat">Emerald Chat</A> tries to be the civilized Chatroulette — interest tags, karma scores, and a cleaner community. In practice you need an account, the user base is smaller than the leaders, and key features like gender filters are behind a subscription. Good intentions, real friction.
+      </ListicleItem>
 
-      <Section>
-        <H2>#10: Bazoocam — and what to avoid</H2>
-        <P><A to="/vs/bazoocam">Bazoocam</A> is a real site but hasn't been meaningfully updated in over a decade — bots are rampant and there's no age check. Beyond it, avoid the legion of clones trading on dead brand names (anything with "chatroulette" or "omegle" stuffed in a .tv/.fun/.online domain). They're unaffiliated, unmoderated, and some serve malware-tier ads. Stick to the platforms above — or just see <A to="/omegle-alternative">the best Omegle alternatives</A> for the wider field.</P>
-      </Section>
+      <ListicleItem n={5} icon="💬" accent="#DB2777" title="Chatspin — polished apps, paywalled filters">
+        <A to="/vs/chatspin">Chatspin</A> has polished mobile apps, but requires signup and gates gender/location filters behind premium. Decent UX, but the "free" tier is mostly a funnel.
+      </ListicleItem>
+
+      <ListicleItem n={6} icon="🎁" accent="#0284C7" title="Shagle — virtual gifts, dating-skewed">
+        <A to="/vs/shagle">Shagle</A> offers virtual gifts and filters, but it's dating-skewed, account required, and core features are paid.
+      </ListicleItem>
+
+      <ListicleItem n={7} icon="🎲" accent="#7C3AED" title="Chatrandom — niche rooms, heavy friction">
+        <A to="/vs/chatrandom">Chatrandom</A> has themed chat rooms and gay chat that differentiate it, but signup + paywall friction kills the spontaneity.
+      </ListicleItem>
+
+      <ListicleItem n={8} icon="🏄" accent="#0D9488" title="CamSurf — simple but thin">
+        <A to="/vs/camsurf">CamSurf</A> is simple and family-friendly in pitch, but the smaller user base means slow matching at off-peak hours.
+      </ListicleItem>
+
+      <ListicleItem n={9} icon="⌨️" accent="#D97706" title="Joingy — rare text-only option">
+        <A to="/vs/joingy">Joingy</A> is one of the few with text-only random chat, but the interface is dated and moderation is thin.
+      </ListicleItem>
+
+      <ListicleItem n={10} icon="🕹️" accent="#64748B" title="Bazoocam — and what to avoid">
+        <A to="/vs/bazoocam">Bazoocam</A> is a real site but hasn't been meaningfully updated in over a decade — bots are rampant and there's no age check. Beyond it, avoid the legion of clones trading on dead brand names (anything with "chatroulette" or "omegle" stuffed in a .tv/.fun/.online domain). They're unaffiliated, unmoderated, and some serve malware-tier ads.
+      </ListicleItem>
 
       <Section>
         <H2>How we ranked these</H2>
-        <P>Every site was tested firsthand on the criteria Chatroulette fails: bot presence (do you reach real people fast), moderation (AI real-time scanning vs manual reports), age verification, friction (signup/download requirements), and cost (free vs paywalled filters). Rankings reflect each platform's state as of October 2026. For the bigger picture, see <A to="/blog/best-random-video-chat-2026">the best random video chat sites of 2026</A>.</P>
+        <P>Every site was tested firsthand on the criteria Chatroulette fails: bot presence (do you reach real people fast), moderation (AI real-time scanning vs manual reports), age verification, friction (signup/download requirements), and cost (free vs paywalled filters). Rankings reflect each platform's state as of October 2026. For the bigger picture, see <A to="/blog/best-random-video-chat-2026">the best random video chat sites of 2026</A> or <A to="/best-omegle-alternatives">the best Omegle alternatives</A>.</P>
       </Section>
 
       <Section>

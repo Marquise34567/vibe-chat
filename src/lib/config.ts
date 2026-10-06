@@ -71,7 +71,7 @@ export const VIP_PLANS = [
 
 /** Official social links — point these at your accounts */
 export const SOCIAL_LINKS = {
-  x: "https://x.com/facefrenzy", // ← replace with your X handle
+  x: "https://x.com/quisebuilds",
 } as const;
 
 /** Worker/server base URL (http) for REST API calls */
