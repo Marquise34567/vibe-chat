@@ -152,6 +152,24 @@ const SEO_ROUTES: Record<string, SeoMeta> = {
     description:
       "The 10 best Omegle alternatives in 2026, ranked. Sites like Omegle that still work — free random video chat, no signup, no bots. See why FaceFrenzy ranks #1.",
   },
+  "/best-chatroulette-alternatives": {
+    path: "/best-chatroulette-alternatives",
+    title: "10 Best Chatroulette Alternatives in 2026 — Sites Like Chatroulette | FaceFrenzy",
+    description:
+      "The 10 best Chatroulette alternatives in 2026, ranked. Sites like Chatroulette with real users, no bots, better moderation — see why FaceFrenzy ranks #1.",
+  },
+  "/monkey-app-alternatives": {
+    path: "/monkey-app-alternatives",
+    title: "10 Best Monkey App Alternatives in 2026 — No Download Needed | FaceFrenzy",
+    description:
+      "The 10 best Monkey app alternatives in 2026. Random video chat without the download or signup — see why FaceFrenzy is the #1 free Monkey alternative.",
+  },
+  "/random-video-chat-apps": {
+    path: "/random-video-chat-apps",
+    title: "10 Best Random Video Chat Apps in 2026 — Talk to Strangers Free | FaceFrenzy",
+    description:
+      "The 10 best random video chat apps in 2026, ranked. Talk to strangers free — most don't even need a download. See why FaceFrenzy ranks #1.",
+  },
 };
 
 // Edge function that serves the SPA index.html with per-route <title>,

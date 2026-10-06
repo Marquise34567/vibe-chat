@@ -20,7 +20,7 @@ import { useTier } from "@/hooks/useTier";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
 import { getLocalProfile } from "@/lib/localUser";
 import { normalizeGender } from "../../../shared/analytics";
-import { apiBase } from "@/lib/config";
+import { apiBase, SOCIAL_LINKS } from "@/lib/config";
 
 /* ═══════════════════════════════════════════════════════════════
    FaceFrenzy Lobby — "You Are The Lobby"
@@ -432,10 +432,24 @@ const StartTab = () => {
             <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{fmt(onlineCount)}</span>
           </div>
 
+          {/* Follow us on X */}
+          <a href={SOCIAL_LINKS.x} target="_blank" rel="noopener noreferrer" aria-label="Follow us on X"
+            style={{
+              width: 44, height: 44, borderRadius: 22,
+              background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.2s ease, background 0.2s ease",
+              fontSize: 16, fontWeight: 800, color: "#fff", textDecoration: "none",
+            }}
+          >
+            𝕏
+          </a>
+
           {/* Menu */}
           <button onClick={() => setShowSettings(true)} aria-label="Settings"
             style={{
-              width: 38, height: 38, borderRadius: 19,
+              width: 44, height: 44, borderRadius: 22,
               background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
               backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
               display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
@@ -502,7 +516,7 @@ const StartTab = () => {
             {spooky ? "🎃 FaceFrenzy" : "FaceFrenzy"}
           </div>
           <h1 style={{
-            fontSize: 56, fontWeight: 900, letterSpacing: "-2px", lineHeight: 1,
+            fontSize: "clamp(40px, 14vw, 56px)", fontWeight: 900, letterSpacing: "-2px", lineHeight: 1,
             color: "#fff", textShadow: "0 4px 24px rgba(0,0,0,0.5)",
             marginBottom: 8,
           }}>

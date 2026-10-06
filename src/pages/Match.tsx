@@ -121,7 +121,7 @@ const Match = () => {
       </div>
 
       {/* ── Single cancel button ── */}
-      <div className="relative z-10 px-4 pb-8 flex justify-center">
+      <div className="relative z-10 px-4 flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)" }}>
         <button onClick={handleCancel} className="btn-glass flex items-center gap-2">
           <CloseIcon className="w-4 h-4" /> Cancel
         </button>

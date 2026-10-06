@@ -87,6 +87,9 @@ export const SEOPage = ({
           <FooterLink href="/random-cam-chat" label="Random Cam Chat" navigate={navigate} />
           <FooterLink href="/1v1-video-chat" label="1v1 Video Chat" navigate={navigate} />
           <FooterLink href="/best-omegle-alternatives" label="Best Omegle Alternatives" navigate={navigate} />
+          <FooterLink href="/best-chatroulette-alternatives" label="Chatroulette Alternatives" navigate={navigate} />
+          <FooterLink href="/monkey-app-alternatives" label="Monkey App Alternatives" navigate={navigate} />
+          <FooterLink href="/random-video-chat-apps" label="Random Video Chat Apps" navigate={navigate} />
           <FooterLink href="/safety" label="Safety" navigate={navigate} />
           <FooterLink href="/vs/ometv" label="OmeTV Alternative" navigate={navigate} />
           <FooterLink href="/vs/emerald-chat" label="Emerald Chat Alternative" navigate={navigate} />

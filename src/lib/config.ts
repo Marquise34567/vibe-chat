@@ -69,6 +69,11 @@ export const VIP_PLANS = [
   { id: "vip-yearly",  label: "Yearly",  price: "$59.99", per: "/yr", save: "Save 50%", featured: true,  tier: "vip" as const },
 ];
 
+/** Official social links — point these at your accounts */
+export const SOCIAL_LINKS = {
+  x: "https://x.com/facefrenzy", // ← replace with your X handle
+} as const;
+
 /** Worker/server base URL (http) for REST API calls */
 export const apiBase = () =>
   (import.meta.env.VITE_MATCH_SERVER_URL as string | undefined)

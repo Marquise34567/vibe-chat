@@ -326,8 +326,8 @@ const ChatRoom = () => {
       {/* Spooky season — subtle particles floating over the call UI */}
       {spooky && <HalloweenOverlay zIndex={20} density={6} dimmed />}
 
-      {/* Top bar */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+      {/* Top bar — padded below the notch/status bar */}
+      <div className="px-4 pb-2 flex items-center justify-between" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
         <button onClick={handleExit} className="text-sm font-semibold flex items-center gap-1" style={{ color: "rgba(255,255,255,0.5)" }}>
           <ArrowLeft className="w-4 h-4" strokeWidth={2.5} /> Exit
         </button>
@@ -342,7 +342,7 @@ const ChatRoom = () => {
       </div>
 
       {/* Video stage — tile layout depends on participant count */}
-      <div className="flex-1 px-4 pb-4 flex flex-col gap-3">
+      <div className="flex-1 px-4 flex flex-col gap-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)" }}>
 
         {/* ── Games overlay — replaces video, only when pressed ── */}
         {showGames ? (

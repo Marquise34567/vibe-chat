@@ -34,6 +34,9 @@ import AnonymousVideoChat from "./pages/seo/AnonymousVideoChat";
 import RandomCamChat from "./pages/seo/RandomCamChat";
 import OneOnOneVideoChat from "./pages/seo/OneOnOneVideoChat";
 import BestOmegleAlternatives from "./pages/seo/BestOmegleAlternatives";
+import BestChatrouletteAlternatives from "./pages/seo/BestChatrouletteAlternatives";
+import MonkeyAppAlternatives from "./pages/seo/MonkeyAppAlternatives";
+import RandomVideoChatApps from "./pages/seo/RandomVideoChatApps";
 
 const queryClient = new QueryClient();
 
@@ -106,6 +109,9 @@ const App = () => {
               <Route path="/random-cam-chat" element={<RandomCamChat />} />
               <Route path="/1v1-video-chat" element={<OneOnOneVideoChat />} />
               <Route path="/best-omegle-alternatives" element={<BestOmegleAlternatives />} />
+              <Route path="/best-chatroulette-alternatives" element={<BestChatrouletteAlternatives />} />
+              <Route path="/monkey-app-alternatives" element={<MonkeyAppAlternatives />} />
+              <Route path="/random-video-chat-apps" element={<RandomVideoChatApps />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>
