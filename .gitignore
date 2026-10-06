@@ -26,3 +26,4 @@ dist-ssr
 .wrangler
 .dev.vars
 .env*
+vite.config.ts.timestamp-*.mjs
