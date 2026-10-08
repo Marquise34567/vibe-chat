@@ -219,3 +219,48 @@ create index if not exists idx_gifts_sender on public.gifts_sent (sender_id);
 create index if not exists idx_gifts_receiver on public.gifts_sent (receiver_id);
 create index if not exists idx_profiles_online on public.profiles (last_seen_at desc);
 create index if not exists idx_profiles_scholar on public.profiles (is_scholar) where is_scholar = true;
+
+-- ============================================================================
+-- VISITORS (every guest who joins — no auth required, anon-key upsert)
+-- ============================================================================
+create table if not exists public.visitors (
+  id uuid primary key,
+  display_name text,
+  gender text,
+  country text,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+
+alter table public.visitors enable row level security;
+
+-- Anon key gets zero table access — guests are recorded via this
+-- SECURITY DEFINER RPC so the visitor list can't be enumerated.
+create or replace function public.record_visitor(
+  p_id uuid,
+  p_display_name text,
+  p_gender text default null,
+  p_country text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.visitors (id, display_name, gender, country, last_seen_at)
+  values (p_id, left(coalesce(p_display_name, ''), 100), p_gender, p_country, now())
+  on conflict (id) do update set
+    display_name = excluded.display_name,
+    gender = excluded.gender,
+    country = excluded.country,
+    last_seen_at = now();
+end;
+$$;
+
+grant execute on function public.record_visitor(uuid, text, text, text) to anon, authenticated;
+
+revoke select, insert, update, delete, truncate, references, trigger
+  on public.visitors from anon, authenticated;
+
+create index if not exists idx_visitors_last_seen on public.visitors (last_seen_at desc);

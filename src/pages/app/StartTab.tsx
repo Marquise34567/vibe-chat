@@ -18,6 +18,7 @@ import { FrenzyFace } from "@/components/MatchIcons";
 import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
 import { isHalloweenSeason } from "@/lib/halloween";
 import { useTier } from "@/hooks/useTier";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
 import { getLocalProfile } from "@/lib/localUser";
 import { normalizeGender } from "../../../shared/analytics";
@@ -78,6 +79,7 @@ const StartTab = () => {
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
   const [paywall, setPaywall] = useState<PaywallReason | null>(null);
   const { tier, features, setTier, loading: tierLoading } = useTier();
+  const isMobile = useIsMobile();
   const isPaid = tier !== "free";
   const canPickGender = features.canFilterByGender;
   // Free tier: worldwide only. Paid: pick any region.
@@ -330,13 +332,15 @@ const StartTab = () => {
             <span style={{ fontSize: 12, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(onlineCount)}</span>
           </div>
 
-          {/* Follow us on X */}
-          <a href={SOCIAL_LINKS.x} target="_blank" rel="noopener noreferrer" aria-label="Follow us on X"
-            className="bub-btn bub-btn-ghost"
-            style={{ ...circleBtnStyle, fontSize: 16, fontWeight: 800, color: BUBBLE.ink, textDecoration: "none" }}
-          >
-            𝕏
-          </a>
+          {/* Follow us on X — desktop only, keeps mobile top bar clean */}
+          {!isMobile && (
+            <a href={SOCIAL_LINKS.x} target="_blank" rel="noopener noreferrer" aria-label="Follow us on X"
+              className="bub-btn bub-btn-ghost"
+              style={{ ...circleBtnStyle, fontSize: 16, fontWeight: 800, color: BUBBLE.ink, textDecoration: "none" }}
+            >
+              𝕏
+            </a>
+          )}
 
           {/* Menu */}
           <button onClick={() => setShowSettings(true)} aria-label="Settings" className="bub-btn bub-btn-ghost" style={circleBtnStyle}>
@@ -368,13 +372,15 @@ const StartTab = () => {
       <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 20px 12px", textAlign: "center" }}>
         {spooky && <div style={{ marginBottom: 8 }}><FrightBadge /></div>}
 
-        {/* Activity ticker chip */}
-        <div key={feedIdx} className="animate-fade-in" style={{ ...chipStyle, marginBottom: 12, fontSize: 11, color: BUBBLE.sub, fontWeight: 600 }}>
-          <span style={{ color: BUBBLE.ink, fontWeight: 800 }}>{ACTIVITY_FEED[feedIdx].name}</span>
-          {" "}{ACTIVITY_FEED[feedIdx].flag} {ACTIVITY_FEED[feedIdx].action}{" "}
-          <span style={{ color: accent, fontWeight: 800 }}>{ACTIVITY_FEED[feedIdx].target}</span>
-          {ACTIVITY_FEED[feedIdx].flag2 && ` ${ACTIVITY_FEED[feedIdx].flag2}`}
-        </div>
+        {/* Activity ticker chip — desktop only, declutters mobile */}
+        {!isMobile && (
+          <div key={feedIdx} className="animate-fade-in" style={{ ...chipStyle, marginBottom: 12, fontSize: 11, color: BUBBLE.sub, fontWeight: 600 }}>
+            <span style={{ color: BUBBLE.ink, fontWeight: 800 }}>{ACTIVITY_FEED[feedIdx].name}</span>
+            {" "}{ACTIVITY_FEED[feedIdx].flag} {ACTIVITY_FEED[feedIdx].action}{" "}
+            <span style={{ color: accent, fontWeight: 800 }}>{ACTIVITY_FEED[feedIdx].target}</span>
+            {ACTIVITY_FEED[feedIdx].flag2 && ` ${ACTIVITY_FEED[feedIdx].flag2}`}
+          </div>
+        )}
 
         <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease" }}>
           <h1 style={{ fontSize: "clamp(30px, 9vw, 44px)", fontWeight: 900, letterSpacing: "-1.6px", lineHeight: 1.05, color: BUBBLE.ink, marginBottom: 5 }}>
@@ -382,7 +388,7 @@ const StartTab = () => {
           </h1>
           <p style={{ fontSize: 14, color: BUBBLE.sub, fontWeight: 600 }}>
             {friendConnected ? "You and your friend — ready to match" : modeMeta[mode].desc}
-            <span style={{ color: BUBBLE.faint }}> · {spooky ? "the spookiest Omegle alternative" : "The #1 Omegle Alternative"}</span>
+            {!isMobile && <span style={{ color: BUBBLE.faint }}> · {spooky ? "the spookiest Omegle alternative" : "The #1 Omegle Alternative"}</span>}
           </p>
         </div>
       </div>
@@ -502,14 +508,16 @@ const StartTab = () => {
             background: "linear-gradient(180deg, rgba(246,244,255,0.92) 0%, rgba(246,244,255,0.5) 24%, rgba(246,244,255,0.38) 50%, rgba(246,244,255,0.5) 72%, rgba(246,244,255,0.88) 100%)",
           }} />
 
-          {/* Match counter chip — floats just below the top bar */}
-          <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 64px)", right: 16, zIndex: 5 }}>
-            <span style={{ ...chipStyle, gap: 6, padding: "6px 13px" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5B400", boxShadow: "0 0 8px rgba(245,180,0,0.7)", animation: "ff-core-pulse 1.5s ease-in-out infinite" }} />
-              <span style={{ fontSize: 11, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(matchCount)}</span>
-              <span style={{ fontSize: 10, color: BUBBLE.faint, fontWeight: 700 }}>today</span>
-            </span>
-          </div>
+          {/* Match counter chip — desktop only, declutters mobile */}
+          {!isMobile && (
+            <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 64px)", right: 16, zIndex: 5 }}>
+              <span style={{ ...chipStyle, gap: 6, padding: "6px 13px" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5B400", boxShadow: "0 0 8px rgba(245,180,0,0.7)", animation: "ff-core-pulse 1.5s ease-in-out infinite" }} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(matchCount)}</span>
+                <span style={{ fontSize: 10, color: BUBBLE.faint, fontWeight: 700 }}>today</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -526,6 +534,50 @@ const StartTab = () => {
           border: `1px solid ${BUBBLE.border}`,
           boxShadow: BUBBLE.cardShadow,
         }}>
+          {/* Sponsors — compact strip on mobile (right rail is desktop-only) */}
+          {isMobile && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              {[0, 1, 2, 3].map((i) => {
+                const sponsor = sponsors[i];
+                const preview = sponsor?.preview;
+                return (
+                  <button key={i}
+                    onClick={() => {
+                      if (sponsor?.link) window.open(sponsor.link.startsWith("http") ? sponsor.link : `https://${sponsor.link}`, "_blank");
+                      else setShowSponsorSheet(true);
+                    }}
+                    style={{
+                      flex: 1, height: 44, borderRadius: 13, padding: 4, overflow: "hidden",
+                      background: sponsor ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(109,94,245,0.08))" : "rgba(109,94,245,0.04)",
+                      border: sponsor ? "1.5px solid rgba(217,119,6,0.30)" : `1px dashed ${BUBBLE.border}`,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      cursor: "pointer", position: "relative",
+                    }}
+                  >
+                    {sponsor ? (
+                      <>
+                        {preview?.image ? (
+                          <img src={preview.image} alt="" style={{ width: 20, height: 20, borderRadius: 6, objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : preview?.favicon ? (
+                          <img src={preview.favicon} alt="" style={{ width: 16, height: 16, borderRadius: 4 }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : null}
+                        <span style={{ fontSize: 8, fontWeight: 800, color: BUBBLE.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 44 }}>
+                          {preview?.title || sponsor.label}
+                        </span>
+                        <span style={{ position: "absolute", top: 2, right: 4, fontSize: 6, fontWeight: 800, color: "rgba(217,119,6,0.6)", textTransform: "uppercase" }}>ad</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusIcon style={{ width: 12, height: 12, color: "rgba(217,119,6,0.5)" }} />
+                        <span style={{ fontSize: 8, fontWeight: 800, color: "rgba(217,119,6,0.55)" }}>ad</span>
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Mode selector — 3 pills */}
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {(["solo", "group", "blind"] as Mode[]).map((m, idx) => {
@@ -731,8 +783,10 @@ const StartTab = () => {
       </div>
 
       {/* ═══════════════════════════════════════════════════
-          SPONSOR BOXES — right side of lobby, prominent
+          SPONSOR BOXES — right rail, desktop only (mobile gets
+          a compact strip inside the dock instead)
       ═══════════════════════════════════════════════════ */}
+      {!isMobile && (
       <div style={{
         position: "fixed", right: 14, top: "50%", transform: "translateY(-50%)",
         display: "flex", flexDirection: "column", gap: 10, zIndex: 50,
@@ -843,6 +897,7 @@ const StartTab = () => {
           Become a Sponsor
         </button>
       </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════
           SHEETS

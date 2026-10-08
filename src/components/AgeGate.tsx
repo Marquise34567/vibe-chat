@@ -3,6 +3,7 @@ import { Shield, Sparkles, ArrowRight, User } from "lucide-react";
 import { GlassCard } from "@/components/glass";
 import { setAgeVerified } from "@/lib/verification";
 import { getDisplayName, setDisplayName } from "@/lib/localUser";
+import { syncVisitorToSupabase } from "@/lib/identitySync";
 import { toast } from "sonner";
 
 /**
@@ -25,6 +26,8 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
     if (!trimmed) { toast.error("Pick a name to show when matching"); return; }
     if (trimmed.length > 20) { toast.error("Keep it under 20 characters"); return; }
     setDisplayName(trimmed);
+    // Persist the new visitor row immediately (no auth required)
+    void syncVisitorToSupabase();
     toast.success(`Let's go, ${trimmed}!`);
     onDone();
   };

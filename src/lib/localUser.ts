@@ -1,5 +1,3 @@
-import { syncDisplayNameToSupabase } from "@/lib/identitySync";
-
 /**
  * Local user system — provides a persistent identity + profile without Supabase auth.
  * The app works fully without login. If a Supabase session exists, it takes priority.
@@ -101,8 +99,6 @@ export const setDisplayName = (name: string) => {
   // Also sync into the local user + profile so existing reads pick it up
   updateLocalUserMeta({ display_name: name });
   saveLocalProfile({ display_name: name });
-  // Fire-and-forget: persist to Postgres too when a Supabase session exists
-  void syncDisplayNameToSupabase(name);
 };
 export const hasDisplayName = (): boolean => {
   return !!getDisplayName();

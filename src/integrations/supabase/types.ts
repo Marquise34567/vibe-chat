@@ -72,6 +72,33 @@ export type Database = {
         }
         Relationships: []
       }
+      visitors: {
+        Row: {
+          id: string
+          display_name: string | null
+          gender: string | null
+          country: string | null
+          first_seen_at: string
+          last_seen_at: string
+        }
+        Insert: {
+          id: string
+          display_name?: string | null
+          gender?: string | null
+          country?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Update: {
+          id?: string
+          display_name?: string | null
+          gender?: string | null
+          country?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Relationships: []
+      }
       chat_threads: {
         Row: {
           id: string
@@ -266,7 +293,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      record_visitor: {
+        Args: {
+          p_id: string
+          p_display_name: string
+          p_gender?: string | null
+          p_country?: string | null
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       subscription_tier: "free" | "plus" | "vip"

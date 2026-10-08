@@ -1,19 +1,20 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getDisplayName, getLocalProfile, getLocalUser } from "@/lib/localUser";
 
 /**
- * Persists the chosen display name to Supabase — auth user_metadata + the
- * profiles row (auto-created by the on_auth_user_created trigger).
- * No-op when there's no session (fully-local fallback users).
+ * Persists every visitor to the `visitors` table via the `record_visitor`
+ * SECURITY DEFINER RPC — no auth required, and the anon key gets zero direct
+ * table access (visitors can't be enumerated via PostgREST). Upserts on the
+ * stable local user id and doubles as the guest last_seen_at heartbeat.
  */
-export const syncDisplayNameToSupabase = async (name: string): Promise<void> => {
-  const trimmed = name.trim();
-  if (!trimmed) return;
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return;
-  await Promise.all([
-    supabase.auth.updateUser({ data: { display_name: trimmed } }),
-    supabase.from("profiles").upsert({ id: session.user.id, display_name: trimmed }),
-  ]);
+export const syncVisitorToSupabase = async (): Promise<void> => {
+  const user = getLocalUser();
+  const profile = getLocalProfile();
+  const { error } = await supabase.rpc("record_visitor", {
+    p_id: user.id,
+    p_display_name: getDisplayName() ?? user.user_metadata.display_name,
+    p_gender: profile.gender,
+    p_country: profile.country,
+  });
+  if (error) console.warn("[identity] visitor sync failed:", error.message);
 };
