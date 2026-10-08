@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getLocalUser, type LocalUser } from "@/lib/localUser";
+import { getDisplayName, getLocalUser, type LocalUser } from "@/lib/localUser";
+import { syncDisplayNameToSupabase } from "@/lib/identitySync";
 
 type AuthContextType = {
   user: User | LocalUser | null;
@@ -32,14 +33,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: existing } }) => {
-      setSession(existing);
-      setUser(existing?.user ?? getLocalUser());
+    supabase.auth.getSession().then(async ({ data: { session: existing } }) => {
+      if (existing) {
+        setSession(existing);
+        setUser(existing.user);
+        setLoading(false);
+        return;
+      }
+      // No session — silently create an anonymous Supabase user so every
+      // visitor is persisted (on_auth_user_created trigger → profiles row).
+      try {
+        const { data, error } = await supabase.auth.signInAnonymously({
+          options: {
+            data: {
+              display_name:
+                getDisplayName() ?? getLocalUser().user_metadata.display_name,
+            },
+          },
+        });
+        if (error || !data.session) throw error ?? new Error("no session");
+        // onAuthStateChange picks up the new session + user
+      } catch {
+        // Anonymous sign-ins disabled (or offline) — local-only identity fallback
+        setSession(null);
+        setUser(getLocalUser());
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Keep the Postgres profile in sync with the locally-chosen display name
+  // (covers names picked/changed after the anonymous session was created).
+  const syncedNameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!session || !user) return;
+    const name = getDisplayName();
+    if (!name) return;
+    const key = `${user.id}:${name}`;
+    if (syncedNameRef.current === key) return;
+    syncedNameRef.current = key;
+    void syncDisplayNameToSupabase(name);
+  }, [session, user]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

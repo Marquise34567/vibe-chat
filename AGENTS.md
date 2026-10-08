@@ -15,6 +15,7 @@
 - **Frontend**: React + Vite + TypeScript + Tailwind CSS
 - **Backend**: Supabase (profiles, auth, presence) + Node.js WebSocket server (matching + WebRTC signaling)
 - **Real-time video**: WebRTC P2P — the match server only relays signaling (offer/answer/ICE), video goes directly peer-to-peer for zero lag
+- **Identity**: every visitor silently gets a Supabase anonymous sign-in (`signInAnonymously` in `AuthContext`) → real `auth.users` row + auto-created `profiles` row via the `on_auth_user_created` trigger — so every join is persisted in Postgres with their display name. Requires "Anonymous sign-ins" enabled in the Supabase dashboard (Authentication → Providers); falls back to localStorage-only identity (`src/lib/localUser.ts`) if disabled/offline. Name changes sync via `src/lib/identitySync.ts`.
 
 ## Match Server
 

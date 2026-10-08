@@ -15,7 +15,7 @@ import { GIFTS, COIN_PACKAGES } from "@/lib/config";
 import { SOCIAL_PLATFORMS, formatSocialUrl } from "@/lib/socialLinks";
 import { getScholarVerified, getScholarEmail, setScholarVerified, isScholarEmail, clearScholarVerified } from "@/lib/verification";
 import {
-  getLocalProfile, saveLocalProfile, updateLocalUserMeta, type LocalProfile,
+  getLocalProfile, saveLocalProfile, setDisplayName as setLocalDisplayName, updateLocalUserMeta, type LocalProfile,
 } from "@/lib/localUser";
 import { toast } from "sonner";
 
@@ -162,6 +162,8 @@ const ProfileTab = () => {
     }).eq("id", user.id);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
+    // Keep the local name (used as the match name) in sync with the DB
+    setLocalDisplayName(displayName.trim());
     toast.success("Profile saved ✨");
   };
 

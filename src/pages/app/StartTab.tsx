@@ -402,7 +402,7 @@ const StartTab = () => {
                   position: "absolute", inset: 0, width: "100%", height: "100%",
                   objectFit: "cover", transform: "scaleX(-1)",
                   objectPosition: "center top",
-                  opacity: camStatus === "active" ? 0.5 : 0,
+                  opacity: camStatus === "active" ? 0.65 : 0,
                   transition: "opacity 0.6s ease",
                 }}
               />
@@ -499,7 +499,7 @@ const StartTab = () => {
           {/* Lavender scrim — keeps foreground readable over the faint feed */}
           <div style={{
             position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none",
-            background: "linear-gradient(180deg, rgba(246,244,255,0.94) 0%, rgba(246,244,255,0.62) 26%, rgba(246,244,255,0.55) 52%, rgba(246,244,255,0.9) 100%)",
+            background: "linear-gradient(180deg, rgba(246,244,255,0.92) 0%, rgba(246,244,255,0.5) 24%, rgba(246,244,255,0.38) 50%, rgba(246,244,255,0.5) 72%, rgba(246,244,255,0.88) 100%)",
           }} />
 
           {/* Match counter chip — floats just below the top bar */}
