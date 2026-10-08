@@ -161,6 +161,147 @@ export const playCard = (
   return nextState;
 };
 
+/* ════════════════════════════════════════════════════════════════
+   Multiplayer (synced over WebRTC data channel)
+   ────────────────────────────────────────────────────────────────
+   Host-authoritative: one peer (the WebRTC caller) holds the full
+   state — deck, both hands, discard pile — applies moves from both
+   sides, and broadcasts the full state after every change. Each
+   client renders a private "view" via unoViewFor(), which maps to
+   the same UnoState shape the solo game UI already renders.
+   ════════════════════════════════════════════════════════════════ */
+
+export type UnoSide = "a" | "b";
+
+export type UnoFullState = {
+  deck: UnoCard[];
+  discard: UnoCard[];       // played cards under the top — reshuffled when deck empties
+  hands: Record<UnoSide, UnoCard[]>;
+  top: UnoCard;
+  currentColor: UnoColor;
+  turn: UnoSide;
+  winner: UnoSide | null;
+  lastEvent: { actor: UnoSide; text: string } | null;
+};
+
+export type UnoMove =
+  | { type: "play"; cardId: string; color?: UnoColor }
+  | { type: "draw" };
+
+export const otherSideOf = (s: UnoSide): UnoSide => (s === "a" ? "b" : "a");
+
+export const startUnoFull = (): UnoFullState => {
+  const deck = buildDeck();
+  const a = deck.splice(0, 7);
+  const b = deck.splice(0, 7);
+  // First card can't be wild
+  let top = deck.shift()!;
+  while (top.color === "wild") {
+    deck.push(top);
+    top = deck.shift()!;
+  }
+  return {
+    deck,
+    discard: [],
+    hands: { a, b },
+    top,
+    currentColor: top.color,
+    turn: "a",
+    winner: null,
+    lastEvent: null,
+  };
+};
+
+/** Draw `n` cards for `side`, reshuffling the discard pile if the deck runs out. */
+const drawInto = (s: UnoFullState, side: UnoSide, n: number): UnoFullState => {
+  let { deck, discard } = s;
+  const hand = [...s.hands[side]];
+  for (let i = 0; i < n; i++) {
+    if (deck.length === 0) {
+      if (discard.length === 0) break; // truly out of cards
+      deck = shuffle(discard);
+      discard = [];
+    }
+    hand.push(deck.shift()!);
+  }
+  return { ...s, deck, discard, hands: { ...s.hands, [side]: hand } };
+};
+
+export const applyUnoMove = (s: UnoFullState, side: UnoSide, move: UnoMove): UnoFullState => {
+  if (s.winner || s.turn !== side) return s;
+
+  if (move.type === "draw") {
+    const next = drawInto(s, side, 1);
+    if (next.hands[side].length === s.hands[side].length) {
+      return { ...s, lastEvent: { actor: side, text: "couldn't draw — deck empty" } };
+    }
+    return {
+      ...next,
+      turn: otherSideOf(side),
+      lastEvent: { actor: side, text: "drew a card" },
+    };
+  }
+
+  const card = s.hands[side].find((c) => c.id === move.cardId);
+  if (!card) return s;
+  if (!canPlay(card, s.top, s.currentColor)) {
+    return { ...s, lastEvent: { actor: side, text: "played a card that doesn't match" } };
+  }
+  if (card.color === "wild" && !move.color) return s; // must choose a color
+
+  const hands = { ...s.hands, [side]: s.hands[side].filter((c) => c.id !== cardId) };
+  const newColor = card.color === "wild" ? move.color! : card.color;
+  const base: UnoFullState = {
+    ...s,
+    discard: [...s.discard, s.top],
+    top: card,
+    currentColor: newColor,
+    hands,
+  };
+
+  if (hands[side].length === 0) {
+    return { ...base, winner: side, lastEvent: { actor: side, text: "went out — game over!" } };
+  }
+
+  // Action cards: in 2-player, skip/reverse/+2/+4 all mean "you go again"
+  // (the victim loses their turn; +2/+4 also make them draw).
+  const drawN = card.value === "draw2" ? 2 : card.value === "wild4" ? 4 : 0;
+  if (drawN > 0) {
+    const next = drawInto(base, otherSideOf(side), drawN);
+    return {
+      ...next,
+      turn: side,
+      lastEvent: { actor: side, text: `played +${drawN} — opponent draws ${drawN}` },
+    };
+  }
+  if (card.value === "skip" || card.value === "reverse") {
+    return {
+      ...base,
+      turn: side,
+      lastEvent: { actor: side, text: `played ${card.color} ${card.value} — go again` },
+    };
+  }
+  return {
+    ...base,
+    turn: otherSideOf(side),
+    lastEvent: { actor: side, text: `played ${card.color} ${card.value}` },
+  };
+};
+
+/** Convert the authoritative state into the per-player view shape the UI renders. */
+export const unoViewFor = (s: UnoFullState, side: UnoSide): UnoState => ({
+  deck: s.deck,
+  hand: s.hands[side],
+  opponentHandCount: s.hands[otherSideOf(side)].length,
+  top: s.top,
+  currentColor: s.currentColor,
+  turn: s.turn === side ? "me" : "them",
+  winner: s.winner ? (s.winner === side ? "me" : "them") : null,
+  message: s.lastEvent
+    ? `${s.lastEvent.actor === side ? "You" : "Opponent"} ${s.lastEvent.text}`
+    : s.turn === side ? "Your turn — play a card or draw!" : "Opponent goes first.",
+});
+
 /** AI opponent plays — picks first playable card */
 export const opponentPlay = (state: UnoState): UnoState => {
   if (state.winner) return state;

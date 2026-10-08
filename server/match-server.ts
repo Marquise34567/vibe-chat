@@ -492,11 +492,12 @@ const findMatch = (client: Client): Client | null => {
     if (other.recentlySkipped.has(client.id)) continue;
 
     // ── Gender compatibility ──
-    // If client wants women, other must be a woman (gender = "woman")
-    // If client wants men, other must be a man (gender = "man")
-    // If either is "any", no gender constraint from that side
-    if (client.gender !== "any" && other.gender !== client.gender) continue;
-    if (other.gender !== "any" && client.gender !== other.gender) continue;
+    // `gender` is the *filter* (who they want to meet); `selfGender` is who
+    // they ARE. If client wants women, the other's selfGender must be "woman".
+    // Previously this compared filter-to-filter, so two users who both wanted
+    // women would get matched with each other.
+    if (client.gender !== "any" && other.selfGender !== client.gender) continue;
+    if (other.gender !== "any" && client.selfGender !== other.gender) continue;
 
     // ── Scholar filter ──
     if (client.scholarOnly && !other.scholarOnly) continue;
@@ -653,6 +654,24 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
       // ── Start searching for a match ──
       case "search": {
+        // If this client was still paired (e.g. they re-searched after a
+        // reconnect without skipping), release the old partner so they aren't
+        // stuck with a dangling partnerId in "matched" status forever.
+        if (c.partnerId) {
+          const oldPartner = clients.get(c.partnerId);
+          if (oldPartner) {
+            oldPartner.recentlySkipped.add(c.id);
+            c.recentlySkipped.add(oldPartner.id);
+            setTimeout(() => { try { oldPartner.recentlySkipped.delete(c.id); } catch {} }, 60000);
+            setTimeout(() => { try { c.recentlySkipped.delete(oldPartner.id); } catch {} }, 60000);
+            if (oldPartner.ws.readyState === WebSocket.OPEN) {
+              send(oldPartner.ws, { type: "partner-left", peerId: id });
+            }
+            oldPartner.status = "searching";
+            oldPartner.partnerId = undefined;
+            endCall(oldPartner);
+          }
+        }
         c.status = "searching";
         c.mode = msg.mode ?? "solo";
         c.gender = msg.gender ?? "any";
@@ -681,7 +700,9 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
       // ── Cancel search ──
       case "cancel": {
-        c.status = "searching";
+        // "in-call" = not in the queue — keeps findMatch from pairing a user
+        // who already backed out to the lobby.
+        c.status = "in-call";
         c.partnerId = undefined;
         send(ws, { type: "cancelled" });
         break;
@@ -724,6 +745,17 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         if (c.partnerId) {
           const partner = clients.get(c.partnerId);
           if (partner) send(partner.ws, { type: "ice", candidate: msg.candidate, peerId: id });
+        }
+        break;
+      }
+
+      // ── In-call game relay ──
+      // Fallback transport for peer messages (games) when the WebRTC data
+      // channel isn't open — forwards the opaque payload to the partner.
+      case "game-relay": {
+        if (c.partnerId && msg.data !== undefined) {
+          const partner = clients.get(c.partnerId);
+          if (partner) send(partner.ws, { type: "game-relay", data: msg.data, peerId: id });
         }
         break;
       }

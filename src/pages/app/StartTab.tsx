@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useLobbyRoom } from "@/hooks/useLobbyRoom";
@@ -10,32 +10,29 @@ import {
   CameraIcon as Camera, CameraOffIcon as CameraOff,
   CameraRetryIcon as RefreshCw, ChevronRightIcon as ChevronRight,
   ScholarIcon as GraduationCap, UserIcon as User, UserCircleIcon as UserCircle,
-  PlayIcon, SoloModeIcon, DuoModeIcon, GroupModeIcon, BlindModeIcon,
+  PlayIcon, SoloModeIcon, GroupModeIcon, BlindModeIcon,
   PlusIcon, LockIcon as Lock,
 } from "@/components/FaceFrenzyIcons";
 import { HalloweenOverlay, FrightBadge } from "@/components/HalloweenOverlay";
+import { FrenzyFace } from "@/components/MatchIcons";
 import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
-import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
+import { isHalloweenSeason } from "@/lib/halloween";
 import { useTier } from "@/hooks/useTier";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
 import { getLocalProfile } from "@/lib/localUser";
 import { normalizeGender } from "../../../shared/analytics";
 import { apiBase, SOCIAL_LINKS } from "@/lib/config";
+import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
 
 /* ═══════════════════════════════════════════════════════════════
-   FaceFrenzy Lobby — "You Are The Lobby"
+   FaceFrenzy Lobby — bubbly light theme
 
    Design philosophy:
-   - Your live camera fills the entire screen as the background
-   - A dark gradient scrim makes UI readable on top
-   - Floating glass controls at the bottom
-   - Bold, oversized mode name overlaid on your face
-   - The CTA is the only yellow thing — it's the star
-   - Everything else is glass + white text
-   - Blind mode: no camera, full-screen animated gradient instead
-
-   This creates instant immersion — you're already IN the app.
-   One tap and you're connected.
+   - Soft lavender canvas with purple glows
+   - Your live camera sits inside a chunky white-framed card
+   - White pill chips for status, modes and preferences
+   - The gradient CTA is the star — everything else is soft + bubbly
+   - Blind mode: no camera, pastel wave card instead
 ═══════════════════════════════════════════════════════════════ */
 
 type Mode = "solo" | "group" | "blind";
@@ -268,15 +265,26 @@ const StartTab = () => {
     navigate(`/match?${sp.toString()}`);
   };
 
-  const fmt = (n: number) => n.toLocaleString("en-US");
-
-  const modeMeta: Record<Mode, { desc: string; icon: typeof SoloModeIcon; accent: string; label: string; gradient: string }> = {
-    solo:  { desc: "1-on-1 random video chat",              icon: SoloModeIcon,  accent: "#7C5CFF", label: "SOLO",  gradient: "rgba(124,92,255,0.6)" },
-    group: { desc: "Bring friends. Meet more.",              icon: GroupModeIcon, accent: "#FFD60A", label: "GROUP", gradient: "rgba(255,214,10,0.5)" },
-    blind: { desc: "Voice first. Cameras reveal at 30s.",    icon: BlindModeIcon, accent: "#FF4D8D", label: "BLIND", gradient: "rgba(255,77,141,0.5)" },
+  const openInvite = () => {
+    const openSheet = (url: string) => { setPendingShareUrl(url); setShowShareSheet(true); };
+    if (!roomId) {
+      createRoom();
+      setTimeout(() => openSheet(`${window.location.origin}/?invite=${roomId}`), 1500);
+    } else {
+      openSheet(`${window.location.origin}/?invite=${roomId}`);
+    }
   };
 
-  const accent = modeMeta[mode].accent;
+  const fmt = (n: number) => n.toLocaleString("en-US");
+
+  const modeMeta: Record<Mode, { desc: string; icon: typeof SoloModeIcon; accent: string; label: string }> = {
+    solo:  { desc: "1-on-1 random video chat",            icon: SoloModeIcon,  accent: "#7C5CFF", label: "SOLO"  },
+    group: { desc: "Bring friends. Meet more.",           icon: GroupModeIcon, accent: "#E8890B", label: "GROUP" },
+    blind: { desc: "Voice first. Cameras reveal at 30s.", icon: BlindModeIcon, accent: "#FF4D8D", label: "BLIND" },
+  };
+
+  const accent = friendConnected ? "#22c55e" : modeMeta[mode].accent;
+  const modeLabel = friendConnected ? "DUO" : modeMeta[mode].label;
   const isBlind = mode === "blind";
   const spooky = isHalloweenSeason();
 
@@ -292,173 +300,47 @@ const StartTab = () => {
   }, [camStatus, isBlind, startLobbyScan, stopLobbyScan, videoRef]);
 
   return (
-    <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: "#050508", color: "#fff", display: "flex", flexDirection: "column" }} data-room-id={roomId ?? undefined}>
-      {/* ═══════════════════════════════════════════════════
-          LAYER 0 — Full-bleed camera OR split with friend
-      ═══════════════════════════════════════════════════ */}
-      {!isBlind && !friendConnected && (
-        <>
-          {/* Full-screen camera — solo */}
-          <video
-            ref={videoRef}
-            autoPlay playsInline muted
-            style={{
-              position: "absolute", inset: 0, width: "100%", height: "100%",
-              objectFit: "cover", transform: "scaleX(-1)",
-              objectPosition: "center top",
-              opacity: camStatus === "active" ? 1 : 0,
-              transition: "opacity 0.6s ease",
-              zIndex: 0,
-            }}
-          />
-          {/* Camera states overlay */}
-          {camStatus !== "active" && (
-            <div style={{ position: "absolute", inset: 0, zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "linear-gradient(180deg, #0A0A14 0%, #14142A 50%, #0A0A14 100%)" }}>
-              {(camStatus === "denied" || camStatus === "error") && (
-                <button onClick={camStart} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer" }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 32, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {camStatus === "denied" ? <CameraOff style={{ width: 28, height: 28, color: "rgba(255,255,255,0.4)" }} /> : <Camera style={{ width: 28, height: 28, color: "rgba(255,255,255,0.4)" }} />}
-                  </div>
-                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{camError || "Tap to enable camera"}</span>
-                </button>
-              )}
-              {camStatus === "requesting" && (
-                <>
-                  <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: "rgba(255,255,255,0.3)" }} />
-                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.4)" }}>Starting camera…</span>
-                </>
-              )}
-              {camStatus === "idle" && (
-                <button onClick={camStart} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer" }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 32, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Camera style={{ width: 28, height: 28, color: "rgba(255,255,255,0.4)" }} />
-                  </div>
-                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.4)" }}>Tap to preview</span>
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Split-screen — you + friend side by side */}
-      {!isBlind && friendConnected && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 0, display: "flex" }}>
-          {/* Left — your camera */}
-          <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden" }}>
-            <video
-              ref={videoRef}
-              autoPlay playsInline muted
-              style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", objectPosition: "center top" }}
-            />
-            <div style={{ position: "absolute", bottom: 16, left: 16, padding: "4px 10px", borderRadius: 12, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", fontSize: 12, fontWeight: 700, color: "#fff" }}>You</div>
-          </div>
-          {/* Right — friend's camera */}
-          <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden", background: "#0A0A14" }}>
-            <video
-              ref={friendVideoRef}
-              autoPlay playsInline
-              style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
-            />
-            <div style={{ position: "absolute", bottom: 16, left: 16, padding: "4px 10px", borderRadius: 12, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)", fontSize: 12, fontWeight: 700, color: "#fff" }}>Friend</div>
-            {/* Pulsing green dot for connected */}
-            <div style={{ position: "absolute", top: 16, right: 16, display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 12, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)" }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.8)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>Connected</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Waiting for friend overlay */}
-      {!isBlind && lobbyState === "waiting" && !friendConnected && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "rgba(5,5,8,0.7)", backdropFilter: "blur(8px)" }}>
-          <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: "#FFD60A" }} />
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>Waiting for friend…</span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Share your invite link</span>
-        </div>
-      )}
-
-      {/* Blind mode — animated gradient background */}
-      {isBlind && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(160deg, #1A0820 0%, #0A0A14 40%, #14081A 100%)" }}>
-          {/* Floating voice waves */}
-          <div style={{ position: "absolute", left: "50%", top: "45%", transform: "translate(-50%, -50%)", display: "flex", alignItems: "center", gap: 6 }}>
-            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} style={{
-                width: 6, borderRadius: 3, background: accent,
-                height: [40, 70, 100, 130, 100, 70, 40][i],
-                opacity: 0.3,
-                animation: `ff-wave-bar 1.5s ease-in-out ${i * 0.1}s infinite`,
-              }} />
-            ))}
-          </div>
-          {/* Glow */}
-          <div style={{ position: "absolute", left: "50%", top: "45%", transform: "translate(-50%, -50%)", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${accent}15 0%, transparent 70%)`, filter: "blur(40px)" }} />
-        </div>
-      )}
+    <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: BUBBLE.bg, color: BUBBLE.ink, display: "flex", flexDirection: "column" }} data-room-id={roomId ?? undefined}>
+      {/* Spooky season particles */}
+      {spooky && <HalloweenOverlay zIndex={3} />}
 
       {/* ═══════════════════════════════════════════════════
-          LAYER 1 — Scrim gradients for readability
+          TOP BAR — logo + status chips
       ═══════════════════════════════════════════════════ */}
-      {/* Top scrim */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 200, zIndex: 2, pointerEvents: "none", background: "linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)" }} />
-      {/* Bottom scrim — heavier for the dock */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "55%", zIndex: 2, pointerEvents: "none", background: "linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)" }} />
-      {/* Accent tint at bottom */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40%", zIndex: 2, pointerEvents: "none", background: `linear-gradient(0deg, ${accent}12 0%, transparent 100%)` }} />
+      <div style={{ position: "relative", zIndex: 10, paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)", paddingLeft: 16, paddingRight: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* Wordmark */}
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 12, background: BUBBLE.card,
+            border: `1px solid ${BUBBLE.border}`,
+            boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 4px 12px rgba(27,26,51,0.08)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <FrenzyFace className="w-5 h-5" />
+          </div>
+          {spooky && <span style={{ fontSize: 15 }}>🎃</span>}
+          <span className="ff-wordmark" style={{ fontSize: 16 }}>facefrenzy</span>
+        </div>
 
-      {/* Spooky season vignette — pumpkin glow bottom + purple haze top */}
-      {spooky && (
-        <>
-          <div style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none", background: `radial-gradient(ellipse 120% 50% at 50% 115%, ${HALLOWEEN.pumpkin}26 0%, transparent 60%), radial-gradient(ellipse 90% 40% at 50% -10%, ${HALLOWEEN.purple}33 0%, transparent 65%)` }} />
-          <HalloweenOverlay zIndex={3} />
-        </>
-      )}
-
-      {/* ═══════════════════════════════════════════════════
-          LAYER 2 — Top bar (floating glass)
-      ═══════════════════════════════════════════════════ */}
-      <div style={{ position: "relative", zIndex: 10, paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)", paddingLeft: 20, paddingRight: 20, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
         {/* Right cluster */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Online pill */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 7, padding: "7px 13px", borderRadius: 20,
-            background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
-            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-          }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.8)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{fmt(onlineCount)}</span>
+          <div style={{ ...chipStyle, padding: "8px 14px" }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.7)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(onlineCount)}</span>
           </div>
 
           {/* Follow us on X */}
           <a href={SOCIAL_LINKS.x} target="_blank" rel="noopener noreferrer" aria-label="Follow us on X"
-            style={{
-              width: 44, height: 44, borderRadius: 22,
-              background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "transform 0.2s ease, background 0.2s ease",
-              fontSize: 16, fontWeight: 800, color: "#fff", textDecoration: "none",
-            }}
+            className="bub-btn bub-btn-ghost"
+            style={{ ...circleBtnStyle, fontSize: 16, fontWeight: 800, color: BUBBLE.ink, textDecoration: "none" }}
           >
             𝕏
           </a>
 
           {/* Menu */}
-          <button onClick={() => setShowSettings(true)} aria-label="Settings"
-            style={{
-              width: 44, height: 44, borderRadius: 22,
-              background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-              transition: "transform 0.2s ease, background 0.2s ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.08) rotate(90deg)"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1) rotate(0)"; e.currentTarget.style.background = "rgba(0,0,0,0.3)"; }}
-          >
-            <Menu className="w-4 h-4" style={{ color: "#fff" }} />
+          <button onClick={() => setShowSettings(true)} aria-label="Settings" className="bub-btn bub-btn-ghost" style={circleBtnStyle}>
+            <Menu className="w-4 h-4" style={{ color: BUBBLE.ink }} />
           </button>
         </div>
       </div>
@@ -469,8 +351,8 @@ const StartTab = () => {
           position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 70px)", left: "50%",
           transform: "translateX(-50%)", zIndex: 200,
           padding: "12px 20px", borderRadius: 16, maxWidth: "90vw",
-          background: "rgba(220,38,38,0.9)", backdropFilter: "blur(16px)",
-          border: "1px solid rgba(255,255,255,0.15)",
+          background: "rgba(220,38,38,0.92)", backdropFilter: "blur(16px)",
+          border: "1px solid rgba(255,255,255,0.3)",
           display: "flex", alignItems: "center", gap: 10,
           boxShadow: "0 8px 32px rgba(220,38,38,0.4)",
           animation: "ff-slide-up 0.3s ease",
@@ -481,89 +363,171 @@ const StartTab = () => {
       )}
 
       {/* ═══════════════════════════════════════════════════
-          LAYER 3 — Activity ticker (decorative lobby ambiance)
+          HERO — ticker chip + big mode headline
       ═══════════════════════════════════════════════════ */}
-      <div style={{ position: "relative", zIndex: 10, display: "flex", justifyContent: "center", paddingTop: 10 }}>
-        <div key={feedIdx} className="animate-fade-in" style={{
-          fontSize: 12, color: "rgba(255,255,255,0.6)", padding: "5px 14px", borderRadius: 16,
-          background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        }}>
-          <span style={{ color: "#fff", fontWeight: 700 }}>{ACTIVITY_FEED[feedIdx].name}</span>
+      <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 20px 12px", textAlign: "center" }}>
+        {spooky && <div style={{ marginBottom: 8 }}><FrightBadge /></div>}
+
+        {/* Activity ticker chip */}
+        <div key={feedIdx} className="animate-fade-in" style={{ ...chipStyle, marginBottom: 12, fontSize: 11, color: BUBBLE.sub, fontWeight: 600 }}>
+          <span style={{ color: BUBBLE.ink, fontWeight: 800 }}>{ACTIVITY_FEED[feedIdx].name}</span>
           {" "}{ACTIVITY_FEED[feedIdx].flag} {ACTIVITY_FEED[feedIdx].action}{" "}
-          <span style={{ color: accent, fontWeight: 700 }}>{ACTIVITY_FEED[feedIdx].target}</span>
+          <span style={{ color: accent, fontWeight: 800 }}>{ACTIVITY_FEED[feedIdx].target}</span>
           {ACTIVITY_FEED[feedIdx].flag2 && ` ${ACTIVITY_FEED[feedIdx].flag2}`}
         </div>
-      </div>
 
-      {/* ═══════════════════════════════════════════════════
-          LAYER 4 — Hero text overlay (on the camera)
-      ═══════════════════════════════════════════════════ */}
-      <div style={{ flex: 1, position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
-        {/* Big mode label */}
-        <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease", textAlign: "center" }}>
-          {spooky && <div style={{ marginBottom: 10 }}><FrightBadge /></div>}
-          {/* Brand wordmark — matches tab title */}
-          <div
-            className={spooky ? "ff-spooky-glow" : undefined}
-            style={{
-              fontSize: 22, fontWeight: 900, letterSpacing: "-0.5px",
-              color: spooky ? HALLOWEEN.pumpkin : "#FFD60A",
-              textShadow: spooky ? undefined : "0 2px 16px rgba(255,214,10,0.3)",
-              marginBottom: 6,
-            }}
-          >
-            {spooky ? "🎃 FaceFrenzy" : "FaceFrenzy"}
-          </div>
-          <h1 style={{
-            fontSize: "clamp(40px, 14vw, 56px)", fontWeight: 900, letterSpacing: "-2px", lineHeight: 1,
-            color: "#fff", textShadow: "0 4px 24px rgba(0,0,0,0.5)",
-            marginBottom: 8,
-          }}>
-            {friendConnected ? "DUO" : modeMeta[mode].label}
+        <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease" }}>
+          <h1 style={{ fontSize: "clamp(30px, 9vw, 44px)", fontWeight: 900, letterSpacing: "-1.6px", lineHeight: 1.05, color: BUBBLE.ink, marginBottom: 5 }}>
+            {modeLabel} CHAT
           </h1>
-          <p style={{
-            fontSize: 16, color: "rgba(255,255,255,0.7)", fontWeight: 500,
-            textShadow: "0 2px 12px rgba(0,0,0,0.5)",
-            marginBottom: 4,
-          }}>
+          <p style={{ fontSize: 14, color: BUBBLE.sub, fontWeight: 600 }}>
             {friendConnected ? "You and your friend — ready to match" : modeMeta[mode].desc}
+            <span style={{ color: BUBBLE.faint }}> · {spooky ? "the spookiest Omegle alternative" : "The #1 Omegle Alternative"}</span>
           </p>
-          <p style={{
-            fontSize: 13, color: "rgba(255,255,255,0.45)", fontWeight: 600,
-            textShadow: "0 2px 12px rgba(0,0,0,0.5)",
-          }}>
-            {spooky ? "The spookiest Omegle alternative" : "The #1 Omegle Alternative"}
-          </p>
-        </div>
-
-        {/* Match counter — decorative */}
-        <div style={{
-          marginTop: 20, display: "flex", alignItems: "center", gap: 8,
-          padding: "7px 16px", borderRadius: 20,
-          background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-        }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#FFD60A", boxShadow: "0 0 8px rgba(255,214,10,0.7)", animation: "ff-core-pulse 1.5s ease-in-out infinite" }} />
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>today</span>
-          <span style={{ fontSize: 15, color: "#FFD60A", fontVariantNumeric: "tabular-nums", fontWeight: 800 }}>{fmt(matchCount)}</span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>matches</span>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════
-          LAYER 5 — Floating glass dock (the control center)
+          CAMERA BACKDROP — faint full-bleed layer behind content
       ═══════════════════════════════════════════════════ */}
-      <div style={{ position: "relative", zIndex: 10, paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)", paddingLeft: 12, paddingRight: 12, animation: "ff-dock-rise 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 1, overflow: "hidden", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", inset: 0 }}>
+          {/* Solo camera */}
+          {!isBlind && !friendConnected && (
+            <>
+              <video
+                ref={videoRef}
+                autoPlay playsInline muted
+                style={{
+                  position: "absolute", inset: 0, width: "100%", height: "100%",
+                  objectFit: "cover", transform: "scaleX(-1)",
+                  objectPosition: "center top",
+                  opacity: camStatus === "active" ? 0.5 : 0,
+                  transition: "opacity 0.6s ease",
+                }}
+              />
+              {/* Camera states overlay — light ink-on-lavender prompts */}
+              {camStatus !== "active" && (
+                <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                  {(camStatus === "denied" || camStatus === "error") && (
+                    <button onClick={camStart} className="bub-btn" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer" }}>
+                      <div style={{ width: 64, height: 64, borderRadius: 22, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.shadow, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {camStatus === "denied" ? <CameraOff style={{ width: 26, height: 26, color: BUBBLE.faint }} /> : <Camera style={{ width: 26, height: 26, color: BUBBLE.faint }} />}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>{camError || "Tap to enable camera"}</span>
+                    </button>
+                  )}
+                  {camStatus === "requesting" && (
+                    <>
+                      <RefreshCw className="animate-spin" style={{ width: 30, height: 30, color: BUBBLE.violet }} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>Starting camera…</span>
+                    </>
+                  )}
+                  {camStatus === "idle" && (
+                    <button onClick={camStart} className="bub-btn" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer" }}>
+                      <div style={{ width: 64, height: 64, borderRadius: 22, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.shadow, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Camera style={{ width: 26, height: 26, color: BUBBLE.faint }} />
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>Tap to preview</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Split-screen — you + friend side by side */}
+          {!isBlind && friendConnected && (
+            <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+              {/* Left — your camera */}
+              <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden" }}>
+                <video
+                  ref={videoRef}
+                  autoPlay playsInline muted
+                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", objectPosition: "center top", opacity: 0.6 }}
+                />
+                <div style={{ position: "absolute", bottom: 14, left: 14, ...chipStyle, padding: "5px 12px", fontSize: 11, zIndex: 5 }}>You</div>
+              </div>
+              {/* Right — friend's camera */}
+              <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden", background: "#16162A" }}>
+                <video
+                  ref={friendVideoRef}
+                  autoPlay playsInline
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", opacity: 0.6 }}
+                />
+                <div style={{ position: "absolute", bottom: 14, left: 14, ...chipStyle, padding: "5px 12px", fontSize: 11, zIndex: 5 }}>Friend</div>
+                {/* Pulsing green dot for connected */}
+                <div style={{ position: "absolute", top: 14, right: 14, ...chipStyle, padding: "5px 11px", gap: 6, zIndex: 5 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.8)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
+                  <span style={{ fontSize: 10, fontWeight: 800, color: "#16a34a", textTransform: "uppercase", letterSpacing: "0.5px" }}>Connected</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Waiting for friend overlay — light dim */}
+          {!isBlind && lobbyState === "waiting" && !friendConnected && (
+            <div style={{ position: "absolute", inset: 0, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(246,244,255,0.62)", backdropFilter: "blur(8px)" }}>
+              <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: BUBBLE.violet }} />
+              <span style={{ fontSize: 16, fontWeight: 800, color: BUBBLE.ink }}>Waiting for friend…</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: BUBBLE.sub }}>Share your invite link</span>
+            </div>
+          )}
+
+          {/* Blind mode — pastel wave wash (sits above the scrim, inherently soft) */}
+          {isBlind && (
+            <div style={{ position: "absolute", inset: 0, zIndex: 5, background: "linear-gradient(160deg, #F1E9FF 0%, #FDE8F3 55%, #E9E4FF 100%)" }}>
+              {/* Floating voice waves */}
+              <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", display: "flex", alignItems: "center", gap: 7 }}>
+                {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} style={{
+                    width: 7, borderRadius: 4, background: accent,
+                    height: [40, 70, 100, 130, 100, 70, 40][i],
+                    opacity: 0.4,
+                    animation: `ff-wave-bar 1.5s ease-in-out ${i * 0.1}s infinite`,
+                  }} />
+                ))}
+              </div>
+              {/* Glow */}
+              <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${accent}26 0%, transparent 70%)`, filter: "blur(40px)" }} />
+              <div style={{ position: "absolute", left: "50%", top: "60%", transform: "translateX(-50%)", fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>
+                🎧 Voice first — cameras stay off
+              </div>
+            </div>
+          )}
+
+          {/* Lavender scrim — keeps foreground readable over the faint feed */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none",
+            background: "linear-gradient(180deg, rgba(246,244,255,0.94) 0%, rgba(246,244,255,0.62) 26%, rgba(246,244,255,0.55) 52%, rgba(246,244,255,0.9) 100%)",
+          }} />
+
+          {/* Match counter chip — floats just below the top bar */}
+          <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 64px)", right: 16, zIndex: 5 }}>
+            <span style={{ ...chipStyle, gap: 6, padding: "6px 13px" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5B400", boxShadow: "0 0 8px rgba(245,180,0,0.7)", animation: "ff-core-pulse 1.5s ease-in-out infinite" }} />
+              <span style={{ fontSize: 11, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(matchCount)}</span>
+              <span style={{ fontSize: 10, color: BUBBLE.faint, fontWeight: 700 }}>today</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Spacer — pushes the dock to the bottom */}
+      <div style={{ flex: 1, minHeight: 24 }} />
+
+      {/* ═══════════════════════════════════════════════════
+          DOCK — white card with modes, prefs, CTA
+      ═══════════════════════════════════════════════════ */}
+      <div style={{ position: "relative", zIndex: 10, padding: "10px 14px calc(env(safe-area-inset-bottom, 0px) + 14px)", animation: "ff-dock-rise 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>
         <div style={{
-          borderRadius: 28, padding: "16px 14px 14px",
-          background: "rgba(8,8,14,0.7)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(40px)", WebkitBackdropFilter: "blur(40px)",
-          boxShadow: `0 -8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)`,
+          borderRadius: 26, padding: "14px 14px 12px", maxWidth: 560, margin: "0 auto",
+          background: BUBBLE.card,
+          border: `1px solid ${BUBBLE.border}`,
+          boxShadow: BUBBLE.cardShadow,
         }}>
           {/* Mode selector — 3 pills */}
-          <div style={{ display: "flex", gap: 7, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {(["solo", "group", "blind"] as Mode[]).map((m, idx) => {
               const meta = modeMeta[m];
               const Icon = meta.icon;
@@ -571,43 +535,34 @@ const StartTab = () => {
               return (
                 <button key={m} onClick={() => setMode(m)}
                   style={{
-                    flex: 1, height: 56, borderRadius: 18,
-                    background: selected ? `linear-gradient(160deg, ${meta.accent}25, ${meta.accent}05)` : "rgba(255,255,255,0.03)",
-                    border: selected ? `1.5px solid ${meta.accent}55` : "1px solid rgba(255,255,255,0.05)",
+                    flex: 1, height: 54, borderRadius: 18,
+                    background: selected ? `${meta.accent}14` : "rgba(109,94,245,0.04)",
+                    border: selected ? `1.5px solid ${meta.accent}66` : `1px solid ${BUBBLE.border}`,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                     cursor: "pointer",
                     transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
                     transform: selected ? "translateY(-3px)" : "none",
-                    boxShadow: selected ? `0 8px 24px ${meta.accent}20` : "none",
+                    boxShadow: selected ? `0 8px 20px ${meta.accent}26` : "none",
                     position: "relative", overflow: "hidden",
                     animation: `ff-pill-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) ${idx * 0.08}s both`,
                   }}
                   onMouseEnter={(e) => { if (!selected) e.currentTarget.style.transform = "translateY(-1px)"; }}
                   onMouseLeave={(e) => { if (!selected) e.currentTarget.style.transform = "translateY(0)"; }}
                 >
-                  {selected && <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 0%, ${meta.accent}15, transparent 70%)`, pointerEvents: "none" }} />}
-                  {/* Shimmer sweep on selected */}
-                  {selected && (
-                    <div style={{
-                      position: "absolute", top: 0, bottom: 0, width: "40%",
-                      background: `linear-gradient(90deg, transparent, ${meta.accent}20, transparent)`,
-                      animation: "ff-shimmer 3s ease-in-out infinite",
-                      pointerEvents: "none",
-                    }} />
-                  )}
-                  <Icon key={mode} style={{ width: 22, height: 22, opacity: selected ? 1 : 0.35, zIndex: 1, animation: selected ? "ff-icon-bounce 0.5s ease" : "none" }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: selected ? "#fff" : "rgba(255,255,255,0.3)", zIndex: 1, letterSpacing: "0.5px" }}>{meta.label}</span>
+                  {selected && <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 0%, ${meta.accent}14, transparent 70%)`, pointerEvents: "none" }} />}
+                  <Icon style={{ width: 22, height: 22, opacity: selected ? 1 : 0.4, zIndex: 1, animation: selected ? "ff-icon-bounce 0.5s ease" : "none" }} />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: selected ? meta.accent : BUBBLE.faint, zIndex: 1, letterSpacing: "0.5px" }}>{meta.label}</span>
                 </button>
               );
             })}
           </div>
 
           {/* Preferences row — gender + region + scholar */}
-          <div style={{ display: "flex", gap: 7, marginBottom: 12, justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, justifyContent: "center" }}>
             {/* Gender pill — collapsed shows 1, tap expands */}
             <div style={{
               height: 42, borderRadius: 21, overflow: "hidden",
-              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+              background: "rgba(109,94,245,0.06)", border: `1px solid ${BUBBLE.border}`,
               display: "flex", alignItems: "center",
               transition: "all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
             }}>
@@ -625,17 +580,18 @@ const StartTab = () => {
                       setGender(g.id); setGenderExpanded(false);
                     }}
                     style={{
-                      height: "100%", border: "none", padding: "0 14px",
-                      background: gender === g.id ? "rgba(255,214,10,0.15)" : "transparent",
-                      cursor: "pointer", color: gender === g.id ? "#FFD60A" : "rgba(255,255,255,0.5)",
+                      height: "calc(100% - 6px)", border: "none", padding: "0 13px", margin: "3px 2px",
+                      borderRadius: 18,
+                      background: gender === g.id ? BUBBLE.card : "transparent",
+                      boxShadow: gender === g.id ? "0 2px 8px rgba(27,26,51,0.10)" : "none",
+                      cursor: "pointer", color: gender === g.id ? BUBBLE.violet : BUBBLE.sub,
                       fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", transition: "all 0.2s ease",
                       display: "flex", alignItems: "center", gap: 4,
-                      transform: gender === g.id ? "scale(1.05)" : "scale(1)",
                       opacity: locked ? 0.55 : 1,
                     }}>
                     <span style={{ fontSize: 13, opacity: 0.7 }}>{g.icon}</span>
                     {g.label}
-                    {locked && <Lock style={{ width: 10, height: 10, color: "#FFD60A" }} />}
+                    {locked && <Lock style={{ width: 10, height: 10, color: BUBBLE.violet }} />}
                   </button>
                   );
                 })
@@ -643,7 +599,7 @@ const StartTab = () => {
                 <button onClick={() => setGenderExpanded(true)}
                   style={{
                     height: "100%", border: "none", padding: "0 16px", background: "transparent",
-                    cursor: "pointer", color: "#FFD60A", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                    cursor: "pointer", color: BUBBLE.violet, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
                     display: "flex", alignItems: "center", gap: 6,
                     transition: "transform 0.2s ease",
                   }}
@@ -652,23 +608,23 @@ const StartTab = () => {
                 >
                   <span style={{ fontSize: 15, opacity: 0.8 }}>{gender === "both" ? "♀♂" : gender === "girls" ? "♀" : "♂"}</span>
                   {gender === "both" ? "Both" : gender === "girls" ? "Girls" : "Guys"}
-                  <ChevronRight style={{ width: 13, height: 13, color: "rgba(255,255,255,0.25)", transform: "rotate(90deg)" }} />
+                  <ChevronRight style={{ width: 13, height: 13, color: BUBBLE.faint, transform: "rotate(90deg)" }} />
                 </button>
               )}
             </div>
 
             {/* Region */}
             <button onClick={() => setShowRegionPicker(true)}
+              className="bub-btn bub-btn-ghost"
               style={{
                 height: 42, padding: "0 14px", borderRadius: 21,
-                background: region !== "worldwide" ? "rgba(255,214,10,0.10)" : "rgba(255,255,255,0.04)",
-                border: region !== "worldwide" ? "1px solid rgba(255,214,10,0.25)" : "1px solid rgba(255,255,255,0.07)",
-                color: region !== "worldwide" ? "#FFD60A" : "rgba(255,255,255,0.5)",
-                fontSize: 13, fontWeight: 700, cursor: "pointer", transition: "all 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+                background: region !== "worldwide" ? BUBBLE.violetSoft : BUBBLE.card,
+                border: region !== "worldwide" ? "1px solid rgba(99,98,242,0.35)" : `1px solid ${BUBBLE.border}`,
+                color: region !== "worldwide" ? BUBBLE.violet : BUBBLE.sub,
+                fontSize: 13, fontWeight: 700, cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+                boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 2px 8px rgba(27,26,51,0.05)",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
             >
               <Globe style={{ width: 15, height: 15 }} />
               <span style={{ fontSize: 14 }}>{REGIONS.find((r) => r.id === region)?.flag}</span>
@@ -677,18 +633,17 @@ const StartTab = () => {
 
             {/* Scholar */}
             <button onClick={() => setScholarOnly(!scholarOnly)}
+              className="bub-btn bub-btn-ghost"
               style={{
                 height: 42, width: 42, borderRadius: 21, flexShrink: 0,
-                background: scholarOnly ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.04)",
-                border: scholarOnly ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(255,255,255,0.07)",
-                color: scholarOnly ? "#22c55e" : "rgba(255,255,255,0.4)",
-                cursor: "pointer", transition: "all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+                background: scholarOnly ? "rgba(34,197,94,0.10)" : BUBBLE.card,
+                border: scholarOnly ? "1px solid rgba(34,197,94,0.35)" : `1px solid ${BUBBLE.border}`,
+                color: scholarOnly ? "#16a34a" : BUBBLE.faint,
+                cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                transform: scholarOnly ? "scale(1.05)" : "scale(1)",
+                boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 2px 8px rgba(27,26,51,0.05)",
                 animation: scholarOnly ? "ff-icon-bounce 0.4s ease" : "none",
               }}
-              onMouseEnter={(e) => { if (!scholarOnly) e.currentTarget.style.transform = "scale(1.08)"; }}
-              onMouseLeave={(e) => { if (!scholarOnly) e.currentTarget.style.transform = "scale(1)"; }}
             >
               <GraduationCap style={{ width: 18, height: 18 }} />
             </button>
@@ -698,82 +653,49 @@ const StartTab = () => {
           <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center" }}>
             {/* Invite — opens custom share sheet */}
             <button
-              onClick={() => {
-                const openSheet = (url: string) => { setPendingShareUrl(url); setShowShareSheet(true); };
-                if (!roomId) {
-                  createRoom();
-                  setTimeout(() => openSheet(`${window.location.origin}/?invite=${roomId}`), 1500);
-                } else {
-                  openSheet(`${window.location.origin}/?invite=${roomId}`);
-                }
-              }}
+              onClick={openInvite}
               aria-label="Invite friends"
+              className="bub-btn bub-btn-ghost"
               style={{
-                width: 44, height: 44, borderRadius: 22, flexShrink: 0,
-                background: friendConnected ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)",
-                border: friendConnected ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(255,255,255,0.1)",
-                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-                transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease",
+                ...circleBtnStyle, flexShrink: 0,
+                background: friendConnected ? "rgba(34,197,94,0.10)" : BUBBLE.card,
+                border: friendConnected ? "1px solid rgba(34,197,94,0.35)" : `1px solid ${BUBBLE.border}`,
                 animation: friendConnected ? "ff-btn-glow 2s ease-in-out infinite" : "none",
-                color: friendConnected ? "#22c55e" : "#FFD60A",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-              onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.93)")}
-              onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
-              <PlusIcon style={{ width: 18, height: 18, color: friendConnected ? "#22c55e" : "#FFD60A" }} />
+              <PlusIcon style={{ width: 18, height: 18, color: friendConnected ? "#16a34a" : BUBBLE.violet }} />
             </button>
 
             {/* Start — GROUP requires a friend first, otherwise normal */}
             {mode === "group" && !friendConnected ? (
               <button
-                onClick={() => {
-                  const openSheet = (url: string) => { setPendingShareUrl(url); setShowShareSheet(true); };
-                  if (!roomId) {
-                    createRoom();
-                    setTimeout(() => openSheet(`${window.location.origin}/?invite=${roomId}`), 1500);
-                  } else {
-                    openSheet(`${window.location.origin}/?invite=${roomId}`);
-                  }
-                }}
+                onClick={openInvite}
+                className="bub-btn bub-btn-ghost"
                 style={{
-                  height: 44, padding: "0 22px", borderRadius: 22,
-                  background: "rgba(255,214,10,0.12)", border: "1px solid rgba(255,214,10,0.3)",
-                  color: "#FFD60A", fontSize: 14, fontWeight: 800, letterSpacing: "0.2px",
-                  cursor: "pointer",
+                  ...ghostPillStyle,
+                  height: 48, padding: "0 24px",
+                  border: "1.5px solid rgba(99,98,242,0.35)",
+                  color: BUBBLE.violet, fontSize: 15, letterSpacing: "0.2px",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)", position: "relative",
+                  position: "relative",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 <PlusIcon style={{ width: 16, height: 16 }} />
                 Invite Friends
               </button>
             ) : (
               <button onClick={startMatch}
+                className="bub-btn bub-btn-primary"
                 style={{
-                  height: 44, padding: "0 28px", borderRadius: 22,
-                  background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)",
-                  color: "#0A0A0F", fontSize: 14, fontWeight: 800, letterSpacing: "0.2px",
-                  border: "none", cursor: "pointer",
+                  ...ctaStyle,
+                  height: 48, padding: "0 30px",
+                  fontSize: 15, letterSpacing: "0.2px",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  boxShadow: "0 6px 20px rgba(245,208,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6)",
-                  transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)", position: "relative",
+                  position: "relative",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.96)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.04)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
-                <div style={{ position: "absolute", inset: -3, borderRadius: 25, background: "linear-gradient(180deg, #FFE45E, #F5D000)", opacity: 0.3, filter: "blur(12px)", animation: "ff-cta-pulse 2.5s ease-in-out infinite", zIndex: -1 }} />
-                {/* Expanding ring on hover */}
-                <div style={{ position: "absolute", inset: 0, borderRadius: 22, border: "2px solid #FFD60A", pointerEvents: "none", animation: "ff-cta-ring 2s ease-out infinite" }} />
                 <PlayIcon style={{ width: 16, height: 16 }} />
-                Start Video Chat
+                Start Video Chat →
               </button>
             )}
 
@@ -781,30 +703,25 @@ const StartTab = () => {
             {friendConnected && (
               <button
                 onClick={() => { leaveRoom(); setSearchParams({}); }}
+                className="bub-btn bub-btn-ghost"
                 style={{
-                  width: 44, height: 44, borderRadius: 22, flexShrink: 0,
-                  background: "rgba(255,77,141,0.12)", border: "1px solid rgba(255,77,141,0.3)",
-                  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-                  transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+                  ...circleBtnStyle, flexShrink: 0,
+                  background: "rgba(255,77,141,0.08)", border: "1px solid rgba(255,77,141,0.3)",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.93)")}
-                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
                 aria-label="Leave friend"
               >
-                <X style={{ width: 18, height: 18, color: "#FF4D8D" }} />
+                <X style={{ width: 18, height: 18, color: BUBBLE.pink }} />
               </button>
             )}
           </div>
 
           {/* Free-tier remaining matches — nudges toward Plus */}
           {!isPaid && (
-            <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.35)" }}>
+            <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, fontWeight: 600, color: BUBBLE.faint }}>
               {matchesLeft() > 0 ? (
-                <span>{matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: "#FFD60A", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button></span>
+                <span>{matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: BUBBLE.violet, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button></span>
               ) : (
-                <button onClick={() => setPaywall("limit")} style={{ color: "#FF6B6B", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
+                <button onClick={() => setPaywall("limit")} style={{ color: "#e11d48", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
                   Out of free matches today — unlock Plus
                 </button>
               )}
@@ -821,17 +738,14 @@ const StartTab = () => {
         display: "flex", flexDirection: "column", gap: 10, zIndex: 50,
       }}>
         {/* Header */}
-        <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 2, marginBottom: 4,
-        }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, marginBottom: 4 }}>
           <div style={{
-            fontSize: 11, fontWeight: 900, color: "#FFD60A",
+            fontSize: 11, fontWeight: 900, color: "#D97706",
             textTransform: "uppercase", letterSpacing: 2, textAlign: "center",
-            textShadow: "0 1px 8px rgba(255,214,10,0.4)",
           }}>
             Sponsors
           </div>
-          <div style={{ width: 24, height: 2, borderRadius: 1, background: "rgba(255,214,10,0.4)" }} />
+          <div style={{ width: 24, height: 2, borderRadius: 1, background: "rgba(217,119,6,0.4)" }} />
         </div>
 
         {/* 4 sponsor boxes */}
@@ -850,59 +764,58 @@ const StartTab = () => {
                 }
               }}
               style={{
-                width: 88, height: 88, borderRadius: 16,
+                width: 88, height: 88, borderRadius: 18,
                 background: sponsor
-                  ? "linear-gradient(135deg, rgba(255,214,10,0.18), rgba(107,76,255,0.12))"
-                  : "rgba(255,255,255,0.03)",
+                  ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(109,94,245,0.08))"
+                  : BUBBLE.card,
                 border: sponsor
-                  ? "1.5px solid rgba(255,214,10,0.35)"
-                  : "1px dashed rgba(255,255,255,0.12)",
+                  ? "1.5px solid rgba(217,119,6,0.35)"
+                  : `1px dashed ${BUBBLE.border}`,
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", gap: 4, padding: 6, overflow: "hidden",
                 transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.3s",
-                backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-                boxShadow: sponsor ? "0 4px 20px rgba(255,214,10,0.1)" : "none",
+                boxShadow: sponsor ? "0 6px 20px rgba(217,119,6,0.12)" : "0 2px 10px rgba(27,26,51,0.05)",
                 position: "relative",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.06)";
-                if (isEmpty) e.currentTarget.style.borderColor = "rgba(255,214,10,0.4)";
+                if (isEmpty) e.currentTarget.style.borderColor = "rgba(217,119,6,0.45)";
               }}
               onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.94)")}
               onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "scale(1)";
-                if (isEmpty) e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+                if (isEmpty) e.currentTarget.style.borderColor = BUBBLE.border;
               }}
             >
               {sponsor ? (
                 <>
                   {/* Preview image or favicon */}
                   {preview?.image ? (
-                    <img src={preview.image} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }}
+                    <img src={preview.image} alt="" style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : preview?.favicon ? (
-                    <img src={preview.favicon} alt="" style={{ width: 28, height: 28, borderRadius: 6 }}
+                    <img src={preview.favicon} alt="" style={{ width: 28, height: 28, borderRadius: 8 }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : (
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(255,214,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔗</div>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(245,158,11,0.14)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔗</div>
                   )}
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#FFD60A", textAlign: "center", padding: "0 2px", lineHeight: 1.15, maxWidth: 76, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: BUBBLE.ink, textAlign: "center", padding: "0 2px", lineHeight: 1.15, maxWidth: 76, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {preview?.title || sponsor.label}
                   </span>
                   {/* Sponsored badge */}
-                  <span style={{ position: "absolute", top: 3, right: 3, fontSize: 6, fontWeight: 700, color: "rgba(255,214,10,0.5)", textTransform: "uppercase", letterSpacing: 0.5 }}>ad</span>
+                  <span style={{ position: "absolute", top: 4, right: 5, fontSize: 6, fontWeight: 800, color: "rgba(217,119,6,0.6)", textTransform: "uppercase", letterSpacing: 0.5 }}>ad</span>
                 </>
               ) : (
                 <>
                   <div style={{
                     width: 28, height: 28, borderRadius: 14,
-                    background: "rgba(255,214,10,0.08)",
+                    background: "rgba(245,158,11,0.10)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    <PlusIcon style={{ width: 16, height: 16, color: "rgba(255,214,10,0.4)" }} />
+                    <PlusIcon style={{ width: 16, height: 16, color: "rgba(217,119,6,0.55)" }} />
                   </div>
-                  <span style={{ fontSize: 8, color: "rgba(255,214,10,0.4)", fontWeight: 700, textAlign: "center", lineHeight: 1.2 }}>
+                  <span style={{ fontSize: 8, color: "rgba(217,119,6,0.6)", fontWeight: 800, textAlign: "center", lineHeight: 1.2 }}>
                     Your ad<br />here
                   </span>
                 </>
@@ -915,16 +828,17 @@ const StartTab = () => {
         <button
           onClick={() => setShowSponsorSheet(true)}
           style={{
-            width: 88, padding: "6px 0", borderRadius: 10,
-            background: "rgba(255,214,10,0.1)", border: "1px solid rgba(255,214,10,0.2)",
-            color: "#FFD60A", fontSize: 9, fontWeight: 800, cursor: "pointer",
+            width: 88, padding: "7px 0", borderRadius: 12,
+            background: BUBBLE.card, border: "1px solid rgba(217,119,6,0.3)",
+            color: "#D97706", fontSize: 9, fontWeight: 800, cursor: "pointer",
             textTransform: "uppercase", letterSpacing: 0.5,
-            transition: "transform 0.2s ease, background 0.2s ease",
+            boxShadow: "0 2px 10px rgba(27,26,51,0.05)",
+            transition: "transform 0.2s ease",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.background = "rgba(255,214,10,0.18)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
-          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = "rgba(255,214,10,0.1)"; }}
+          onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
         >
           Become a Sponsor
         </button>
@@ -990,19 +904,44 @@ const StartTab = () => {
   );
 };
 
+export default StartTab;
+
+/* ═══════════════════════════════════════════════════════════════
+   Shared sheet shell styles (bubbly light)
+═══════════════════════════════════════════════════════════════ */
+const sheetWrap: React.CSSProperties = {
+  background: BUBBLE.scrim, backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+};
+const sheetCard: React.CSSProperties = {
+  background: BUBBLE.card, borderRadius: "30px 30px 0 0", padding: 24,
+  paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
+  borderTop: `1px solid ${BUBBLE.border}`,
+  boxShadow: "0 -16px 48px rgba(27,26,51,0.28)",
+};
+const sheetHandle: React.CSSProperties = {
+  width: 40, height: 4, borderRadius: 2, background: "rgba(27,26,51,0.15)", margin: "0 auto 20px",
+};
+const sheetCloseBtn: React.CSSProperties = {
+  width: 34, height: 34, borderRadius: 17, background: "rgba(109,94,245,0.08)",
+  border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+};
+const rowCard = (selected: boolean, tint = BUBBLE.violet): React.CSSProperties => ({
+  background: selected ? `${tint === BUBBLE.violet ? BUBBLE.violetSoft : "rgba(34,197,94,0.08)"}` : "rgba(109,94,245,0.035)",
+  border: selected ? `1.5px solid ${tint === BUBBLE.violet ? "rgba(109,94,245,0.40)" : "rgba(34,197,94,0.30)"}` : `1px solid ${BUBBLE.border}`,
+});
+
 /* ═══════════════════════════════════════════════════════════════
    RegionPickerSheet
 ═══════════════════════════════════════════════════════════════ */
 const RegionPickerSheet = ({ region, setRegion, onClose, canPickRegions, onLocked }: { region: Region; setRegion: (r: Region) => void; onClose: () => void; canPickRegions: boolean; onLocked: () => void; }) => {
   return (
-    <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up"
-        style={{ background: "#0A0A14", borderRadius: "32px 32px 0 0", padding: 24, paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)", borderTop: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 -12px 48px rgba(0,0,0,0.6)" }}>
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 20px" }} />
+    <div className="fixed inset-0 z-[100] flex items-end" style={sheetWrap} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up" style={sheetCard}>
+        <div style={sheetHandle} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Pick a region</h2>
-          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 17, background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <X className="w-4 h-4" style={{ color: "#fff" }} />
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: BUBBLE.ink, letterSpacing: "-0.3px" }}>Pick a region</h2>
+          <button onClick={onClose} className="bub-btn" style={sheetCloseBtn}>
+            <X className="w-4 h-4" style={{ color: BUBBLE.ink }} />
           </button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1012,24 +951,23 @@ const RegionPickerSheet = ({ region, setRegion, onClose, canPickRegions, onLocke
             return (
               <button key={r.id} onClick={() => { if (locked) { onLocked(); return; } setRegion(r.id); onClose(); }}
                 style={{
-                  height: 58, padding: "0 16px", borderRadius: 16,
-                  background: selected ? "rgba(255,214,0,0.10)" : "rgba(255,255,255,0.03)",
-                  border: selected ? "1px solid rgba(255,214,0,0.25)" : "1px solid rgba(255,255,255,0.05)",
+                  height: 58, padding: "0 16px", borderRadius: 18,
+                  ...rowCard(selected),
                   cursor: "pointer", transition: "all 0.2s ease",
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   opacity: locked ? 0.55 : 1,
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 12, background: selected ? "rgba(255,214,0,0.12)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{r.flag}</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 13, background: selected ? "rgba(109,94,245,0.12)" : "rgba(109,94,245,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{r.flag}</div>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: selected ? "#FFD60A" : "#fff" }}>{r.label}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{r.countries.length === 0 ? "No filter" : locked ? "Plus only" : `${r.countries.length} countries`}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: selected ? BUBBLE.violet : BUBBLE.ink }}>{r.label}</div>
+                    <div style={{ fontSize: 11, color: BUBBLE.faint }}>{r.countries.length === 0 ? "No filter" : locked ? "Plus only" : `${r.countries.length} countries`}</div>
                   </div>
                 </div>
-                {locked && <Lock style={{ width: 15, height: 15, color: "#FFD60A" }} />}
+                {locked && <Lock style={{ width: 15, height: 15, color: BUBBLE.violet }} />}
                 {selected && !locked && (
-                  <div style={{ width: 24, height: 24, borderRadius: 12, background: "#FFD60A", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <div style={{ width: 24, height: 24, borderRadius: 12, background: BUBBLE.violet, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
                 )}
               </button>
@@ -1057,35 +995,34 @@ const SettingsSheet = ({
     { id: "both", label: "Both" }, { id: "girls", label: "Girls" }, { id: "guys", label: "Guys" },
   ];
   return (
-    <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up"
-        style={{ background: "#0A0A14", borderRadius: "32px 32px 0 0", padding: 24, paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)", borderTop: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 -12px 48px rgba(0,0,0,0.6)" }}>
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 20px" }} />
+    <div className="fixed inset-0 z-[100] flex items-end" style={sheetWrap} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up" style={sheetCard}>
+        <div style={sheetHandle} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>Settings</h2>
-          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 17, background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <X className="w-4 h-4" style={{ color: "#fff" }} />
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: BUBBLE.ink, letterSpacing: "-0.3px" }}>Settings</h2>
+          <button onClick={onClose} className="bub-btn" style={sheetCloseBtn}>
+            <X className="w-4 h-4" style={{ color: BUBBLE.ink }} />
           </button>
         </div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Show me</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.faint, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Show me</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
             {genders.map((g) => {
               const locked = !canPickGender && g.id !== "both";
+              const selected = gender === g.id;
               return (
               <button key={g.id} onClick={() => { if (locked) { onLockedGender(); return; } setGender(g.id); }}
                 style={{
                   height: 44, borderRadius: 14,
-                  background: gender === g.id ? "rgba(255,214,0,0.15)" : "rgba(255,255,255,0.04)",
-                  border: gender === g.id ? "1px solid rgba(255,214,0,0.3)" : "1px solid rgba(255,255,255,0.06)",
-                  color: gender === g.id ? "#FFD60A" : "#EDEDED", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  ...rowCard(selected),
+                  color: selected ? BUBBLE.violet : BUBBLE.ink, fontSize: 14, fontWeight: 600, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.2s ease",
                   opacity: locked ? 0.55 : 1,
                 }}>
                 {g.id === "both" && <UserCircle className="w-3.5 h-3.5" />}
                 {(g.id === "girls" || g.id === "guys") && <User className="w-3.5 h-3.5" />}
                 {g.label}
-                {locked && <Lock style={{ width: 11, height: 11, color: "#FFD60A" }} />}
+                {locked && <Lock style={{ width: 11, height: 11, color: BUBBLE.violet }} />}
               </button>
               );
             })}
@@ -1093,38 +1030,38 @@ const SettingsSheet = ({
         </div>
         <div style={{ marginBottom: 24 }}>
           <button onClick={() => setScholarOnly(!scholarOnly)} className="flex items-center justify-between w-full"
-            style={{ height: 54, padding: "0 16px", borderRadius: 16, background: scholarOnly ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)", border: scholarOnly ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(255,255,255,0.06)", cursor: "pointer", transition: "all 0.2s ease" }}>
+            style={{ height: 54, padding: "0 16px", borderRadius: 18, cursor: "pointer", transition: "all 0.2s ease", ...rowCard(scholarOnly, "#22c55e") }}>
             <div className="flex items-center gap-3">
-              <div style={{ width: 38, height: 38, borderRadius: 11, background: scholarOnly ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <GraduationCap className="w-4 h-4" style={{ color: scholarOnly ? "#22c55e" : "rgba(255,255,255,0.4)" }} />
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: scholarOnly ? "rgba(34,197,94,0.14)" : "rgba(109,94,245,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <GraduationCap className="w-4 h-4" style={{ color: scholarOnly ? "#16a34a" : BUBBLE.faint }} />
               </div>
               <div className="text-left">
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>Scholars only</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{scholarVerified ? "You're verified 🎓" : "Match with verified students only"}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: BUBBLE.ink }}>Scholars only</div>
+                <div style={{ fontSize: 11, color: BUBBLE.faint }}>{scholarVerified ? "You're verified 🎓" : "Match with verified students only"}</div>
               </div>
             </div>
-            <div style={{ width: 46, height: 28, borderRadius: 14, background: scholarOnly ? "#22c55e" : "rgba(255,255,255,0.1)", padding: 3, transition: "background 0.2s ease", display: "flex", alignItems: "center" }}>
-              <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", transform: scholarOnly ? "translateX(18px)" : "translateX(0)", transition: "transform 0.2s ease" }} />
+            <div style={{ width: 46, height: 28, borderRadius: 14, background: scholarOnly ? "#22c55e" : "rgba(27,26,51,0.12)", padding: 3, transition: "background 0.2s ease", display: "flex", alignItems: "center" }}>
+              <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transform: scholarOnly ? "translateX(18px)" : "translateX(0)", transition: "transform 0.2s ease" }} />
             </div>
           </button>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Camera</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.faint, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Camera</div>
           <button onClick={onRetryCam} className="flex items-center justify-between w-full"
-            style={{ height: 54, padding: "0 16px", borderRadius: 16, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer" }}>
+            style={{ height: 54, padding: "0 16px", borderRadius: 18, ...rowCard(false), cursor: "pointer" }}>
             <div className="flex items-center gap-3">
-              <div style={{ width: 38, height: 38, borderRadius: 11, background: camStatus === "active" ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {camStatus === "active" ? <Camera className="w-4 h-4" style={{ color: "#22c55e" }} /> : <CameraOff className="w-4 h-4" style={{ color: "rgba(255,255,255,0.4)" }} />}
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: camStatus === "active" ? "rgba(34,197,94,0.14)" : "rgba(109,94,245,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {camStatus === "active" ? <Camera className="w-4 h-4" style={{ color: "#16a34a" }} /> : <CameraOff className="w-4 h-4" style={{ color: BUBBLE.faint }} />}
               </div>
               <div className="text-left">
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{camStatus === "active" ? "Camera active" : camStatus === "denied" ? "Camera denied" : camStatus === "requesting" ? "Starting…" : "Camera off"}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{camStatus === "active" ? "Your preview is live" : camError || "Tap to enable"}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: BUBBLE.ink }}>{camStatus === "active" ? "Camera active" : camStatus === "denied" ? "Camera denied" : camStatus === "requesting" ? "Starting…" : "Camera off"}</div>
+                <div style={{ fontSize: 11, color: BUBBLE.faint }}>{camStatus === "active" ? "Your preview is live" : camError || "Tap to enable"}</div>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4" style={{ color: "rgba(255,255,255,0.3)" }} />
+            <ChevronRight className="w-4 h-4" style={{ color: BUBBLE.faint }} />
           </button>
         </div>
-        <button onClick={onClose} style={{ width: "100%", height: 52, borderRadius: 26, background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)", color: "#0A0A0F", fontSize: 17, fontWeight: 800, border: "none", cursor: "pointer", marginTop: 8, boxShadow: "0 6px 24px rgba(245,208,0,0.25)" }}>Done</button>
+        <button onClick={onClose} className="bub-btn bub-btn-primary" style={{ ...ctaStyle, width: "100%", height: 52, fontSize: 17, marginTop: 8 }}>Done</button>
       </div>
     </div>
   );
@@ -1165,46 +1102,46 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up"
-        style={{ background: "#0A0A14", borderRadius: "32px 32px 0 0", padding: 24, paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)", borderTop: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 -12px 48px rgba(0,0,0,0.6)" }}>
+    <div className="fixed inset-0 z-[100] flex items-end" style={sheetWrap} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up" style={sheetCard}>
         {/* Handle */}
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)", margin: "0 auto 20px" }} />
+        <div style={sheetHandle} />
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 2 }}>Invite a friend</h2>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>Share your link to video chat together</p>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: BUBBLE.ink, marginBottom: 2, letterSpacing: "-0.3px" }}>Invite a friend</h2>
+            <p style={{ fontSize: 13, color: BUBBLE.faint }}>Share your link to video chat together</p>
           </div>
-          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 17, background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <X className="w-4 h-4" style={{ color: "#fff" }} />
+          <button onClick={onClose} className="bub-btn" style={sheetCloseBtn}>
+            <X className="w-4 h-4" style={{ color: BUBBLE.ink }} />
           </button>
         </div>
 
         {/* Link preview */}
         <div style={{
           display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
-          padding: "12px 14px", borderRadius: 14,
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
+          padding: "12px 14px", borderRadius: 16,
+          background: "rgba(109,94,245,0.05)", border: `1px solid ${BUBBLE.border}`,
         }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: "linear-gradient(135deg, #7C5CFF, #FF4D8D)",
+            width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+            background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`,
+            boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 3px 8px rgba(27,26,51,0.07)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <span style={{ fontSize: 16, fontWeight: 900, color: "#fff" }}>F</span>
+            <FrenzyFace className="w-5 h-5" />
           </div>
           <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>FaceFrenzy invite</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{url}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>FaceFrenzy invite</div>
+            <div style={{ fontSize: 11, color: BUBBLE.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{url}</div>
           </div>
           <button onClick={copyLink}
             style={{
               height: 36, padding: "0 16px", borderRadius: 18, flexShrink: 0,
-              background: copied ? "rgba(34,197,94,0.15)" : "rgba(255,214,10,0.12)",
-              border: copied ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(255,214,10,0.25)",
-              color: copied ? "#22c55e" : "#FFD60A", fontSize: 13, fontWeight: 700,
+              background: copied ? "rgba(34,197,94,0.12)" : BUBBLE.violetSoft,
+              border: copied ? "1px solid rgba(34,197,94,0.35)" : "1px solid rgba(109,94,245,0.3)",
+              color: copied ? "#16a34a" : BUBBLE.violet, fontSize: 13, fontWeight: 800,
               cursor: "pointer", transition: "all 0.2s ease", whiteSpace: "nowrap",
             }}>
             {copied ? "Copied!" : "Copy"}
@@ -1217,22 +1154,22 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
             <a key={target.label} href={target.url(url)} target="_blank" rel="noopener noreferrer"
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                padding: "16px 8px", borderRadius: 16, textDecoration: "none",
-                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)",
+                padding: "16px 8px", borderRadius: 18, textDecoration: "none",
+                background: "rgba(109,94,245,0.035)", border: `1px solid ${BUBBLE.border}`,
                 cursor: "pointer", transition: "all 0.2s ease",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.transform = "translateY(0)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(109,94,245,0.07)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(109,94,245,0.035)"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
               <div style={{
                 width: 44, height: 44, borderRadius: 14,
-                background: `${target.color}22`, border: `1px solid ${target.color}33`,
+                background: `${target.color}18`, border: `1px solid ${target.color}30`,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 22,
               }}>
                 {target.icon}
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{target.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.sub }}>{target.label}</span>
             </a>
           ))}
         </div>
@@ -1241,14 +1178,15 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
         {typeof navigator !== "undefined" && (navigator as any).share && (
           <button
             onClick={() => { (navigator as any).share({ title: "FaceFrenzy", text: "Join me on FaceFrenzy!", url }); }}
+            className="bub-btn bub-btn-ghost"
             style={{
-              width: "100%", height: 48, borderRadius: 24,
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
-              color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer",
+              ...ghostPillStyle,
+              width: "100%", height: 48,
+              fontSize: 15,
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
-            <PlusIcon style={{ width: 18, height: 18, color: "#FFD60A" }} />
+            <PlusIcon style={{ width: 18, height: 18, color: BUBBLE.violet }} />
             More share options…
           </button>
         )}
@@ -1256,8 +1194,6 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
     </div>
   );
 };
-
-export default StartTab;
 
 /* ═══════════════════════════════════════════════════════════════
    SponsorSheet — submit your app/product/social handle to a sponsor box
@@ -1275,6 +1211,13 @@ const SponsorSheet = ({ onClose, onSubmit }: {
   const total = days * PRICE_PER_DAY;
 
   const dayOptions = [1, 3, 7, 14, 30];
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", height: 48, borderRadius: 14,
+    background: "rgba(109,94,245,0.05)", border: `1px solid ${BUBBLE.border}`,
+    color: BUBBLE.ink, fontSize: 15, fontWeight: 600, padding: "0 16px",
+    outline: "none",
+  };
 
   // Fetch preview when link changes (debounced)
   useEffect(() => {
@@ -1296,78 +1239,68 @@ const SponsorSheet = ({ onClose, onSubmit }: {
   }, [link]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up"
-        style={{ background: "rgba(20,18,30,0.95)", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: "24px 20px 32px", border: "1px solid rgba(255,255,255,0.08)", borderBottom: "none" }}>
+    <div className="fixed inset-0 z-[100] flex items-end" style={sheetWrap} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up" style={sheetCard}>
+        <div style={sheetHandle} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div>
-            <h3 style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 2 }}>Become a Sponsor</h3>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>Get your app, product, or social seen by hundreds daily</p>
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: BUBBLE.ink, marginBottom: 2, letterSpacing: "-0.3px" }}>Become a Sponsor</h3>
+            <p style={{ fontSize: 13, color: BUBBLE.faint }}>Get your app, product, or social seen by hundreds daily</p>
           </div>
-          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 17, background: "rgba(255,255,255,0.06)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <X className="w-4 h-4" style={{ color: "#fff" }} />
+          <button onClick={onClose} className="bub-btn" style={sheetCloseBtn}>
+            <X className="w-4 h-4" style={{ color: BUBBLE.ink }} />
           </button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "block" }}>Display name (shown in box)</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.faint, marginBottom: 6, display: "block" }}>Display name (shown in box)</label>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g. My App, @yourhandle, yourbrand"
               maxLength={20}
-              style={{
-                width: "100%", height: 48, borderRadius: 14,
-                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                color: "#fff", fontSize: 15, fontWeight: 600, padding: "0 16px",
-                outline: "none",
-              }}
+              style={inputStyle}
               autoFocus
             />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "block" }}>Link (app URL, website, or @handle)</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.faint, marginBottom: 6, display: "block" }}>Link (app URL, website, or @handle)</label>
             <input
               type="text"
               value={link}
               onChange={(e) => setLink(e.target.value)}
               placeholder="https://myapp.com or @yourhandle"
-              style={{
-                width: "100%", height: 48, borderRadius: 14,
-                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                color: "#fff", fontSize: 15, fontWeight: 600, padding: "0 16px",
-                outline: "none",
-              }}
+              style={inputStyle}
             />
           </div>
 
           {/* Live preview of how the sponsor box will look */}
           {(preview || fetchingPreview) && (
             <div style={{
-              display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 14,
-              background: "rgba(255,214,10,0.06)", border: "1px solid rgba(255,214,10,0.15)",
+              display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 16,
+              background: "rgba(245,158,11,0.08)", border: "1px solid rgba(217,119,6,0.25)",
             }}>
               {fetchingPreview ? (
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Fetching preview…</span>
+                <span style={{ fontSize: 12, color: BUBBLE.faint }}>Fetching preview…</span>
               ) : (
                 <>
                   {preview?.image ? (
-                    <img src={preview.image} alt="" style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
+                    <img src={preview.image} alt="" style={{ width: 40, height: 40, borderRadius: 12, objectFit: "cover", flexShrink: 0 }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : preview?.favicon ? (
-                    <img src={preview.favicon} alt="" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }}
+                    <img src={preview.favicon} alt="" style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0 }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : (
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,214,10,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18 }}>🔗</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(245,158,11,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 18 }}>🔗</div>
                   )}
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#FFD60A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: BUBBLE.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {preview?.title || label || "Your sponsor"}
                     </div>
                     {preview?.description && (
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 11, color: BUBBLE.faint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {preview.description}
                       </div>
                     )}
@@ -1379,18 +1312,17 @@ const SponsorSheet = ({ onClose, onSubmit }: {
 
           {/* Duration toggle bar */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 8, display: "block" }}>How long should it run?</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.faint, marginBottom: 8, display: "block" }}>How long should it run?</label>
             <div style={{ display: "flex", gap: 6, width: "100%" }}>
               {dayOptions.map((d) => (
                 <button
                   key={d}
                   onClick={() => setDays(d)}
                   style={{
-                    flex: 1, height: 40, borderRadius: 12,
-                    background: days === d ? "rgba(255,214,10,0.15)" : "rgba(255,255,255,0.04)",
-                    border: days === d ? "1px solid rgba(255,214,10,0.4)" : "1px solid rgba(255,255,255,0.06)",
-                    color: days === d ? "#FFD60A" : "rgba(255,255,255,0.5)",
-                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    flex: 1, height: 40, borderRadius: 13,
+                    ...rowCard(days === d),
+                    color: days === d ? BUBBLE.violet : BUBBLE.sub,
+                    fontSize: 13, fontWeight: 800, cursor: "pointer",
                     transition: "all 0.2s ease",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
@@ -1404,14 +1336,14 @@ const SponsorSheet = ({ onClose, onSubmit }: {
           {/* Cost summary */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "14px 16px", borderRadius: 14,
-            background: "rgba(255,214,10,0.06)", border: "1px solid rgba(255,214,10,0.15)",
+            padding: "14px 16px", borderRadius: 16,
+            background: "rgba(245,158,11,0.08)", border: "1px solid rgba(217,119,6,0.25)",
           }}>
             <div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>${PRICE_PER_DAY}/day x {days} {days === 1 ? "day" : "days"}</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Visible to everyone in the lobby</div>
+              <div style={{ fontSize: 12, color: BUBBLE.sub, fontWeight: 700 }}>${PRICE_PER_DAY}/day x {days} {days === 1 ? "day" : "days"}</div>
+              <div style={{ fontSize: 11, color: BUBBLE.faint }}>Visible to everyone in the lobby</div>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#FFD60A", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#D97706", fontVariantNumeric: "tabular-nums" }}>
               ${total}
             </div>
           </div>
@@ -1423,13 +1355,11 @@ const SponsorSheet = ({ onClose, onSubmit }: {
               if (!link.trim()) { toast.error("Enter a link or handle"); return; }
               onSubmit(t, link.trim(), days);
             }}
+            className="bub-btn bub-btn-primary"
             style={{
-              width: "100%", height: 52, borderRadius: 26,
-              background: "linear-gradient(180deg, #FFE45E 0%, #F5D000 100%)",
-              color: "#0A0A0F", fontSize: 16, fontWeight: 800,
-              border: "none", cursor: "pointer",
+              ...ctaStyle,
+              width: "100%", height: 52, fontSize: 16,
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 6px 24px rgba(245,208,0,0.25)",
               marginTop: 4,
             }}
           >

@@ -185,10 +185,10 @@ export const FrightBadge = () => {
         fontWeight: 800,
         letterSpacing: "0.12em",
         textTransform: "uppercase",
-        color: "#FFD9A8",
-        background: `linear-gradient(135deg, ${HALLOWEEN.pumpkin}33, ${HALLOWEEN.purple}44)`,
-        border: `1px solid ${HALLOWEEN.pumpkin}55`,
-        textShadow: "0 1px 6px rgba(0,0,0,0.6)",
+        color: "#C2410C",
+        background: "#FFFFFF",
+        border: `1px solid ${HALLOWEEN.pumpkin}66`,
+        boxShadow: "0 2px 10px rgba(194,65,12,0.15)",
       }}
     >
       🎃 Fright Fest

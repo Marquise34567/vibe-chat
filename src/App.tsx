@@ -37,6 +37,13 @@ import BestOmegleAlternatives from "./pages/seo/BestOmegleAlternatives";
 import BestChatrouletteAlternatives from "./pages/seo/BestChatrouletteAlternatives";
 import MonkeyAppAlternatives from "./pages/seo/MonkeyAppAlternatives";
 import RandomVideoChatApps from "./pages/seo/RandomVideoChatApps";
+import RandomVideoChatNoSignUp from "./pages/seo/RandomVideoChatNoSignUp";
+import GroupVideoChatStrangers from "./pages/seo/GroupVideoChatStrangers";
+import BlindDateVideoChat from "./pages/seo/BlindDateVideoChat";
+import VoiceChatWithStrangers from "./pages/seo/VoiceChatWithStrangers";
+import CollegeVideoChat from "./pages/seo/CollegeVideoChat";
+import WebsitesLikeOmegle from "./pages/seo/WebsitesLikeOmegle";
+import CamToCamChat from "./pages/seo/CamToCamChat";
 
 const queryClient = new QueryClient();
 
@@ -112,6 +119,13 @@ const App = () => {
               <Route path="/best-chatroulette-alternatives" element={<BestChatrouletteAlternatives />} />
               <Route path="/monkey-app-alternatives" element={<MonkeyAppAlternatives />} />
               <Route path="/random-video-chat-apps" element={<RandomVideoChatApps />} />
+              <Route path="/random-video-chat-no-sign-up" element={<RandomVideoChatNoSignUp />} />
+              <Route path="/group-video-chat-strangers" element={<GroupVideoChatStrangers />} />
+              <Route path="/blind-date-video-chat" element={<BlindDateVideoChat />} />
+              <Route path="/voice-chat-with-strangers" element={<VoiceChatWithStrangers />} />
+              <Route path="/college-video-chat" element={<CollegeVideoChat />} />
+              <Route path="/websites-like-omegle" element={<WebsitesLikeOmegle />} />
+              <Route path="/cam-to-cam-chat" element={<CamToCamChat />} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>

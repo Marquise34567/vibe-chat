@@ -618,9 +618,12 @@ export class Matchmaker extends DurableObject<Env> {
       const skippedByThem = other.recentlySkipped[client.id];
       if (skippedByThem && skippedByThem > now) continue;
 
-      // Gender compatibility
-      if (client.gender !== "any" && other.gender !== client.gender) continue;
-      if (other.gender !== "any" && client.gender !== other.gender) continue;
+      // Gender compatibility — `gender` is the *filter* (who they want to
+      // meet); `selfGender` is who they ARE. Compare filter → selfGender,
+      // not filter → filter (otherwise two users both seeking women match
+      // each other).
+      if (client.gender !== "any" && other.selfGender !== client.gender) continue;
+      if (other.gender !== "any" && client.selfGender !== other.gender) continue;
 
       // Scholar filter
       if (client.scholarOnly && !other.scholarOnly) continue;
@@ -862,6 +865,23 @@ export class Matchmaker extends DurableObject<Env> {
 
       // ── Start searching for a match ──
       case "search": {
+        // If still paired (e.g. re-search after reconnect without skipping),
+        // release the old partner so they aren't stuck in "matched" status
+        // with a dangling partnerId forever.
+        if (c.partnerId) {
+          const oldWs = this.wsById(c.partnerId);
+          const oldPartner = oldWs ? this.getClient(oldWs) : null;
+          if (oldWs && oldPartner) {
+            const now = Date.now();
+            c.recentlySkipped[oldPartner.id] = now + 60000;
+            oldPartner.recentlySkipped[id] = now + 60000;
+            oldPartner.status = "searching";
+            oldPartner.partnerId = undefined;
+            this.endCall(oldPartner);
+            this.putClient(oldWs, oldPartner);
+            this.send(oldWs, { type: "partner-left", peerId: id });
+          }
+        }
         c.status = "searching";
         c.mode = msg.mode ?? "solo";
         c.gender = msg.gender ?? "any";
@@ -893,7 +913,9 @@ export class Matchmaker extends DurableObject<Env> {
 
       // ── Cancel search ──
       case "cancel": {
-        c.status = "searching";
+        // "in-call" = not in the queue — keeps findMatch from pairing a user
+        // who already backed out to the lobby.
+        c.status = "in-call";
         c.partnerId = undefined;
         this.send(ws, { type: "cancelled" });
         break;
@@ -916,6 +938,17 @@ export class Matchmaker extends DurableObject<Env> {
           }
         } else {
           console.log(`Signaling ${msg.type}: ${id} has no partnerId!`);
+        }
+        break;
+      }
+
+      // ── In-call game relay ──
+      // Fallback transport for peer messages (games) when the WebRTC data
+      // channel isn't open — forwards the opaque payload to the partner.
+      case "game-relay": {
+        if (c.partnerId && msg.data !== undefined) {
+          const partnerWs = this.wsById(c.partnerId);
+          if (partnerWs) this.send(partnerWs, { type: "game-relay", data: msg.data, peerId: id });
         }
         break;
       }

@@ -71,13 +71,20 @@ export function useMatchConnection() {
   const [extendRequestFrom, setExtendRequestFrom] = useState<string | null>(null);
   const [extendAccepted, setExtendAccepted] = useState(false);
 
+  const [peerRole, setPeerRole] = useState<"caller" | "receiver" | null>(null);
+  const [peerChannelOpen, setPeerChannelOpen] = useState(false);
+
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const dcRef = useRef<RTCDataChannel | null>(null); // P2P channel for in-call games
+  const peerMsgHandlersRef = useRef<Set<(data: any) => void>>(new Set());
   const localStreamRef = useRef<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null); // self-preview video element
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null); // store stream until video element mounts
   const pendingOfferRef = useRef<any>(null); // queue offer if pc isn't ready yet
+  const pendingIceRef = useRef<any[]>([]); // queue ICE candidates that arrive before pc/remoteDescription
+  const connFailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const roleRef = useRef<"caller" | "receiver">("receiver");
   const paramsRef = useRef<MatchParams | null>(null);
@@ -109,9 +116,69 @@ export function useMatchConnection() {
     },
   ];
 
+  // ── Tear down the peer connection + remote stream ──
+  // Centralized so every exit path (skip, partner-left, ICE failure) cleans up
+  // the same way — leaves pcRef null so a fresh search() isn't blocked.
+  const teardownPeer = useCallback(() => {
+    if (connFailTimerRef.current) {
+      clearTimeout(connFailTimerRef.current);
+      connFailTimerRef.current = null;
+    }
+    if (dcRef.current) {
+      try { dcRef.current.close(); } catch {}
+      dcRef.current = null;
+    }
+    setPeerChannelOpen(false);
+    if (pcRef.current) {
+      try { pcRef.current.close(); } catch {}
+      pcRef.current = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    remoteStreamRef.current = null;
+    pendingOfferRef.current = null;
+    pendingIceRef.current = [];
+  }, []);
+
+  // ── Flush queued ICE candidates once remote description is set ──
+  const flushPendingIce = useCallback(async () => {
+    const pc = pcRef.current;
+    if (!pc || !pc.remoteDescription) return;
+    const queued = pendingIceRef.current;
+    pendingIceRef.current = [];
+    for (const candidate of queued) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error("[webrtc] Failed to add queued ICE candidate:", err);
+      }
+    }
+  }, []);
+
+  // ── Wire a data channel used for in-call games ──
+  const setupDataChannel = useCallback((dc: RTCDataChannel) => {
+    dcRef.current = dc;
+    dc.onopen = () => setPeerChannelOpen(true);
+    dc.onclose = () => { if (dcRef.current === dc) { dcRef.current = null; } setPeerChannelOpen(false); };
+    dc.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        peerMsgHandlersRef.current.forEach((h) => h(msg));
+      } catch { /* ignore malformed game messages */ }
+    };
+  }, []);
+
   // ── Create RTCPeerConnection ──
   const createPeerConnection = useCallback(() => {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+    // Game data channel: the caller creates it (must exist before the offer
+    // so it's negotiated in the SDP); the receiver picks it up via ondatachannel.
+    if (roleRef.current === "caller") {
+      setupDataChannel(pc.createDataChannel("ff-games", { ordered: true }));
+    }
+    pc.ondatachannel = (e) => setupDataChannel(e.channel);
 
     // Add local tracks — this is what sends our video/audio to the peer
     if (localStreamRef.current) {
@@ -174,9 +241,34 @@ export function useMatchConnection() {
 
     pc.onconnectionstatechange = () => {
       console.log(`[webrtc] Connection state: ${pc.connectionState}`);
-      if (pc.connectionState === "connected") setState("connected");
-      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+      if (pcRef.current !== pc) return; // stale pc — ignore
+      if (pc.connectionState === "connected") {
+        if (connFailTimerRef.current) {
+          clearTimeout(connFailTimerRef.current);
+          connFailTimerRef.current = null;
+        }
+        setState("connected");
+      }
+      if (pc.connectionState === "failed") {
+        // Hard failure — tear down so the next search() can start clean
+        teardownPeer();
         setState("disconnected");
+      }
+      if (pc.connectionState === "disconnected") {
+        // Transient ICE disconnect — give it a grace period to recover
+        // (wifi blips often self-heal), then treat as failed.
+        if (connFailTimerRef.current) clearTimeout(connFailTimerRef.current);
+        connFailTimerRef.current = setTimeout(() => {
+          connFailTimerRef.current = null;
+          if (pcRef.current === pc && pc.connectionState !== "connected") {
+            console.log("[webrtc] Disconnected too long — tearing down");
+            teardownPeer();
+            setState("disconnected");
+          }
+        }, 5000);
+      }
+      if (pc.connectionState === "closed") {
+        teardownPeer();
       }
     };
 
@@ -186,7 +278,7 @@ export function useMatchConnection() {
 
     pcRef.current = pc;
     return pc;
-  }, []);
+  }, [setupDataChannel, teardownPeer]);
 
   // ── Start local camera + mic ──
   // This is the SINGLE source of truth for the camera stream.
@@ -279,10 +371,16 @@ export function useMatchConnection() {
           break;
 
         case "matched":
+          // Clean slate — drop any stale pc/offer/ICE from a previous pairing
+          // (e.g. a "matched" arriving after a reconnect while an old pc exists)
+          if (pcRef.current) teardownPeer();
+          pendingOfferRef.current = null;
+          pendingIceRef.current = [];
           setPeerId(data.peerId);
           setPeerCountry(data.peerCountry ?? null);
           setPeerName(data.peerName ?? null);
           roleRef.current = data.role;
+          setPeerRole(data.role);
           setState("matched");
 
           // Create peer connection and start WebRTC handshake
@@ -308,6 +406,7 @@ export function useMatchConnection() {
                 const pending = pendingOfferRef.current;
                 pendingOfferRef.current = null;
                 await pc.setRemoteDescription(new RTCSessionDescription(pending.sdp));
+                await flushPendingIce();
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 wsRef.current?.send(JSON.stringify({ type: "answer", sdp: answer }));
@@ -326,6 +425,7 @@ export function useMatchConnection() {
           if (pcRef.current) {
             try {
               await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+              await flushPendingIce();
               const answer = await pcRef.current.createAnswer();
               await pcRef.current.setLocalDescription(answer);
               wsRef.current?.send(JSON.stringify({ type: "answer", sdp: answer }));
@@ -346,6 +446,7 @@ export function useMatchConnection() {
           if (pcRef.current) {
             try {
               await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+              await flushPendingIce();
               console.log("[webrtc] Remote description set");
             } catch (err) {
               console.error("Failed to handle answer:", err);
@@ -354,28 +455,32 @@ export function useMatchConnection() {
           break;
 
         case "ice":
-          if (pcRef.current) {
+          if (pcRef.current?.remoteDescription) {
             try {
               await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
             } catch (err) {
               console.error("Failed to add ICE candidate:", err);
             }
+          } else {
+            // Candidate arrived before the pc/offer — queue instead of dropping.
+            // Without this, fast callers lose their ICE on the receiver and the
+            // call silently never connects.
+            pendingIceRef.current.push(data.candidate);
           }
+          break;
+
+        case "game-relay":
+          // Game message delivered via match server (data channel fallback)
+          peerMsgHandlersRef.current.forEach((h) => h(data.data));
           break;
 
         case "partner-left":
           // Partner disconnected — clean up WebRTC
-          if (pcRef.current) {
-            pcRef.current.close();
-            pcRef.current = null;
-          }
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = null;
-          }
-          remoteStreamRef.current = null;
+          teardownPeer();
           setPeerId(null);
           setPeerCountry(null);
           setPeerName(null);
+          setPeerRole(null);
           setState("disconnected");
           break;
 
@@ -400,15 +505,11 @@ export function useMatchConnection() {
 
         case "partner-banned":
           // Partner was banned for NSFW — treat like partner-left
-          if (pcRef.current) {
-            pcRef.current.close();
-            pcRef.current = null;
-          }
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = null;
-          }
+          teardownPeer();
           setPeerId(null);
           setPeerCountry(null);
+          setPeerName(null);
+          setPeerRole(null);
           setState("disconnected");
           break;
 
@@ -437,7 +538,7 @@ export function useMatchConnection() {
           break;
       }
     },
-    [createPeerConnection, startLocalStream]
+    [createPeerConnection, startLocalStream, teardownPeer, flushPendingIce]
   );
 
   // ── Connect to match server ──
@@ -480,10 +581,7 @@ export function useMatchConnection() {
     ws.onclose = () => {
       console.log("[ws] WebSocket closed");
       if (pingIntervalRef.current) { clearInterval(pingIntervalRef.current); pingIntervalRef.current = null; }
-      if (pcRef.current) {
-        pcRef.current.close();
-        pcRef.current = null;
-      }
+      teardownPeer();
       // Auto-reconnect if we were searching or matched (not intentionally disconnected)
       if (paramsRef.current) {
         console.log("[ws] Auto-reconnecting in 1s…");
@@ -495,9 +593,10 @@ export function useMatchConnection() {
         }, 1000);
       } else {
         setState("disconnected");
+        setPeerRole(null);
       }
     };
-  }, []);
+  }, [teardownPeer]);
 
   // ── Start searching for a match ──
   const search = useCallback(
@@ -528,17 +627,11 @@ export function useMatchConnection() {
 
   // ── Skip current partner (does NOT auto-search — client navigates to Match view) ──
   const skip = useCallback(() => {
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-    }
-    remoteStreamRef.current = null;
+    teardownPeer();
     setPeerId(null);
     setPeerCountry(null);
     setPeerName(null);
+    setPeerRole(null);
     setExtendRequestFrom(null);
     setExtendAccepted(false);
 
@@ -547,7 +640,7 @@ export function useMatchConnection() {
     }
     // Set to searching immediately so the UI transitions
     setState("searching");
-  }, []);
+  }, [teardownPeer]);
 
   // ── Request to extend the call with current partner ──
   const requestExtend = useCallback(() => {
@@ -575,26 +668,43 @@ export function useMatchConnection() {
 
   // ── Cancel search ──
   const cancel = useCallback(() => {
+    // Clear params so a WS drop/reconnect doesn't silently re-search
+    paramsRef.current = null;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "cancel" }));
     }
     setState("idle");
   }, []);
 
+  // ── Send a message to the matched peer (in-call games) ──
+  // Prefers the P2P data channel; falls back to relaying through the match
+  // server so games still work if the channel never opened.
+  const sendPeerMessage = useCallback((payload: any) => {
+    if (dcRef.current?.readyState === "open") {
+      dcRef.current.send(JSON.stringify(payload));
+      return true;
+    }
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "game-relay", data: payload }));
+      return true;
+    }
+    return false;
+  }, []);
+
+  // ── Subscribe to peer messages. Returns an unsubscribe fn. ──
+  const onPeerMessage = useCallback((handler: (data: any) => void) => {
+    peerMsgHandlersRef.current.add(handler);
+    return () => { peerMsgHandlersRef.current.delete(handler); };
+  }, []);
+
   // ── Disconnect everything ──
   const disconnect = useCallback(() => {
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
+    paramsRef.current = null; // no auto-reconnect after intentional disconnect
+    teardownPeer();
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-    }
-    remoteStreamRef.current = null;
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "leave" }));
@@ -604,7 +714,8 @@ export function useMatchConnection() {
     }
     setState("idle");
     setPeerId(null);
-  }, []);
+    setPeerRole(null);
+  }, [teardownPeer]);
 
   // ── Heartbeat ping every 25s ──
   useEffect(() => {
@@ -627,6 +738,8 @@ export function useMatchConnection() {
     peerId,
     peerCountry,
     peerName,
+    peerRole,
+    peerChannelOpen,
     extendRequestFrom,
     extendAccepted,
     localStreamRef,
@@ -642,5 +755,7 @@ export function useMatchConnection() {
     declineExtend,
     setDisplayName,
     startCamera,
+    sendPeerMessage,
+    onPeerMessage,
   };
 }

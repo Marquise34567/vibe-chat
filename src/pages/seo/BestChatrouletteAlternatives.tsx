@@ -8,7 +8,7 @@ const UPDATED = "October 2026";
 const URL = "https://www.facefrenzy.fun/best-chatroulette-alternatives";
 
 const A = ({ to, children }: { to: string; children: React.ReactNode }) => (
-  <Link to={to} style={{ color: "#FFD60A", textDecoration: "none", fontWeight: 600 }}>{children}</Link>
+  <Link to={to} style={{ color: "#6362F2", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
 );
 
 const faqs = [

@@ -1,4 +1,10 @@
-export default function handler(req, res) {
+type VercelLikeResponse = {
+  setHeader(name: string, value: string): void;
+  status(code: number): VercelLikeResponse;
+  send(body: string): void;
+};
+
+export default function handler(_req: unknown, res: VercelLikeResponse) {
   const today = new Date().toISOString().split("T")[0];
 
   const urls = [
@@ -13,6 +19,13 @@ export default function handler(req, res) {
     { loc: "https://www.facefrenzy.fun/best-chatroulette-alternatives", priority: "0.9", freq: "weekly", lastmod: "2026-10-05" },
     { loc: "https://www.facefrenzy.fun/monkey-app-alternatives", priority: "0.9", freq: "weekly", lastmod: "2026-10-05" },
     { loc: "https://www.facefrenzy.fun/random-video-chat-apps", priority: "0.9", freq: "weekly", lastmod: "2026-10-05" },
+    { loc: "https://www.facefrenzy.fun/random-video-chat-no-sign-up", priority: "0.9", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/group-video-chat-strangers", priority: "0.8", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/blind-date-video-chat", priority: "0.8", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/voice-chat-with-strangers", priority: "0.8", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/college-video-chat", priority: "0.8", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/websites-like-omegle", priority: "0.9", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/cam-to-cam-chat", priority: "0.8", freq: "weekly", lastmod: today },
     { loc: "https://www.facefrenzy.fun/safety", priority: "0.7", freq: "monthly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/vs/ometv", priority: "0.7", freq: "monthly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/vs/emerald-chat", priority: "0.7", freq: "monthly", lastmod: "2026-09-01" },

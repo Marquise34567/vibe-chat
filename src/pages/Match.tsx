@@ -2,14 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { getDisplayName } from "@/lib/localUser";
-import { RadarPulse, CloseIcon } from "@/components/MatchIcons";
+import { RadarPulse, CloseIcon, FrenzyFace } from "@/components/MatchIcons";
 import { HalloweenOverlay } from "@/components/HalloweenOverlay";
 import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
 import { recordMatch, matchesLeft } from "@/lib/limits";
 import { useTier } from "@/hooks/useTier";
+import { BUBBLE, chipStyle, ghostPillStyle } from "@/lib/bubble";
 import { toast } from "sonner";
 
 type Mode = "solo" | "group" | "blind";
+
+const MODE_CHIP: Record<string, { icon: string; label: string }> = {
+  solo: { icon: "⚡", label: "Solo" },
+  duo: { icon: "👯", label: "Duo" },
+  group: { icon: "🎉", label: "Group" },
+  blind: { icon: "🎭", label: "Blind" },
+};
 
 const Match = () => {
   const navigate = useNavigate();
@@ -85,45 +93,107 @@ const Match = () => {
   // Only show "matched" UI when actually connected (not ghost matched)
   const showMatched = connState === "connected";
 
+  const modeChip = MODE_CHIP[mode] ?? MODE_CHIP.solo;
+  const isBlind = mode === "blind";
+
   return (
-    <div className="relative min-h-screen flex flex-col bg-app overflow-hidden">
-      {/* ── Full-bleed webcam feed ── */}
-      <div className="absolute inset-0 overflow-hidden bg-black">
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: "scaleX(-1)", objectPosition: "center top" }}
-        />
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
+    <div
+      className="relative flex flex-col overflow-hidden"
+      style={{ height: "100dvh", background: BUBBLE.bg, color: BUBBLE.ink }}
+    >
+      {/* Spooky season particles */}
+      {isHalloweenSeason() && <HalloweenOverlay zIndex={5} density={10} />}
+
+      {/* ── Top bar — logo + online chip ── */}
+      <div className="relative z-10 flex items-center justify-between px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 11, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 4px 12px rgba(27,26,51,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <FrenzyFace className="w-[18px] h-[18px]" />
+          </div>
+          <span className="ff-wordmark" style={{ fontSize: 15 }}>facefrenzy</span>
+        </div>
+        {typeof onlineCount === "number" && onlineCount > 0 && (
+          <span style={{ ...chipStyle, gap: 6, padding: "6px 12px" }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.7)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
+            <span style={{ fontSize: 11, fontWeight: 800 }}>{onlineCount.toLocaleString("en-US")} online</span>
+          </span>
+        )}
       </div>
 
       {/* ── Centered search content ── */}
-      {/* Spooky season particles above the dimmed camera */}
-      {isHalloweenSeason() && <HalloweenOverlay zIndex={5} density={10} />}
-
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full">
-        <div style={{ filter: `drop-shadow(0 0 30px ${isHalloweenSeason() ? HALLOWEEN.pumpkin + "88" : "rgba(124,92,255,0.5)"})` }}>
-          <RadarPulse className="mb-8" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center px-4 w-full gap-4">
+        {/* Webcam card */}
+        <div
+          style={{
+            position: "relative", height: "min(38dvh, 340px)", aspectRatio: "4/5",
+            borderRadius: 28, overflow: "hidden",
+            background: "#101019", border: `5px solid ${BUBBLE.card}`,
+            boxShadow: BUBBLE.cardShadow,
+            flexShrink: 0,
+          }}
+        >
+          {isBlind ? (
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #F1E9FF 0%, #FDE8F3 55%, #E9E4FF 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} style={{
+                    width: 6, borderRadius: 3, background: "#FF4D8D",
+                    height: [26, 44, 62, 80, 62, 44, 26][i],
+                    opacity: 0.55,
+                    animation: `ff-wave-bar 1.5s ease-in-out ${i * 0.1}s infinite`,
+                  }} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: "scaleX(-1)", objectPosition: "center top" }}
+            />
+          )}
+          {/* Searching chip on the card */}
+          <div style={{ position: "absolute", top: 10, left: 10 }}>
+            <span style={{ ...chipStyle, gap: 6, padding: "5px 12px" }}>
+              <span style={{ fontSize: 13 }}>{modeChip.icon}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.4px" }}>{modeChip.label}</span>
+            </span>
+          </div>
         </div>
 
-        <h2 className="text-3xl font-bold tracking-tight mb-2 text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
-          {showMatched ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
-        </h2>
-        <p className="text-white/90 text-center mb-1" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}>{statusText}</p>
+        {/* Radar */}
+        <div style={{ filter: `drop-shadow(0 0 26px ${isHalloweenSeason() ? HALLOWEEN.pumpkin + "88" : "rgba(124,92,255,0.45)"})`, flexShrink: 0 }}>
+          <RadarPulse />
+        </div>
 
-        <div className="mt-4 text-4xl font-bold tabular-nums text-white" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
+        {/* Status */}
+        <div style={{ textAlign: "center" }}>
+          <h2 style={{ fontSize: "clamp(24px, 6vw, 32px)", fontWeight: 900, letterSpacing: "-1px", color: BUBBLE.ink, marginBottom: 4 }}>
+            {showMatched ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
+          </h2>
+          <p style={{ fontSize: 15, color: BUBBLE.sub, fontWeight: 600 }}>{statusText}</p>
+        </div>
+
+        <div style={{ fontSize: 34, fontWeight: 900, letterSpacing: "-0.5px", color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>
           {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
         </div>
       </div>
 
-      {/* ── Single cancel button ── */}
+      {/* ── Cancel — white ghost pill ── */}
       <div className="relative z-10 px-4 flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)" }}>
-        <button onClick={handleCancel} className="btn-glass flex items-center gap-2">
-          <CloseIcon className="w-4 h-4" /> Cancel
+        <button
+          onClick={handleCancel}
+          className="bub-btn bub-btn-ghost"
+          style={{
+            ...ghostPillStyle,
+            padding: "13px 30px", fontSize: 15,
+            display: "flex", alignItems: "center", gap: 8,
+          }}
+        >
+          <CloseIcon className="w-4 h-4" style={{ color: BUBBLE.pink }} /> Cancel
         </button>
       </div>
     </div>
