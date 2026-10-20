@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Shield, Sparkles, ArrowRight, User } from "lucide-react";
-import { GlassCard } from "@/components/glass";
+import { Shield, ArrowRight, User } from "lucide-react";
+import { BrandMark } from "@/components/BrandMark";
+import { FloatingStickers } from "@/components/FloatingStickers";
+import { BUBBLE } from "@/lib/bubble";
 import { setAgeVerified } from "@/lib/verification";
 import { getDisplayName, setDisplayName } from "@/lib/localUser";
 import { syncVisitorToSupabase } from "@/lib/identitySync";
@@ -9,6 +11,7 @@ import { toast } from "sonner";
 /**
  * AgeGate — shown on first visit. Confirms 16+ then asks the user to pick
  * a display name (like monkey.app). The name shows when matched with someone.
+ * Locket-style: warm cream canvas, floating stickers, chunky white card.
  */
 export const AgeGate = ({ onDone }: { onDone: () => void }) => {
   const [step, setStep] = useState<"age" | "name">("age");
@@ -32,26 +35,73 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
     onDone();
   };
 
+  const cardStyle: React.CSSProperties = {
+    maxWidth: 420,
+    width: "100%",
+    borderRadius: 28,
+    background: BUBBLE.card,
+    border: `1px solid ${BUBBLE.border}`,
+    boxShadow: BUBBLE.cardShadow,
+    padding: "32px 28px",
+    textAlign: "center",
+    position: "relative",
+    zIndex: 10,
+  };
+
+  const ctaStyleLocal: React.CSSProperties = {
+    width: "100%",
+    height: 54,
+    borderRadius: 27,
+    border: "none",
+    background: BUBBLE.grad,
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: 800,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    boxShadow:
+      "inset 0 1.5px 0 rgba(255,255,255,0.35), inset 0 -2.5px 0 rgba(140,80,10,0.20), 0 8px 22px rgba(255,159,10,0.42)",
+    transition: "transform 0.18s ease, filter 0.2s ease",
+  };
+
   if (step === "age") {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-app">
-        <GlassCard strong className="max-w-md w-full p-8 text-center animate-pop-in">
-          <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center mx-auto mb-5 shadow-lg">
-            <Sparkles className="w-8 h-8 text-white" strokeWidth={2.5} />
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+        style={{ background: BUBBLE.bg, color: BUBBLE.ink }}
+      >
+        <FloatingStickers />
+        <div className="animate-pop-in" style={cardStyle}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <BrandMark size={64} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight mb-2 text-white">Welcome to FaceFrenzy</h1>
-          <p className="text-white/60 mb-6">
+          <h1 style={{ fontFamily: '"Baloo 2", "Nunito", sans-serif', fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", marginBottom: 6 }}>
+            welcome to <span style={{ color: BUBBLE.brand }}>facefrenzy</span>
+          </h1>
+          <p style={{ color: BUBBLE.sub, fontWeight: 600, fontSize: 14, marginBottom: 22 }}>
             Random video chat with real people. Real vibes, real connection.
           </p>
 
-          <div className="neu-inset-sm p-5 mb-6 text-left rounded-2xl">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-primary shrink-0 mt-0.5" strokeWidth={2.5} />
-              <div className="text-sm">
-                <div className="font-semibold mb-1 text-white">Before you enter:</div>
-                <ul className="text-white/50 space-y-1 list-disc list-inside">
-                  <li>You must be <strong className="text-white/80">16 years or older</strong></li>
-                  <li>You'll be matched with <strong className="text-white/80">real people</strong>, not bots</li>
+          <div
+            style={{
+              borderRadius: 18,
+              background: "rgba(255,159,10,0.06)",
+              border: `1px solid ${BUBBLE.border}`,
+              padding: "16px 18px",
+              marginBottom: 22,
+              textAlign: "left",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <Shield style={{ width: 20, height: 20, color: BUBBLE.brand, flexShrink: 0, marginTop: 2 }} strokeWidth={2.5} />
+              <div style={{ fontSize: 13 }}>
+                <div style={{ fontWeight: 800, marginBottom: 6, color: BUBBLE.ink }}>Before you enter:</div>
+                <ul style={{ color: BUBBLE.sub, fontWeight: 600, lineHeight: 1.7, listStyle: "disc", paddingLeft: 18 }}>
+                  <li>You must be <strong style={{ color: BUBBLE.ink }}>16 years or older</strong></li>
+                  <li>You'll be matched with <strong style={{ color: BUBBLE.ink }}>real people</strong>, not bots</li>
                   <li>No fake profiles, no creeps</li>
                   <li>Be respectful — AI moderation is active</li>
                 </ul>
@@ -59,30 +109,49 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
             </div>
           </div>
 
-          <button onClick={confirmAge} className="btn-primary w-full text-lg">
-            I'm 16 or older <ArrowRight className="w-5 h-5" strokeWidth={2.5} />
+          <button
+            onClick={confirmAge}
+            className="bub-btn"
+            style={ctaStyleLocal}
+          >
+            I'm 16 or older <ArrowRight style={{ width: 20, height: 20 }} strokeWidth={2.5} />
           </button>
-          <button onClick={() => { setAgeVerified(); onDone(); }} className="text-xs text-white/40 mt-3 hover:text-white/70">
+          <button
+            onClick={() => { setAgeVerified(); onDone(); }}
+            style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: BUBBLE.faint, background: "none", border: "none", cursor: "pointer" }}
+          >
             I'm not 16 yet — exit
           </button>
-        </GlassCard>
+        </div>
       </div>
     );
   }
 
   // Name step — pick a display name (monkey.app style)
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-app">
-      <GlassCard strong className="max-w-md w-full p-8 animate-pop-in">
-        <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center mx-auto mb-5 shadow-lg">
-          <User className="w-8 h-8 text-white" strokeWidth={2.5} />
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+      style={{ background: BUBBLE.bg, color: BUBBLE.ink }}
+    >
+      <FloatingStickers />
+      <div className="animate-pop-in" style={cardStyle}>
+        <div
+          style={{
+            width: 64, height: 64, borderRadius: 22, margin: "0 auto 16px",
+            background: BUBBLE.brandSoft, border: `1px solid rgba(255,159,10,0.3)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <User style={{ width: 30, height: 30, color: BUBBLE.brand }} strokeWidth={2.5} />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-center mb-2 text-white">Pick your name</h2>
-        <p className="text-white/60 text-center mb-6">
+        <h2 style={{ fontFamily: '"Baloo 2", "Nunito", sans-serif', fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", marginBottom: 6 }}>
+          pick your name
+        </h2>
+        <p style={{ color: BUBBLE.sub, fontWeight: 600, fontSize: 14, marginBottom: 22 }}>
           This is what the other person sees when you match. Make it yours.
         </p>
 
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input
             type="text"
             value={name}
@@ -90,18 +159,19 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
             placeholder="e.g. Alex, Kai, Nova…"
             maxLength={20}
             autoFocus
-            className="input-glass text-center text-lg"
+            className="input-glass text-center"
+            style={{ fontSize: 17, fontWeight: 700 }}
             onKeyDown={(e) => e.key === "Enter" && pickName()}
           />
-          <button onClick={pickName} className="btn-primary w-full">
-            <ArrowRight className="w-4 h-4" strokeWidth={2.5} /> Start matching
+          <button onClick={pickName} className="bub-btn" style={ctaStyleLocal}>
+            Start matching <ArrowRight style={{ width: 20, height: 20 }} strokeWidth={2.5} />
           </button>
         </div>
 
-        <p className="text-xs text-white/40 text-center mt-4">
+        <p style={{ fontSize: 12, color: BUBBLE.faint, fontWeight: 600, marginTop: 16 }}>
           You can change this later in your profile.
         </p>
-      </GlassCard>
+      </div>
     </div>
   );
 };

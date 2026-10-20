@@ -14,8 +14,6 @@ import { BUBBLE, chipStyle } from "@/lib/bubble";
 import { PeerGames } from "@/components/games/PeerGames";
 import { AttentionCheck } from "@/components/AttentionCheck";
 import { useAttentionTracking } from "@/hooks/useAttentionTracking";
-import { HalloweenOverlay } from "@/components/HalloweenOverlay";
-import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
 
 import { toast } from "sonner";
 import {
@@ -207,7 +205,7 @@ const ChatRoom = () => {
     if (!isBlind || blindRevealed) return;
     if (blindCountdown <= 0) {
       setBlindRevealed(true);
-      toast.success(isHalloweenSeason() ? "🎃 Pumpkin smashed! Cameras revealed!" : "🎈 Balloon popped! Cameras revealed!");
+      toast.success("🎈 Balloon popped! Cameras revealed!");
       setBalloonPopped(true);
       return;
     }
@@ -315,15 +313,10 @@ const ChatRoom = () => {
   const isGroup = mode === "group";
   const otherSocials = other?.socials ?? {};
 
-  const spooky = isHalloweenSeason();
-
   return (
     <div className="h-screen flex flex-col relative overflow-hidden" style={{ height: "100dvh", background: BUBBLE.bg, color: BUBBLE.ink }}>
       {/* Hidden canvas for attention tracking (reads frames from the pip webcam video) */}
       <canvas ref={canvasRef} width={160} height={120} className="hidden" />
-
-      {/* Spooky season — subtle particles floating over the call UI */}
-      {spooky && <HalloweenOverlay zIndex={20} density={6} dimmed />}
 
       {/* Top bar — padded below the notch/status bar */}
       <div className="px-4 pb-2 flex items-center justify-between" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
@@ -336,7 +329,7 @@ const ChatRoom = () => {
         </button>
         <div className="flex items-center gap-2">
           <span style={{ ...chipStyle, gap: 6, padding: "5px 12px", fontSize: 11, color: "#dc2626", border: "1px solid rgba(220,38,38,0.25)", background: "rgba(220,38,38,0.07)" }}><span className="live-dot" /> LIVE</span>
-          {hdOn && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: BUBBLE.violet, border: "1px solid rgba(109,94,245,0.3)", background: BUBBLE.violetSoft }}>HD</span>}
+          {hdOn && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: BUBBLE.brand, border: "1px solid rgba(255,159,10,0.3)", background: BUBBLE.brandSoft }}>HD</span>}
           {isGroup && <span style={{ ...chipStyle, gap: 5, padding: "5px 12px", fontSize: 11 }}><Users className="w-3 h-3" strokeWidth={2.5} /> Group</span>}
           {isBlind && !blindRevealed && <span style={{ ...chipStyle, gap: 5, padding: "5px 12px", fontSize: 11, color: BUBBLE.pink, border: "1px solid rgba(255,77,141,0.3)", background: "rgba(255,77,141,0.07)" }}><EyeOff className="w-3 h-3" strokeWidth={2.5} /> Blind</span>}
           {attentionState === "idle" && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: "#D97706", border: "1px solid rgba(217,119,6,0.3)", background: "rgba(245,158,11,0.10)" }}>idle</span>}
@@ -355,13 +348,10 @@ const ChatRoom = () => {
           {/* Blind date: audio-only mode */}
           {isBlind && !blindRevealed ? (
             <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-900 via-fuchsia-900 to-rose-900" />
-              {spooky && (
-                <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 50% 80%, ${HALLOWEEN.pumpkin}22 0%, transparent 60%)` }} />
-              )}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-600 to-rose-500" />
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
                 <div className={`text-8xl mb-4 transition-all duration-500 ${balloonPopped ? "scale-0 opacity-0" : "animate-float"}`}>
-                  {spooky ? "🎃" : "🎈"}
+                  🎈
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">Blind Date</h2>
                 <p className="text-white/80 mb-4">Audio only — get to know them first!</p>
@@ -374,7 +364,7 @@ const ChatRoom = () => {
                     <div key={i} className="w-1.5 bg-white/60 rounded-full animate-wave" style={{ animationDelay: `${i * 0.1}s`, height: "100%" }} />
                   ))}
                 </div>
-                <p className="text-white/60 text-xs mt-4">{spooky ? "Cameras reveal when the pumpkin smashes 🎃" : "Cameras reveal when the balloon pops 🎉"}</p>
+                <p className="text-white/60 text-xs mt-4">Cameras reveal when the balloon pops 🎉</p>
               </div>
             </div>
           ) : (
@@ -401,9 +391,9 @@ const ChatRoom = () => {
                 <span
                   className="font-black tracking-tight text-white/70 text-sm md:text-base drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
                   style={{
-                    fontFamily: "Unbounded, system-ui, sans-serif",
+                    fontFamily: '"Baloo 2", "Nunito", system-ui, sans-serif',
                     letterSpacing: "-0.04em",
-                    textShadow: "0 0 12px rgba(107,76,255,0.4)",
+                    textShadow: "0 0 12px rgba(255,159,10,0.4)",
                   }}
                 >
                   face<span className="text-white/50">frenzy</span>
@@ -430,8 +420,8 @@ const ChatRoom = () => {
                         className="bub-btn bub-btn-ghost"
                         style={{
                           marginLeft: 4, padding: "6px 14px", borderRadius: 999,
-                          background: BUBBLE.violetSoft, border: "1px solid rgba(99,98,242,0.35)",
-                          color: BUBBLE.violet, fontSize: 12, fontWeight: 800, cursor: "pointer",
+                          background: BUBBLE.brandSoft, border: "1px solid rgba(255,159,10,0.35)",
+                          color: BUBBLE.brand, fontSize: 12, fontWeight: 800, cursor: "pointer",
                           display: "inline-flex", alignItems: "center", gap: 4,
                         }}
                       >
@@ -485,7 +475,7 @@ const ChatRoom = () => {
             const afford = coins >= g.cost;
             return (
               <button key={g.id} onClick={() => handleSendGift(g)} disabled={!afford} className="text-center disabled:opacity-40">
-                <div className="p-4 flex flex-col items-center gap-1" style={{ borderRadius: 18, background: "rgba(109,94,245,0.04)", border: `1px solid ${BUBBLE.border}` }}>
+                <div className="p-4 flex flex-col items-center gap-1" style={{ borderRadius: 18, background: "rgba(255,159,10,0.04)", border: `1px solid ${BUBBLE.border}` }}>
                   <span className="text-4xl">{g.emoji}</span>
                   <span className="text-xs font-bold" style={{ color: BUBBLE.ink }}>{g.name}</span>
                   <span className="text-xs font-bold flex items-center gap-0.5" style={{ color: "#D97706" }}>
@@ -506,7 +496,7 @@ const ChatRoom = () => {
             const url = formatSocialUrl(p, handle);
             return (
               <a key={p.id} href={url} target="_blank" rel="noopener noreferrer" className="block">
-                <div className="p-4 flex items-center gap-3" style={{ borderRadius: 18, background: "rgba(109,94,245,0.04)", border: `1px solid ${BUBBLE.border}` }}>
+                <div className="p-4 flex items-center gap-3" style={{ borderRadius: 18, background: "rgba(255,159,10,0.04)", border: `1px solid ${BUBBLE.border}` }}>
                   <span className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${p.color} flex items-center justify-center text-lg shadow`}>
                     {p.icon}
                   </span>
@@ -514,7 +504,7 @@ const ChatRoom = () => {
                     <div className="font-bold text-sm" style={{ color: BUBBLE.ink }}>{p.name}</div>
                     <div className="text-xs" style={{ color: BUBBLE.faint }}>{handle}</div>
                   </div>
-                  <span className="text-xs font-bold" style={{ color: BUBBLE.violet }}>Open →</span>
+                  <span className="text-xs font-bold" style={{ color: BUBBLE.brand }}>Open →</span>
                 </div>
               </a>
             );
@@ -561,15 +551,15 @@ const ChatRoom = () => {
         <div style={{
           position: "fixed", inset: 0, zIndex: 300,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
-          background: "rgba(243,240,255,0.94)", backdropFilter: "blur(12px)",
+          background: "rgba(255,247,232,0.94)", backdropFilter: "blur(12px)",
           animation: "ff-slide-up 0.3s ease",
         }}>
           <div style={{ width: 56, height: 56, borderRadius: 28, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.cardShadow, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <SkipForward style={{ width: 28, height: 28, color: BUBBLE.violet }} />
+            <SkipForward style={{ width: 28, height: 28, color: BUBBLE.brand }} />
           </div>
           <span style={{ fontSize: 18, fontWeight: 800, color: BUBBLE.ink }}>Finding someone new…</span>
-          <div style={{ width: 120, height: 4, borderRadius: 2, background: "rgba(109,94,245,0.15)", overflow: "hidden" }}>
-            <div style={{ width: "100%", height: "100%", background: BUBBLE.violet, animation: "ff-shimmer 1.2s ease-in-out" }} />
+          <div style={{ width: 120, height: 4, borderRadius: 2, background: "rgba(255,159,10,0.15)", overflow: "hidden" }}>
+            <div style={{ width: "100%", height: "100%", background: BUBBLE.brand, animation: "ff-shimmer 1.2s ease-in-out" }} />
           </div>
         </div>
       )}
@@ -586,12 +576,12 @@ const ChatRoom = () => {
             width: "85%", maxWidth: 340, borderRadius: 28, padding: 28,
             background: BUBBLE.card,
             border: `1px solid ${BUBBLE.border}`,
-            boxShadow: "0 24px 64px rgba(27,26,51,0.30)",
+            boxShadow: "0 24px 64px rgba(120,72,20,0.30)",
             display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center",
           }}>
             <div style={{
               width: 64, height: 64, borderRadius: 32,
-              background: "linear-gradient(135deg, rgba(255,77,141,0.14), rgba(124,92,255,0.14))",
+              background: "linear-gradient(135deg, rgba(255,77,141,0.14), rgba(255,159,10,0.14))",
               border: "1px solid rgba(255,77,141,0.3)",
               display: "flex", alignItems: "center", justifyContent: "center",
               animation: "ff-core-pulse 1.5s ease-in-out infinite",
@@ -609,7 +599,7 @@ const ChatRoom = () => {
                 className="bub-btn bub-btn-ghost"
                 style={{
                   flex: 1, height: 48, borderRadius: 999,
-                  background: "rgba(99,98,242,0.05)", border: `1px solid ${BUBBLE.border}`,
+                  background: "rgba(255,159,10,0.05)", border: `1px solid ${BUBBLE.border}`,
                   color: BUBBLE.sub, fontSize: 15, fontWeight: 700, cursor: "pointer",
                 }}
               >
@@ -972,7 +962,7 @@ const callTriggerStyle: React.CSSProperties = {
   background: BUBBLE.card,
   border: `1px solid ${BUBBLE.border}`,
   color: BUBBLE.ink,
-  boxShadow: "0 3px 12px rgba(27,26,51,0.08)",
+  boxShadow: "0 3px 12px rgba(120,72,20,0.08)",
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -1012,11 +1002,11 @@ const BubbleSheet = ({
           background: BUBBLE.card,
           borderRadius: "30px 30px 0 0",
           borderTop: `1px solid ${BUBBLE.border}`,
-          boxShadow: "0 -16px 48px rgba(27,26,51,0.28)",
+          boxShadow: "0 -16px 48px rgba(120,72,20,0.28)",
           paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)",
         }}
       >
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(27,26,51,0.15)", margin: "0 auto 16px" }} />
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(120,72,20,0.15)", margin: "0 auto 16px" }} />
         {title && (
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-extrabold tracking-tight" style={{ color: BUBBLE.ink }}>{title}</h3>
@@ -1025,7 +1015,7 @@ const BubbleSheet = ({
               aria-label="Close"
               style={{
                 width: 34, height: 34, borderRadius: 17, border: "none", cursor: "pointer",
-                background: "rgba(109,94,245,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
+                background: "rgba(255,159,10,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
               }}
             >
               <span style={{ fontSize: 16, color: BUBBLE.ink, lineHeight: 1 }}>✕</span>

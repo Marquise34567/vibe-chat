@@ -8,8 +8,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { MatchConnectionProvider } from "@/contexts/MatchConnectionContext";
 import { AppShell } from "@/components/AppShell";
 import { AgeGate } from "@/components/AgeGate";
+import { SplashScreen } from "@/components/SplashScreen";
 import { getAgeVerified } from "@/lib/verification";
-import { isHalloweenSeason } from "@/lib/halloween";
 import StartTab from "./pages/app/StartTab";
 import ChatsTab from "./pages/app/ChatsTab";
 import MomentsTab from "./pages/app/MomentsTab";
@@ -49,14 +49,16 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [ageOk, setAgeOk] = useState(getAgeVerified());
+  const [splash, setSplash] = useState(() => {
+    try { return !sessionStorage.getItem("ff:splashed"); } catch { return true; }
+  });
 
   useEffect(() => { setAgeOk(getAgeVerified()); }, []);
 
-  // Fright Fest — re-skin the whole app during spooky season
-  useEffect(() => {
-    document.body.classList.toggle("ff-halloween", isHalloweenSeason());
-    return () => document.body.classList.remove("ff-halloween");
-  }, []);
+  const dismissSplash = () => {
+    try { sessionStorage.setItem("ff:splashed", "1"); } catch { /* ignore */ }
+    setSplash(false);
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -65,6 +67,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            {splash && <SplashScreen onDone={dismissSplash} />}
             {!ageOk && <AgeGate onDone={() => setAgeOk(true)} />}
             <Routes>
               {/* Lobby is the landing page — no separate welcome screen */}

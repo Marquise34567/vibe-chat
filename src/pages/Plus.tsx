@@ -5,7 +5,6 @@ import { GlassCard } from "@/components/glass";
 import { useTier } from "@/hooks/useTier";
 import { PLUS_FEATURES, PLUS_PLANS, VIP_PLANS, apiBase } from "@/lib/config";
 import { TIER_LABEL } from "@/lib/tiers";
-import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
 import { FREE_DAILY_MATCH_LIMIT } from "@/lib/limits";
 import { toast } from "sonner";
 
@@ -20,7 +19,6 @@ const Plus = () => {
   const [params] = useSearchParams();
   const reason = params.get("reason") ?? "";
   const { tier, setTier } = useTier();
-  const spooky = isHalloweenSeason();
 
   const [tierTab, setTierTab] = useState<"plus" | "vip">("plus");
   const [selected, setSelected] = useState("plus-yearly");
@@ -62,7 +60,7 @@ const Plus = () => {
   };
 
   const isPlus = tier !== "free";
-  const accent = spooky ? HALLOWEEN.pumpkin : "#FFD60A";
+  const accent = "#FF9F0A";
 
   return (
     <div className="min-h-screen px-4 py-6">
@@ -75,15 +73,11 @@ const Plus = () => {
         <GlassCard strong className="p-8 text-center relative overflow-hidden" interactive={false}>
           <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-highlight/30 blur-3xl" />
           <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-primary/30 blur-3xl" />
-          {spooky && (
-            <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at 50% 0%, ${HALLOWEEN.pumpkin}1f 0%, transparent 60%)` }} />
-          )}
           <div className="relative">
-            <span className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style={{ background: `linear-gradient(135deg, ${accent}, ${spooky ? HALLOWEEN.purple : "hsl(var(--primary))"})` }}>
+            <span className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style={{ background: `linear-gradient(135deg, ${accent}, #E5820A)` }}>
               <Crown className="w-7 h-7 text-white" strokeWidth={2.5} />
             </span>
-            {spooky && <div className="text-3xl mb-2">🎃</div>}
-            <h1 className={`text-3xl font-bold tracking-tight ${spooky ? "ff-spooky-glow" : ""}`}>
+            <h1 className="text-3xl font-bold tracking-tight">
               FaceFrenzy {tierTab === "vip" ? "VIP" : "Plus"}
             </h1>
             <p className="text-muted-foreground mt-2">
@@ -151,10 +145,9 @@ const Plus = () => {
           onClick={subscribe}
           disabled={loading || tier === tierTab}
           className="btn-primary w-full text-lg py-4 disabled:opacity-50"
-          style={spooky ? { background: `linear-gradient(135deg, #FFB347, ${HALLOWEEN.pumpkin})`, boxShadow: `0 6px 24px ${HALLOWEEN.pumpkin}55` } : undefined}
         >
           {loading ? "Redirecting to Stripe…" : tier === tierTab ? `You're already ${TIER_LABEL[tier]} ✨` : (
-            <> <Crown className="w-5 h-5" strokeWidth={2.5} /> {spooky ? "Unleash" : "Get"} {TIER_LABEL[tierTab]} — {selectedPlan.price}{selectedPlan.per}</>
+            <> <Crown className="w-5 h-5" strokeWidth={2.5} /> Get {TIER_LABEL[tierTab]} — {selectedPlan.price}{selectedPlan.per}</>
           )}
         </button>
 

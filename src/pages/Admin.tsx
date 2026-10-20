@@ -1,8 +1,7 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { apiBase } from "@/lib/config";
 import { countryByCode } from "@/lib/countries";
-import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
-import { FrightBadge } from "@/components/HalloweenOverlay";
+import { BUBBLE } from "@/lib/bubble";
 
 /**
  * Admin — matchmaking analytics + AI insights.
@@ -81,8 +80,7 @@ const GENDER_META: Record<string, { label: string; emoji: string; color: string 
 };
 
 const Admin = () => {
-  const spooky = isHalloweenSeason();
-  const accent = spooky ? HALLOWEEN.pumpkin : "#FFD60A";
+  const accent = BUBBLE.brand;
 
   const [key, setKey] = useState(() => sessionStorage.getItem("ff_admin_key") ?? "");
   const [authed, setAuthed] = useState(false);
@@ -140,7 +138,6 @@ const Admin = () => {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h1 style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.5px" }}>Matchmaking Intelligence</h1>
-              {spooky && <FrightBadge />}
             </div>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>
               Live stats from the match server · refreshes every 15s

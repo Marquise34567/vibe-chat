@@ -8,7 +8,7 @@ const UPDATED = "October 2026";
 const URL = "https://www.facefrenzy.fun/random-video-chat-apps";
 
 const A = ({ to, children }: { to: string; children: React.ReactNode }) => (
-  <Link to={to} style={{ color: "#6362F2", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
+  <Link to={to} style={{ color: "#FF9F0A", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
 );
 
 const faqs = [
@@ -63,7 +63,7 @@ const RandomVideoChatApps = () => {
         ]} />
       </Section>
 
-      <ListicleItem n={1} icon="⚡" accent="#7C5CFF" cta title="FaceFrenzy — instant video chat, no download">
+      <ListicleItem n={1} icon="⚡" accent="#FF9F0A" cta title="FaceFrenzy — instant video chat, no download">
         FaceFrenzy wins this list on the metric that matters most: time-to-first-real-conversation. Native apps make you download 100+MB, create an account, verify an email, and accept permissions before you see a face. FaceFrenzy skips all of it — the browser is the app. On mobile you get a fullscreen camera stage, floating glass controls, and thumb-reach skip. It's anonymous by default and AI-moderated in real time, which is why there are no bots. Three modes cover every mood — solo for the classic loop, group for chaos with friends, blind for voice-first mystery. Free, no signup, works everywhere.
       </ListicleItem>
 

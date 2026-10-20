@@ -8,7 +8,7 @@ const UPDATED = "October 2026";
 const URL = "https://www.facefrenzy.fun/monkey-app-alternatives";
 
 const A = ({ to, children }: { to: string; children: React.ReactNode }) => (
-  <Link to={to} style={{ color: "#6362F2", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
+  <Link to={to} style={{ color: "#FF9F0A", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
 );
 
 const faqs = [
@@ -63,7 +63,7 @@ const MonkeyAppAlternatives = () => {
         ]} />
       </Section>
 
-      <ListicleItem n={1} icon="⚡" accent="#7C5CFF" cta title="FaceFrenzy — Monkey's energy, zero friction">
+      <ListicleItem n={1} icon="⚡" accent="#FF9F0A" cta title="FaceFrenzy — Monkey's energy, zero friction">
         What makes Monkey fun is speed: tap, connect, vibe, skip. FaceFrenzy matches that loop exactly — instant random video chat on any device — but removes every barrier Monkey puts in front of it. Nothing to install, nothing to sign up for, nothing to verify. The camera stage is fullscreen with a floating glass dock that feels native on mobile. Three modes instead of one: solo 1-on-1 (the Monkey formula), group chat for 3-4 people (which Monkey doesn't offer at all), and blind mode where the first 30 seconds are voice-only. AI moderation keeps bots out in real time — the problem Monkey's manual queue never solved. Free, anonymous, open now.
       </ListicleItem>
 

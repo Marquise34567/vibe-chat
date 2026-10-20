@@ -4,11 +4,11 @@ import type { SVGProps } from "react";
    FaceFrenzy — Custom Carved Icon Set
    Hand-built SVGs for the entire video chat UI.
    No lucide. Rounded, energetic, brand-specific.
-   Purple (#6B4CFF) + Yellow (#FFD60A) palette.
+   Purple (#FF9F0A) + Yellow (#FFD60A) palette.
    "Carved" feel: dual-tone strokes with subtle depth.
    ============================================================ */
 
-const PURPLE = "#6B4CFF";
+const PURPLE = "#FF9F0A";
 const YELLOW = "#FFD60A";
 const INK = "#0A0A14";
 

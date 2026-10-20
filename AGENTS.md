@@ -38,7 +38,10 @@
 - `src/hooks/useWebcam.ts` — Local camera access
 - `src/components/FaceFrenzyIcons.tsx` — Custom SVG icons
 - `src/components/MatchIcons.tsx` — Match screen animated icons
-- `src/components/HalloweenOverlay.tsx` + `src/lib/halloween.ts` — "Fright Fest" seasonal theme (auto Oct 1–Nov 3, override via localStorage `ff:halloween` = "on"/"off")
+- `src/components/BrandMark.tsx` — Locket-style logo (orange rounded square + white heart) + `BrandLogo` lockup
+- `src/components/FloatingStickers.tsx` — decorative floating sticker layer (photos/emoji/badges) for cream screens
+- `src/components/SplashScreen.tsx` — boot loading screen (shown once per tab session via `ff:splashed`)
+- `src/lib/bubble.ts` — Locket-style design tokens (cream bg `BUBBLE.bg`, orange `BUBBLE.brand`, ink `BUBBLE.ink`) used by StartTab/Match/ChatRoom
 - `src/components/PaywallSheet.tsx` + `src/lib/limits.ts` — hard paywall: 10 free matches/day, gender + region filters are Plus-only
 - `src/pages/Admin.tsx` — hidden `/admin` dashboard (live stats, gender split, countries, AI insights)
 

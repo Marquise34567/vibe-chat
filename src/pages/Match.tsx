@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { getDisplayName } from "@/lib/localUser";
-import { RadarPulse, CloseIcon, FrenzyFace } from "@/components/MatchIcons";
-import { HalloweenOverlay } from "@/components/HalloweenOverlay";
-import { isHalloweenSeason, HALLOWEEN } from "@/lib/halloween";
+import { RadarPulse, CloseIcon } from "@/components/MatchIcons";
+import { BrandMark } from "@/components/BrandMark";
+import { FloatingStickers } from "@/components/FloatingStickers";
 import { recordMatch, matchesLeft } from "@/lib/limits";
 import { useTier } from "@/hooks/useTier";
 import { BUBBLE, chipStyle, ghostPillStyle } from "@/lib/bubble";
@@ -101,15 +101,13 @@ const Match = () => {
       className="relative flex flex-col overflow-hidden"
       style={{ height: "100dvh", background: BUBBLE.bg, color: BUBBLE.ink }}
     >
-      {/* Spooky season particles */}
-      {isHalloweenSeason() && <HalloweenOverlay zIndex={5} density={10} />}
+      {/* Floating sticker decor */}
+      <FloatingStickers />
 
       {/* ── Top bar — logo + online chip ── */}
       <div className="relative z-10 flex items-center justify-between px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 11, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 4px 12px rgba(27,26,51,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <FrenzyFace className="w-[18px] h-[18px]" />
-          </div>
+          <BrandMark size={30} />
           <span className="ff-wordmark" style={{ fontSize: 15 }}>facefrenzy</span>
         </div>
         {typeof onlineCount === "number" && onlineCount > 0 && (
@@ -127,13 +125,13 @@ const Match = () => {
           style={{
             position: "relative", height: "min(38dvh, 340px)", aspectRatio: "4/5",
             borderRadius: 28, overflow: "hidden",
-            background: "#101019", border: `5px solid ${BUBBLE.card}`,
+            background: "#241C14", border: `5px solid ${BUBBLE.card}`,
             boxShadow: BUBBLE.cardShadow,
             flexShrink: 0,
           }}
         >
           {isBlind ? (
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #F1E9FF 0%, #FDE8F3 55%, #E9E4FF 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #FFE8CC 0%, #FFE3EC 55%, #FFF0D6 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} style={{
@@ -165,7 +163,7 @@ const Match = () => {
         </div>
 
         {/* Radar */}
-        <div style={{ filter: `drop-shadow(0 0 26px ${isHalloweenSeason() ? HALLOWEEN.pumpkin + "88" : "rgba(124,92,255,0.45)"})`, flexShrink: 0 }}>
+        <div style={{ filter: "drop-shadow(0 0 26px rgba(255,159,10,0.45))", flexShrink: 0 }}>
           <RadarPulse />
         </div>
 

@@ -6,8 +6,8 @@ import type { SVGProps } from "react";
    energy: pulses, sweeps, orbits, blinks, bounces.
    ============================================================ */
 
-const PURPLE = "#6B4CFF";
-const PURPLE_DEEP = "#3B2AD4";
+const PURPLE = "#FF9F0A";
+const PURPLE_DEEP = "#E5820A";
 const YELLOW = "#FFD60A";
 const YELLOW_SOFT = "#FFE45E";
 const INK = "#1A1400";

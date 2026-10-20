@@ -1,23 +1,23 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { FrenzyFace } from "@/components/MatchIcons";
+import { BrandMark } from "@/components/BrandMark";
 
 // ── Design tokens (light, bubbly theme) ──
-const INK = "#1B1A33";
-const SUB = "rgba(27,26,51,0.62)";
-const FAINT = "rgba(27,26,51,0.42)";
-const BORDER = "rgba(27,26,51,0.09)";
+const INK = "#33291C";
+const SUB = "rgba(120,72,20,0.62)";
+const FAINT = "rgba(120,72,20,0.42)";
+const BORDER = "rgba(120,72,20,0.09)";
 const CARD = "#FFFFFF";
-const VIOLET = "#6362F2";
-const GRAD = "linear-gradient(180deg, #7B78FF 0%, #625FF3 100%)";
-const CTA_SHADOW = "inset 0 1.5px 0 rgba(255,255,255,0.35), inset 0 -2.5px 0 rgba(30,27,75,0.16), 0 8px 22px rgba(98,95,243,0.38)";
-const SHADOW = "0 1px 2px rgba(27,26,51,0.04), 0 8px 24px rgba(109,94,245,0.10)";
+const VIOLET = "#FF9F0A";
+const GRAD = "linear-gradient(180deg, #FFB340 0%, #FF9F0A 100%)";
+const CTA_SHADOW = "inset 0 1.5px 0 rgba(255,255,255,0.35), inset 0 -2.5px 0 rgba(140,80,10,0.16), 0 8px 22px rgba(255,159,10,0.38)";
+const SHADOW = "0 1px 2px rgba(120,72,20,0.04), 0 8px 24px rgba(255,159,10,0.10)";
 
 const BG = [
-  "radial-gradient(55% 42% at 50% -5%, rgba(139,92,246,0.22), transparent 70%)",
+  "radial-gradient(55% 42% at 50% -5%, rgba(255,159,10,0.22), transparent 70%)",
   "radial-gradient(38% 32% at 90% 16%, rgba(255,77,141,0.11), transparent 70%)",
-  "radial-gradient(38% 32% at 6% 24%, rgba(99,102,241,0.13), transparent 70%)",
-  "linear-gradient(180deg, #F6F4FF 0%, #EFEBFF 55%, #F8F6FF 100%)",
+  "radial-gradient(38% 32% at 6% 24%, rgba(255,159,10,0.12), transparent 70%)",
+  "linear-gradient(180deg, #FFFBF2 0%, #FFF6E3 55%, #FFFAF0 100%)",
 ].join(", ");
 
 const Chip = ({ icon, children }: { icon: string; children: ReactNode }) => (
@@ -27,7 +27,7 @@ const Chip = ({ icon, children }: { icon: string; children: ReactNode }) => (
       padding: "8px 16px", borderRadius: 999,
       background: CARD, border: `1px solid ${BORDER}`,
       fontSize: 13, fontWeight: 700, color: INK,
-      boxShadow: "0 2px 10px rgba(27,26,51,0.05)",
+      boxShadow: "0 2px 10px rgba(120,72,20,0.05)",
       whiteSpace: "nowrap",
     }}
   >
@@ -101,14 +101,12 @@ export const SEOPage = ({
         style={{
           position: "sticky", top: 0, zIndex: 20,
           padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between",
-          background: "rgba(250,249,255,0.72)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+          background: "rgba(255,251,242,0.78)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
           borderBottom: `1px solid ${BORDER}`,
         }}
       >
         <button onClick={() => navigate("/")} style={{ display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer" }}>
-          <div style={{ width: 34, height: 34, borderRadius: 12, background: CARD, border: `1px solid ${BORDER}`, boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 4px 12px rgba(27,26,51,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <FrenzyFace className="w-5 h-5" />
-          </div>
+          <BrandMark size={32} />
           <span className="ff-wordmark" style={{ fontSize: 16 }}>facefrenzy</span>
         </button>
         <button
@@ -159,7 +157,7 @@ export const SEOPage = ({
             style={{
               padding: "15px 30px", borderRadius: 999, background: CARD,
               color: INK, fontSize: 16, fontWeight: 800, border: `1px solid ${BORDER}`, cursor: "pointer",
-              boxShadow: "0 2px 12px rgba(27,26,51,0.06)",
+              boxShadow: "0 2px 12px rgba(120,72,20,0.06)",
             }}
           >
             How it works
@@ -168,7 +166,7 @@ export const SEOPage = ({
 
         {/* Mode cards */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
-          <ModeCard icon="⚡" name="Solo" tag="1-on-1 random video chat" accent="#7C5CFF" />
+          <ModeCard icon="⚡" name="Solo" tag="1-on-1 random video chat" accent="#FF9F0A" />
           <ModeCard icon="🎉" name="Group" tag="3-4 people in one call" accent="#FF4D8D" />
           <ModeCard icon="🎭" name="Blind" tag="Voice first, reveal at 30s" accent="#38BDF8" />
         </div>
@@ -249,13 +247,13 @@ export const LI = ({ children }: { children: ReactNode }) => (
       fontSize: 15, color: SUB, lineHeight: 1.6, marginBottom: 10,
       padding: "12px 16px 12px 42px", position: "relative",
       background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14,
-      boxShadow: "0 1px 6px rgba(27,26,51,0.04)",
+      boxShadow: "0 1px 6px rgba(120,72,20,0.04)",
     }}
   >
     <span
       style={{
         position: "absolute", left: 14, top: 14, width: 18, height: 18, borderRadius: "50%",
-        background: "rgba(109,94,245,0.12)", color: VIOLET,
+        background: "rgba(255,159,10,0.12)", color: VIOLET,
         fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center",
       }}
     >
@@ -269,7 +267,7 @@ export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; 
   <div style={{ overflowX: "auto", marginBottom: 24, borderRadius: 18, background: CARD, border: `1px solid ${BORDER}`, boxShadow: SHADOW }}>
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
       <thead>
-        <tr style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(109,94,245,0.05)" }}>
+        <tr style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(255,159,10,0.05)" }}>
           <th style={{ textAlign: "left", padding: "12px 10px", color: FAINT, fontWeight: 700 }}>Site</th>
           <th style={{ textAlign: "center", padding: "12px 8px", color: FAINT, fontWeight: 700 }}>Bots?</th>
           <th style={{ textAlign: "center", padding: "12px 8px", color: FAINT, fontWeight: 700 }}>Age Gate</th>
@@ -282,7 +280,7 @@ export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; 
         {rows.map((r) => (
           <tr key={r.name} style={{
             borderBottom: `1px solid ${BORDER}`,
-            background: r.highlight ? "rgba(109,94,245,0.07)" : "transparent",
+            background: r.highlight ? "rgba(255,159,10,0.07)" : "transparent",
           }}>
             <td style={{ padding: "12px 10px", fontWeight: r.highlight ? 800 : 600, color: r.highlight ? VIOLET : INK }}>
               {r.name}{r.highlight && " ←"}
@@ -302,7 +300,7 @@ export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; 
 export const FAQ = ({ items }: { items: { q: string; a: string }[] }) => (
   <div style={{ marginBottom: 24 }}>
     {items.map((item, i) => (
-      <details key={i} style={{ marginBottom: 10, borderRadius: 16, background: CARD, border: `1px solid ${BORDER}`, overflow: "hidden", boxShadow: "0 1px 6px rgba(27,26,51,0.04)" }}>
+      <details key={i} style={{ marginBottom: 10, borderRadius: 16, background: CARD, border: `1px solid ${BORDER}`, overflow: "hidden", boxShadow: "0 1px 6px rgba(120,72,20,0.04)" }}>
         <summary style={{ padding: "15px 18px", fontSize: 15, fontWeight: 700, color: INK, cursor: "pointer", listStyle: "none" }}>
           {item.q}
         </summary>
@@ -349,7 +347,7 @@ export const ListicleItem = ({
   n,
   icon,
   title,
-  accent = "#7C5CFF",
+  accent = "#FF9F0A",
   children,
   cta = false,
 }: {
@@ -419,8 +417,8 @@ export const ListicleBanner = ({
     <div
       style={{
         borderRadius: 24, padding: "30px 24px", margin: "34px 0", textAlign: "center",
-        background: "linear-gradient(150deg, #6362F2 0%, #8B5CF6 45%, #FF4D8D 120%)",
-        boxShadow: "0 18px 48px rgba(124,92,255,0.35)",
+        background: "linear-gradient(150deg, #FF9F0A 0%, #8B5CF6 45%, #FF4D8D 120%)",
+        boxShadow: "0 18px 48px rgba(255,159,10,0.35)",
       }}
     >
       <div style={{ fontSize: "clamp(18px, 5vw, 22px)", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px", marginBottom: 6 }}>
@@ -446,7 +444,7 @@ export const ListicleBanner = ({
 
 // ── Article byline (named author + last updated date for E-E-A-T) ──
 export const ArticleMeta = ({ author, role, updated }: { author: string; role: string; updated: string }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, padding: "12px 16px", borderRadius: 16, background: CARD, border: `1px solid ${BORDER}`, boxShadow: "0 1px 6px rgba(27,26,51,0.04)" }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, padding: "12px 16px", borderRadius: 16, background: CARD, border: `1px solid ${BORDER}`, boxShadow: "0 1px 6px rgba(120,72,20,0.04)" }}>
     <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #8B5CF6, #FF4D8D)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
       <span style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{author.charAt(0)}</span>
     </div>

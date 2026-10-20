@@ -13,10 +13,9 @@ import {
   PlayIcon, SoloModeIcon, GroupModeIcon, BlindModeIcon,
   PlusIcon, LockIcon as Lock,
 } from "@/components/FaceFrenzyIcons";
-import { HalloweenOverlay, FrightBadge } from "@/components/HalloweenOverlay";
-import { FrenzyFace } from "@/components/MatchIcons";
+import { BrandMark } from "@/components/BrandMark";
+import { FloatingStickers } from "@/components/FloatingStickers";
 import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
-import { isHalloweenSeason } from "@/lib/halloween";
 import { useTier } from "@/hooks/useTier";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
@@ -280,7 +279,7 @@ const StartTab = () => {
   const fmt = (n: number) => n.toLocaleString("en-US");
 
   const modeMeta: Record<Mode, { desc: string; icon: typeof SoloModeIcon; accent: string; label: string }> = {
-    solo:  { desc: "1-on-1 random video chat",            icon: SoloModeIcon,  accent: "#7C5CFF", label: "SOLO"  },
+    solo:  { desc: "1-on-1 random video chat",            icon: SoloModeIcon,  accent: "#FF9F0A", label: "SOLO"  },
     group: { desc: "Bring friends. Meet more.",           icon: GroupModeIcon, accent: "#E8890B", label: "GROUP" },
     blind: { desc: "Voice first. Cameras reveal at 30s.", icon: BlindModeIcon, accent: "#FF4D8D", label: "BLIND" },
   };
@@ -288,7 +287,7 @@ const StartTab = () => {
   const accent = friendConnected ? "#22c55e" : modeMeta[mode].accent;
   const modeLabel = friendConnected ? "DUO" : modeMeta[mode].label;
   const isBlind = mode === "blind";
-  const spooky = isHalloweenSeason();
+  const stickerLayer = true;
 
   // Scan self-preview in lobby for NSFW — warn but don't kill camera
   useEffect(() => {
@@ -303,8 +302,8 @@ const StartTab = () => {
 
   return (
     <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: BUBBLE.bg, color: BUBBLE.ink, display: "flex", flexDirection: "column" }} data-room-id={roomId ?? undefined}>
-      {/* Spooky season particles */}
-      {spooky && <HalloweenOverlay zIndex={3} />}
+      {/* Floating sticker decorations */}
+      {stickerLayer && <FloatingStickers />}
 
       {/* ═══════════════════════════════════════════════════
           TOP BAR — logo + status chips
@@ -312,15 +311,7 @@ const StartTab = () => {
       <div style={{ position: "relative", zIndex: 10, paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)", paddingLeft: 16, paddingRight: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         {/* Wordmark */}
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 12, background: BUBBLE.card,
-            border: `1px solid ${BUBBLE.border}`,
-            boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 4px 12px rgba(27,26,51,0.08)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <FrenzyFace className="w-5 h-5" />
-          </div>
-          {spooky && <span style={{ fontSize: 15 }}>🎃</span>}
+          <BrandMark size={32} />
           <span className="ff-wordmark" style={{ fontSize: 16 }}>facefrenzy</span>
         </div>
 
@@ -370,7 +361,7 @@ const StartTab = () => {
           HERO — ticker chip + big mode headline
       ═══════════════════════════════════════════════════ */}
       <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 20px 12px", textAlign: "center" }}>
-        {spooky && <div style={{ marginBottom: 8 }}><FrightBadge /></div>}
+
 
         {/* Activity ticker chip — desktop only, declutters mobile */}
         {!isMobile && (
@@ -383,12 +374,12 @@ const StartTab = () => {
         )}
 
         <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease" }}>
-          <h1 style={{ fontSize: "clamp(30px, 9vw, 44px)", fontWeight: 900, letterSpacing: "-1.6px", lineHeight: 1.05, color: BUBBLE.ink, marginBottom: 5 }}>
-            {modeLabel} CHAT
+          <h1 className="ff-heading" style={{ fontSize: "clamp(30px, 9vw, 44px)", fontWeight: 800, letterSpacing: "-1.4px", lineHeight: 1.05, color: BUBBLE.ink, marginBottom: 5, textTransform: "lowercase" }}>
+            {modeLabel} chat
           </h1>
           <p style={{ fontSize: 14, color: BUBBLE.sub, fontWeight: 600 }}>
             {friendConnected ? "You and your friend — ready to match" : modeMeta[mode].desc}
-            {!isMobile && <span style={{ color: BUBBLE.faint }}> · {spooky ? "the spookiest Omegle alternative" : "The #1 Omegle Alternative"}</span>}
+            {!isMobile && <span style={{ color: BUBBLE.faint }}> · The #1 Omegle Alternative</span>}
           </p>
         </div>
       </div>
@@ -425,7 +416,7 @@ const StartTab = () => {
                   )}
                   {camStatus === "requesting" && (
                     <>
-                      <RefreshCw className="animate-spin" style={{ width: 30, height: 30, color: BUBBLE.violet }} />
+                      <RefreshCw className="animate-spin" style={{ width: 30, height: 30, color: BUBBLE.brand }} />
                       <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>Starting camera…</span>
                     </>
                   )}
@@ -455,7 +446,7 @@ const StartTab = () => {
                 <div style={{ position: "absolute", bottom: 14, left: 14, ...chipStyle, padding: "5px 12px", fontSize: 11, zIndex: 5 }}>You</div>
               </div>
               {/* Right — friend's camera */}
-              <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden", background: "#16162A" }}>
+              <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden", background: "#241C14" }}>
                 <video
                   ref={friendVideoRef}
                   autoPlay playsInline
@@ -473,8 +464,8 @@ const StartTab = () => {
 
           {/* Waiting for friend overlay — light dim */}
           {!isBlind && lobbyState === "waiting" && !friendConnected && (
-            <div style={{ position: "absolute", inset: 0, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(246,244,255,0.62)", backdropFilter: "blur(8px)" }}>
-              <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: BUBBLE.violet }} />
+            <div style={{ position: "absolute", inset: 0, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(255,250,240,0.62)", backdropFilter: "blur(8px)" }}>
+              <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: BUBBLE.brand }} />
               <span style={{ fontSize: 16, fontWeight: 800, color: BUBBLE.ink }}>Waiting for friend…</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: BUBBLE.sub }}>Share your invite link</span>
             </div>
@@ -482,7 +473,7 @@ const StartTab = () => {
 
           {/* Blind mode — pastel wave wash (sits above the scrim, inherently soft) */}
           {isBlind && (
-            <div style={{ position: "absolute", inset: 0, zIndex: 5, background: "linear-gradient(160deg, #F1E9FF 0%, #FDE8F3 55%, #E9E4FF 100%)" }}>
+            <div style={{ position: "absolute", inset: 0, zIndex: 5, background: "linear-gradient(160deg, #FFE8CC 0%, #FFE3EC 55%, #FFF0D6 100%)" }}>
               {/* Floating voice waves */}
               <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", display: "flex", alignItems: "center", gap: 7 }}>
                 {[0, 1, 2, 3, 4, 5, 6].map((i) => (
@@ -505,7 +496,7 @@ const StartTab = () => {
           {/* Lavender scrim — keeps foreground readable over the faint feed */}
           <div style={{
             position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none",
-            background: "linear-gradient(180deg, rgba(246,244,255,0.92) 0%, rgba(246,244,255,0.5) 24%, rgba(246,244,255,0.38) 50%, rgba(246,244,255,0.5) 72%, rgba(246,244,255,0.88) 100%)",
+            background: "linear-gradient(180deg, rgba(255,250,240,0.92) 0%, rgba(255,250,240,0.5) 24%, rgba(255,250,240,0.38) 50%, rgba(255,250,240,0.5) 72%, rgba(255,250,240,0.88) 100%)",
           }} />
 
           {/* Match counter chip — desktop only, declutters mobile */}
@@ -521,7 +512,7 @@ const StartTab = () => {
         </div>
       </div>
 
-      {/* Spacer — pushes the dock to the bottom */}
+      {/* Spacer — floats the dock near center (bottom spacer is larger) */}
       <div style={{ flex: 1, minHeight: 24 }} />
 
       {/* ═══════════════════════════════════════════════════
@@ -548,7 +539,7 @@ const StartTab = () => {
                     }}
                     style={{
                       flex: 1, height: 44, borderRadius: 13, padding: 4, overflow: "hidden",
-                      background: sponsor ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(109,94,245,0.08))" : "rgba(109,94,245,0.04)",
+                      background: sponsor ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(255,159,10,0.08))" : "rgba(255,159,10,0.04)",
                       border: sponsor ? "1.5px solid rgba(217,119,6,0.30)" : `1px dashed ${BUBBLE.border}`,
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                       cursor: "pointer", position: "relative",
@@ -588,7 +579,7 @@ const StartTab = () => {
                 <button key={m} onClick={() => setMode(m)}
                   style={{
                     flex: 1, height: 54, borderRadius: 18,
-                    background: selected ? `${meta.accent}14` : "rgba(109,94,245,0.04)",
+                    background: selected ? `${meta.accent}14` : "rgba(255,159,10,0.04)",
                     border: selected ? `1.5px solid ${meta.accent}66` : `1px solid ${BUBBLE.border}`,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                     cursor: "pointer",
@@ -614,7 +605,7 @@ const StartTab = () => {
             {/* Gender pill — collapsed shows 1, tap expands */}
             <div style={{
               height: 42, borderRadius: 21, overflow: "hidden",
-              background: "rgba(109,94,245,0.06)", border: `1px solid ${BUBBLE.border}`,
+              background: "rgba(255,159,10,0.06)", border: `1px solid ${BUBBLE.border}`,
               display: "flex", alignItems: "center",
               transition: "all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
             }}>
@@ -635,15 +626,15 @@ const StartTab = () => {
                       height: "calc(100% - 6px)", border: "none", padding: "0 13px", margin: "3px 2px",
                       borderRadius: 18,
                       background: gender === g.id ? BUBBLE.card : "transparent",
-                      boxShadow: gender === g.id ? "0 2px 8px rgba(27,26,51,0.10)" : "none",
-                      cursor: "pointer", color: gender === g.id ? BUBBLE.violet : BUBBLE.sub,
+                      boxShadow: gender === g.id ? "0 2px 8px rgba(120,72,20,0.10)" : "none",
+                      cursor: "pointer", color: gender === g.id ? BUBBLE.brand : BUBBLE.sub,
                       fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", transition: "all 0.2s ease",
                       display: "flex", alignItems: "center", gap: 4,
                       opacity: locked ? 0.55 : 1,
                     }}>
                     <span style={{ fontSize: 13, opacity: 0.7 }}>{g.icon}</span>
                     {g.label}
-                    {locked && <Lock style={{ width: 10, height: 10, color: BUBBLE.violet }} />}
+                    {locked && <Lock style={{ width: 10, height: 10, color: BUBBLE.brand }} />}
                   </button>
                   );
                 })
@@ -651,7 +642,7 @@ const StartTab = () => {
                 <button onClick={() => setGenderExpanded(true)}
                   style={{
                     height: "100%", border: "none", padding: "0 16px", background: "transparent",
-                    cursor: "pointer", color: BUBBLE.violet, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                    cursor: "pointer", color: BUBBLE.brand, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
                     display: "flex", alignItems: "center", gap: 6,
                     transition: "transform 0.2s ease",
                   }}
@@ -670,12 +661,12 @@ const StartTab = () => {
               className="bub-btn bub-btn-ghost"
               style={{
                 height: 42, padding: "0 14px", borderRadius: 21,
-                background: region !== "worldwide" ? BUBBLE.violetSoft : BUBBLE.card,
-                border: region !== "worldwide" ? "1px solid rgba(99,98,242,0.35)" : `1px solid ${BUBBLE.border}`,
-                color: region !== "worldwide" ? BUBBLE.violet : BUBBLE.sub,
+                background: region !== "worldwide" ? BUBBLE.brandSoft : BUBBLE.card,
+                border: region !== "worldwide" ? "1px solid rgba(255,159,10,0.35)" : `1px solid ${BUBBLE.border}`,
+                color: region !== "worldwide" ? BUBBLE.brand : BUBBLE.sub,
                 fontSize: 13, fontWeight: 700, cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
-                boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 2px 8px rgba(27,26,51,0.05)",
+                boxShadow: "inset 0 -2px 0 rgba(120,72,20,0.05), 0 2px 8px rgba(120,72,20,0.05)",
               }}
             >
               <Globe style={{ width: 15, height: 15 }} />
@@ -693,7 +684,7 @@ const StartTab = () => {
                 color: scholarOnly ? "#16a34a" : BUBBLE.faint,
                 cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 2px 8px rgba(27,26,51,0.05)",
+                boxShadow: "inset 0 -2px 0 rgba(120,72,20,0.05), 0 2px 8px rgba(120,72,20,0.05)",
                 animation: scholarOnly ? "ff-icon-bounce 0.4s ease" : "none",
               }}
             >
@@ -715,7 +706,7 @@ const StartTab = () => {
                 animation: friendConnected ? "ff-btn-glow 2s ease-in-out infinite" : "none",
               }}
             >
-              <PlusIcon style={{ width: 18, height: 18, color: friendConnected ? "#16a34a" : BUBBLE.violet }} />
+              <PlusIcon style={{ width: 18, height: 18, color: friendConnected ? "#16a34a" : BUBBLE.brand }} />
             </button>
 
             {/* Start — GROUP requires a friend first, otherwise normal */}
@@ -726,8 +717,8 @@ const StartTab = () => {
                 style={{
                   ...ghostPillStyle,
                   height: 48, padding: "0 24px",
-                  border: "1.5px solid rgba(99,98,242,0.35)",
-                  color: BUBBLE.violet, fontSize: 15, letterSpacing: "0.2px",
+                  border: "1.5px solid rgba(255,159,10,0.35)",
+                  color: BUBBLE.brand, fontSize: 15, letterSpacing: "0.2px",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                   position: "relative",
                 }}
@@ -771,7 +762,7 @@ const StartTab = () => {
           {!isPaid && (
             <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, fontWeight: 600, color: BUBBLE.faint }}>
               {matchesLeft() > 0 ? (
-                <span>{matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: BUBBLE.violet, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button></span>
+                <span>{matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: BUBBLE.brand, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button></span>
               ) : (
                 <button onClick={() => setPaywall("limit")} style={{ color: "#e11d48", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
                   Out of free matches today — unlock Plus
@@ -781,6 +772,9 @@ const StartTab = () => {
           )}
         </div>
       </div>
+
+      {/* Bottom spacer — larger than the top one so the dock sits just above center */}
+      <div style={{ flex: 1.5, minHeight: 24 }} />
 
       {/* ═══════════════════════════════════════════════════
           SPONSOR BOXES — right rail, desktop only (mobile gets
@@ -820,7 +814,7 @@ const StartTab = () => {
               style={{
                 width: 88, height: 88, borderRadius: 18,
                 background: sponsor
-                  ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(109,94,245,0.08))"
+                  ? "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(255,159,10,0.08))"
                   : BUBBLE.card,
                 border: sponsor
                   ? "1.5px solid rgba(217,119,6,0.35)"
@@ -828,7 +822,7 @@ const StartTab = () => {
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", gap: 4, padding: 6, overflow: "hidden",
                 transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.3s",
-                boxShadow: sponsor ? "0 6px 20px rgba(217,119,6,0.12)" : "0 2px 10px rgba(27,26,51,0.05)",
+                boxShadow: sponsor ? "0 6px 20px rgba(217,119,6,0.12)" : "0 2px 10px rgba(120,72,20,0.05)",
                 position: "relative",
               }}
               onMouseEnter={(e) => {
@@ -886,7 +880,7 @@ const StartTab = () => {
             background: BUBBLE.card, border: "1px solid rgba(217,119,6,0.3)",
             color: "#D97706", fontSize: 9, fontWeight: 800, cursor: "pointer",
             textTransform: "uppercase", letterSpacing: 0.5,
-            boxShadow: "0 2px 10px rgba(27,26,51,0.05)",
+            boxShadow: "0 2px 10px rgba(120,72,20,0.05)",
             transition: "transform 0.2s ease",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; }}
@@ -971,18 +965,18 @@ const sheetCard: React.CSSProperties = {
   background: BUBBLE.card, borderRadius: "30px 30px 0 0", padding: 24,
   paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
   borderTop: `1px solid ${BUBBLE.border}`,
-  boxShadow: "0 -16px 48px rgba(27,26,51,0.28)",
+  boxShadow: "0 -16px 48px rgba(120,72,20,0.28)",
 };
 const sheetHandle: React.CSSProperties = {
-  width: 40, height: 4, borderRadius: 2, background: "rgba(27,26,51,0.15)", margin: "0 auto 20px",
+  width: 40, height: 4, borderRadius: 2, background: "rgba(120,72,20,0.15)", margin: "0 auto 20px",
 };
 const sheetCloseBtn: React.CSSProperties = {
-  width: 34, height: 34, borderRadius: 17, background: "rgba(109,94,245,0.08)",
+  width: 34, height: 34, borderRadius: 17, background: "rgba(255,159,10,0.08)",
   border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
 };
-const rowCard = (selected: boolean, tint = BUBBLE.violet): React.CSSProperties => ({
-  background: selected ? `${tint === BUBBLE.violet ? BUBBLE.violetSoft : "rgba(34,197,94,0.08)"}` : "rgba(109,94,245,0.035)",
-  border: selected ? `1.5px solid ${tint === BUBBLE.violet ? "rgba(109,94,245,0.40)" : "rgba(34,197,94,0.30)"}` : `1px solid ${BUBBLE.border}`,
+const rowCard = (selected: boolean, tint: string = BUBBLE.brand): React.CSSProperties => ({
+  background: selected ? `${tint === BUBBLE.brand ? BUBBLE.brandSoft : "rgba(34,197,94,0.08)"}` : "rgba(255,159,10,0.035)",
+  border: selected ? `1.5px solid ${tint === BUBBLE.brand ? "rgba(255,159,10,0.40)" : "rgba(34,197,94,0.30)"}` : `1px solid ${BUBBLE.border}`,
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1013,15 +1007,15 @@ const RegionPickerSheet = ({ region, setRegion, onClose, canPickRegions, onLocke
                   opacity: locked ? 0.55 : 1,
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 13, background: selected ? "rgba(109,94,245,0.12)" : "rgba(109,94,245,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{r.flag}</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 13, background: selected ? "rgba(255,159,10,0.12)" : "rgba(255,159,10,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{r.flag}</div>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: selected ? BUBBLE.violet : BUBBLE.ink }}>{r.label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: selected ? BUBBLE.brand : BUBBLE.ink }}>{r.label}</div>
                     <div style={{ fontSize: 11, color: BUBBLE.faint }}>{r.countries.length === 0 ? "No filter" : locked ? "Plus only" : `${r.countries.length} countries`}</div>
                   </div>
                 </div>
-                {locked && <Lock style={{ width: 15, height: 15, color: BUBBLE.violet }} />}
+                {locked && <Lock style={{ width: 15, height: 15, color: BUBBLE.brand }} />}
                 {selected && !locked && (
-                  <div style={{ width: 24, height: 24, borderRadius: 12, background: BUBBLE.violet, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 12, background: BUBBLE.brand, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
                 )}
@@ -1070,14 +1064,14 @@ const SettingsSheet = ({
                 style={{
                   height: 44, borderRadius: 14,
                   ...rowCard(selected),
-                  color: selected ? BUBBLE.violet : BUBBLE.ink, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  color: selected ? BUBBLE.brand : BUBBLE.ink, fontSize: 14, fontWeight: 600, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.2s ease",
                   opacity: locked ? 0.55 : 1,
                 }}>
                 {g.id === "both" && <UserCircle className="w-3.5 h-3.5" />}
                 {(g.id === "girls" || g.id === "guys") && <User className="w-3.5 h-3.5" />}
                 {g.label}
-                {locked && <Lock style={{ width: 11, height: 11, color: BUBBLE.violet }} />}
+                {locked && <Lock style={{ width: 11, height: 11, color: BUBBLE.brand }} />}
               </button>
               );
             })}
@@ -1087,7 +1081,7 @@ const SettingsSheet = ({
           <button onClick={() => setScholarOnly(!scholarOnly)} className="flex items-center justify-between w-full"
             style={{ height: 54, padding: "0 16px", borderRadius: 18, cursor: "pointer", transition: "all 0.2s ease", ...rowCard(scholarOnly, "#22c55e") }}>
             <div className="flex items-center gap-3">
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: scholarOnly ? "rgba(34,197,94,0.14)" : "rgba(109,94,245,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: scholarOnly ? "rgba(34,197,94,0.14)" : "rgba(255,159,10,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <GraduationCap className="w-4 h-4" style={{ color: scholarOnly ? "#16a34a" : BUBBLE.faint }} />
               </div>
               <div className="text-left">
@@ -1095,7 +1089,7 @@ const SettingsSheet = ({
                 <div style={{ fontSize: 11, color: BUBBLE.faint }}>{scholarVerified ? "You're verified 🎓" : "Match with verified students only"}</div>
               </div>
             </div>
-            <div style={{ width: 46, height: 28, borderRadius: 14, background: scholarOnly ? "#22c55e" : "rgba(27,26,51,0.12)", padding: 3, transition: "background 0.2s ease", display: "flex", alignItems: "center" }}>
+            <div style={{ width: 46, height: 28, borderRadius: 14, background: scholarOnly ? "#22c55e" : "rgba(120,72,20,0.12)", padding: 3, transition: "background 0.2s ease", display: "flex", alignItems: "center" }}>
               <div style={{ width: 22, height: 22, borderRadius: 11, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transform: scholarOnly ? "translateX(18px)" : "translateX(0)", transition: "transform 0.2s ease" }} />
             </div>
           </button>
@@ -1105,7 +1099,7 @@ const SettingsSheet = ({
           <button onClick={onRetryCam} className="flex items-center justify-between w-full"
             style={{ height: 54, padding: "0 16px", borderRadius: 18, ...rowCard(false), cursor: "pointer" }}>
             <div className="flex items-center gap-3">
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: camStatus === "active" ? "rgba(34,197,94,0.14)" : "rgba(109,94,245,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: camStatus === "active" ? "rgba(34,197,94,0.14)" : "rgba(255,159,10,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {camStatus === "active" ? <Camera className="w-4 h-4" style={{ color: "#16a34a" }} /> : <CameraOff className="w-4 h-4" style={{ color: BUBBLE.faint }} />}
               </div>
               <div className="text-left">
@@ -1134,7 +1128,7 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
     { label: "Twitter / X", icon: "𝕏", color: "#000",   url: (u: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent("Join me on FaceFrenzy! " + u)}` },
     { label: "Facebook",  icon: "📘", color: "#1877F2", url: (u: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(u)}` },
     { label: "Reddit",    icon: "🔴", color: "#FF4500", url: (u: string) => `https://reddit.com/submit?url=${encodeURIComponent(u)}&title=${encodeURIComponent("Join me on FaceFrenzy!")}` },
-    { label: "Email",     icon: "📧", color: "#6B4CFF", url: (u: string) => `mailto:?subject=${encodeURIComponent("Join me on FaceFrenzy!")}&body=${encodeURIComponent("Hey! Join me on FaceFrenzy: " + u)}` },
+    { label: "Email",     icon: "📧", color: "#FF9F0A", url: (u: string) => `mailto:?subject=${encodeURIComponent("Join me on FaceFrenzy!")}&body=${encodeURIComponent("Hey! Join me on FaceFrenzy: " + u)}` },
   ];
 
   const copyLink = () => {
@@ -1177,15 +1171,10 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
         <div style={{
           display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
           padding: "12px 14px", borderRadius: 16,
-          background: "rgba(109,94,245,0.05)", border: `1px solid ${BUBBLE.border}`,
+          background: "rgba(255,159,10,0.05)", border: `1px solid ${BUBBLE.border}`,
         }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 11, flexShrink: 0,
-            background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`,
-            boxShadow: "inset 0 -2px 0 rgba(27,26,51,0.05), 0 3px 8px rgba(27,26,51,0.07)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <FrenzyFace className="w-5 h-5" />
+          <div style={{ flexShrink: 0 }}>
+            <BrandMark size={36} />
           </div>
           <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>FaceFrenzy invite</div>
@@ -1194,9 +1183,9 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
           <button onClick={copyLink}
             style={{
               height: 36, padding: "0 16px", borderRadius: 18, flexShrink: 0,
-              background: copied ? "rgba(34,197,94,0.12)" : BUBBLE.violetSoft,
-              border: copied ? "1px solid rgba(34,197,94,0.35)" : "1px solid rgba(109,94,245,0.3)",
-              color: copied ? "#16a34a" : BUBBLE.violet, fontSize: 13, fontWeight: 800,
+              background: copied ? "rgba(34,197,94,0.12)" : BUBBLE.brandSoft,
+              border: copied ? "1px solid rgba(34,197,94,0.35)" : "1px solid rgba(255,159,10,0.3)",
+              color: copied ? "#16a34a" : BUBBLE.brand, fontSize: 13, fontWeight: 800,
               cursor: "pointer", transition: "all 0.2s ease", whiteSpace: "nowrap",
             }}>
             {copied ? "Copied!" : "Copy"}
@@ -1210,11 +1199,11 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
                 padding: "16px 8px", borderRadius: 18, textDecoration: "none",
-                background: "rgba(109,94,245,0.035)", border: `1px solid ${BUBBLE.border}`,
+                background: "rgba(255,159,10,0.035)", border: `1px solid ${BUBBLE.border}`,
                 cursor: "pointer", transition: "all 0.2s ease",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(109,94,245,0.07)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(109,94,245,0.035)"; e.currentTarget.style.transform = "translateY(0)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,159,10,0.07)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,159,10,0.035)"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
               <div style={{
                 width: 44, height: 44, borderRadius: 14,
@@ -1241,7 +1230,7 @@ const ShareSheet = ({ url, onClose }: { url: string; onClose: () => void }) => {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
-            <PlusIcon style={{ width: 18, height: 18, color: BUBBLE.violet }} />
+            <PlusIcon style={{ width: 18, height: 18, color: BUBBLE.brand }} />
             More share options…
           </button>
         )}
@@ -1269,7 +1258,7 @@ const SponsorSheet = ({ onClose, onSubmit }: {
 
   const inputStyle: React.CSSProperties = {
     width: "100%", height: 48, borderRadius: 14,
-    background: "rgba(109,94,245,0.05)", border: `1px solid ${BUBBLE.border}`,
+    background: "rgba(255,159,10,0.05)", border: `1px solid ${BUBBLE.border}`,
     color: BUBBLE.ink, fontSize: 15, fontWeight: 600, padding: "0 16px",
     outline: "none",
   };
@@ -1376,7 +1365,7 @@ const SponsorSheet = ({ onClose, onSubmit }: {
                   style={{
                     flex: 1, height: 40, borderRadius: 13,
                     ...rowCard(days === d),
-                    color: days === d ? BUBBLE.violet : BUBBLE.sub,
+                    color: days === d ? BUBBLE.brand : BUBBLE.sub,
                     fontSize: 13, fontWeight: 800, cursor: "pointer",
                     transition: "all 0.2s ease",
                     display: "flex", alignItems: "center", justifyContent: "center",

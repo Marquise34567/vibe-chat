@@ -8,7 +8,7 @@ const UPDATED = "October 2026";
 const URL = "https://www.facefrenzy.fun/best-chatroulette-alternatives";
 
 const A = ({ to, children }: { to: string; children: React.ReactNode }) => (
-  <Link to={to} style={{ color: "#6362F2", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
+  <Link to={to} style={{ color: "#FF9F0A", textDecoration: "none", fontWeight: 700 }}>{children}</Link>
 );
 
 const faqs = [
@@ -63,7 +63,7 @@ const BestChatrouletteAlternatives = () => {
         ]} />
       </Section>
 
-      <ListicleItem n={1} icon="⚡" accent="#7C5CFF" cta title="FaceFrenzy — Chatroulette's spirit, minus the bots">
+      <ListicleItem n={1} icon="⚡" accent="#FF9F0A" cta title="FaceFrenzy — Chatroulette's spirit, minus the bots">
         FaceFrenzy is the best site like Chatroulette in 2026 because it fixes the three things that ruined the original. First, bots: every connection is a real person with a live camera — scripted webcam loops can't survive the live-video check. Second, safety: AI scans feeds in real time and auto-bans offenders, with one-tap reporting on top. Third, features: beyond the classic match-and-skip loop you get gender and country filters, group video chat for 3-4 people, and blind mode (voice-only for 30 seconds, then the reveal). Free, no account, no download. If you remember what Chatroulette felt like in 2010, this is that — but it actually works.
       </ListicleItem>
 
