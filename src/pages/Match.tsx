@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { getDisplayName } from "@/lib/localUser";
 import { RadarPulse, CloseIcon } from "@/components/MatchIcons";
@@ -8,6 +9,7 @@ import { FloatingStickers } from "@/components/FloatingStickers";
 import { recordMatch, matchesLeft } from "@/lib/limits";
 import { useTier } from "@/hooks/useTier";
 import { BUBBLE, chipStyle, ghostPillStyle } from "@/lib/bubble";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
 
 type Mode = "solo" | "group" | "blind";
@@ -21,6 +23,7 @@ const MODE_CHIP: Record<string, { icon: string; label: string }> = {
 
 const Match = () => {
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const [params] = useSearchParams();
 
   const countries = useMemo(() => params.get("countries")?.split(",").filter(Boolean) ?? [], [params]);
@@ -74,9 +77,10 @@ const Match = () => {
   useEffect(() => {
     if (connState === "connected" && peerId) {
       recordMatch();
+      capturePostHogEvent(posthog, "match_connected", { match_mode: mode });
       navigate(`/chat/${peerId}?mode=${mode}`, { replace: true });
     }
-  }, [connState, peerId, mode, navigate]);
+  }, [connState, peerId, mode, navigate, posthog]);
 
   const handleCancel = () => {
     cancel();

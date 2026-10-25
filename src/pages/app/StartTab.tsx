@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useLobbyRoom } from "@/hooks/useLobbyRoom";
 import { useContentModeration } from "@/hooks/useContentModeration";
@@ -23,6 +24,7 @@ import { getLocalProfile } from "@/lib/localUser";
 import { normalizeGender } from "../../../shared/analytics";
 import { apiBase, SOCIAL_LINKS } from "@/lib/config";
 import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 
 /* ═══════════════════════════════════════════════════════════════
    FaceFrenzy Lobby — bubbly light theme
@@ -61,6 +63,7 @@ const ACTIVITY_FEED = [
 
 const StartTab = () => {
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>("solo");
   const [gender, setGender] = useState<Gender>("both");
@@ -254,6 +257,12 @@ const StartTab = () => {
       setPaywall("limit");
       return;
     }
+    capturePostHogEvent(posthog, "match_started", {
+      match_mode: friendConnected ? "duo" : mode,
+      has_gender_filter: gender !== "both",
+      has_region_filter: region !== "worldwide",
+      scholar_only: scholarOnly,
+    });
     const sp = new URLSearchParams();
     sp.set("mode", friendConnected ? "duo" : mode);
     sp.set("groupSize", friendConnected ? "2" : mode === "solo" ? "2" : "3");

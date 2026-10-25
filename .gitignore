@@ -27,3 +27,4 @@ dist-ssr
 .dev.vars
 .env*
 vite.config.ts.timestamp-*.mjs
+.env

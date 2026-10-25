@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import { Shield, ArrowRight, User } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
 import { FloatingStickers } from "@/components/FloatingStickers";
@@ -6,6 +7,7 @@ import { BUBBLE } from "@/lib/bubble";
 import { setAgeVerified } from "@/lib/verification";
 import { getDisplayName, setDisplayName } from "@/lib/localUser";
 import { syncVisitorToSupabase } from "@/lib/identitySync";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
 
 /**
@@ -16,8 +18,10 @@ import { toast } from "sonner";
 export const AgeGate = ({ onDone }: { onDone: () => void }) => {
   const [step, setStep] = useState<"age" | "name">("age");
   const [name, setName] = useState(getDisplayName() ?? "");
+  const posthog = usePostHog();
 
   const confirmAge = () => {
+    capturePostHogEvent(posthog, "age_confirmed");
     setAgeVerified();
     // If they already have a name saved, skip straight through
     if (getDisplayName()) { onDone(); return; }
@@ -28,6 +32,7 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
     const trimmed = name.trim();
     if (!trimmed) { toast.error("Pick a name to show when matching"); return; }
     if (trimmed.length > 20) { toast.error("Keep it under 20 characters"); return; }
+    capturePostHogEvent(posthog, "profile_created");
     setDisplayName(trimmed);
     // Persist the new visitor row immediately (no auth required)
     void syncVisitorToSupabase();

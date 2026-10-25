@@ -32,6 +32,9 @@ interface Env {
   FRONTEND_URL: string;
   AI?: Ai;                        // Workers AI binding — powers /api/insights
   ADMIN_KEY?: string;             // optional — protects /api/analytics & /api/insights
+  VITE_PUBLIC_POSTHOG_KEY?: string;
+  VITE_PUBLIC_POSTHOG_HOST?: string;
+  ENVIRONMENT?: string;
 }
 
 const SPONSOR_PRICE_CENTS_PER_DAY = 500; // $5/day
@@ -82,6 +85,45 @@ type ClientState = {
 };
 
 type LobbyRoom = { hostId: string; guestId?: string };
+
+type AiGeneration = {
+  traceId: string;
+  sessionId: string;
+  prompt: string;
+  completion: string;
+  latencySeconds: number;
+};
+
+const captureAiGeneration = async (env: Env, generation: AiGeneration): Promise<void> => {
+  const apiKey = env.VITE_PUBLIC_POSTHOG_KEY;
+  const host = env.VITE_PUBLIC_POSTHOG_HOST;
+  if (!apiKey || !host) return;
+
+  try {
+    const response = await fetch(new URL("/i/v0/e/", host), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: apiKey,
+        event: "$ai_generation",
+        properties: {
+          distinct_id: generation.sessionId,
+          $ai_trace_id: generation.traceId,
+          $ai_session_id: generation.sessionId,
+          $ai_model: "@cf/meta/llama-3.1-8b-instruct",
+          $ai_provider: "cloudflare",
+          $ai_input: [{ role: "user", content: generation.prompt }],
+          $ai_output_choices: [{ role: "assistant", content: generation.completion }],
+          $ai_latency: generation.latencySeconds,
+          $ai_max_tokens: 512,
+        },
+      }),
+    });
+    if (!response.ok) console.error("[posthog] AI generation capture failed:", response.status);
+  } catch (err) {
+    console.error("[posthog] AI generation capture failed:", err);
+  }
+};
 
 const corsHeaders = (request: Request, env: Env): Record<string, string> => {
   const origin = request.headers.get("Origin") ?? "";
@@ -369,6 +411,7 @@ export default {
 export class Matchmaker extends DurableObject<Env> {
   private bannedIps = new Map<string, number>();
   private stats: MatchAnalytics = emptyStats();
+  private readonly aiInsightsSessionId = `admin-insights-${crypto.randomUUID()}`;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -433,6 +476,17 @@ export class Matchmaker extends DurableObject<Env> {
 
   // ── AI insights via Workers AI (Llama) with heuristic fallback ──
   private async buildInsights(): Promise<{ insights: string[]; source: string }> {
+    if (this.env.ENVIRONMENT === "development") {
+      const missingPostHogVariable = !this.env.VITE_PUBLIC_POSTHOG_KEY
+        ? "VITE_PUBLIC_POSTHOG_KEY"
+        : !this.env.VITE_PUBLIC_POSTHOG_HOST
+          ? "VITE_PUBLIC_POSTHOG_HOST"
+          : null;
+      if (missingPostHogVariable) {
+        throw new Error(`${missingPostHogVariable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${missingPostHogVariable} is configured`);
+      }
+    }
+
     const live = this.liveCounts();
     const view = analyticsView(this.stats, live);
 
@@ -463,11 +517,20 @@ export class Matchmaker extends DurableObject<Env> {
           }),
         ].join("\n");
 
+        const traceId = crypto.randomUUID();
+        const startedAt = Date.now();
         const res = await this.env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
           messages: [{ role: "user", content: prompt }],
           max_tokens: 512,
         } as never);
         const text = (res as { response?: string }).response ?? "";
+        await captureAiGeneration(this.env, {
+          traceId,
+          sessionId: this.aiInsightsSessionId,
+          prompt,
+          completion: text,
+          latencySeconds: (Date.now() - startedAt) / 1000,
+        });
         const lines = text
           .split("\n")
           .map((l) => l.trim().replace(/^[•\-\*]\s*/, ""))

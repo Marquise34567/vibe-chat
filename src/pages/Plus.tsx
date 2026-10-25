@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 import { ArrowLeft, Check, Crown } from "lucide-react";
 import { GlassCard } from "@/components/glass";
 import { useTier } from "@/hooks/useTier";
 import { PLUS_FEATURES, PLUS_PLANS, VIP_PLANS, apiBase } from "@/lib/config";
 import { TIER_LABEL } from "@/lib/tiers";
 import { FREE_DAILY_MATCH_LIMIT } from "@/lib/limits";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
 
 const REASON_COPY: Record<string, string> = {
@@ -16,6 +18,7 @@ const REASON_COPY: Record<string, string> = {
 
 const Plus = () => {
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const [params] = useSearchParams();
   const reason = params.get("reason") ?? "";
   const { tier, setTier } = useTier();
@@ -41,6 +44,7 @@ const Plus = () => {
       });
       const data = await res.json();
       if (data.url) {
+        capturePostHogEvent(posthog, "checkout_started", { plan_id: selectedPlan.id, subscription_tier: tierTab });
         window.location.href = data.url;
         return;
       }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 import { countryByCode } from "@/lib/countries";
 import { useTier } from "@/hooks/useTier";
 import { useCoins } from "@/hooks/useCoins";
@@ -11,6 +12,7 @@ import { gradientFor, initialFor, GIFTS } from "@/lib/config";
 import { sendGift as sendGiftDb } from "@/lib/supabaseQueries";
 import { SOCIAL_PLATFORMS, formatSocialUrl } from "@/lib/socialLinks";
 import { BUBBLE, chipStyle } from "@/lib/bubble";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { PeerGames } from "@/components/games/PeerGames";
 import { AttentionCheck } from "@/components/AttentionCheck";
 import { useAttentionTracking } from "@/hooks/useAttentionTracking";
@@ -49,6 +51,7 @@ const BLIND_REVEAL_SECONDS = 30;
 const ChatRoom = () => {
   const { otherId } = useParams<{ otherId: string }>();
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const [params] = useSearchParams();
   const mode = (params.get("mode") as Mode) ?? "solo";
   const { features } = useTier();
@@ -223,6 +226,7 @@ const ChatRoom = () => {
 
   const handleSkip = (auto = false) => {
     if (skipping) return; // prevent double-skip during delay
+    if (!auto) capturePostHogEvent(posthog, "chat_skipped", { match_mode: mode });
     if (otherId) { lastSkippedRef.current = otherId; setLastSkipped(otherId); addRecentlySeen(otherId); }
     if (auto) toast("Time's up — finding someone new…");
     // Tell the match server to skip and search for a new real peer
@@ -247,9 +251,10 @@ const ChatRoom = () => {
       setExtended(true);
       setExtendRequested(false);
       setRemaining(EXTEND_SECONDS);
+      capturePostHogEvent(posthog, "chat_extended", { match_mode: mode });
       toast.success("Chat extended! 2 minutes added 🎉");
     }
-  }, [connExtendAccepted, extended]);
+  }, [connExtendAccepted, extended, mode, posthog]);
 
   // ── Partner declined the extend request ──
   useEffect(() => {
@@ -294,6 +299,7 @@ const ChatRoom = () => {
     const ok = await spend(g.cost);
     if (ok) {
       if (otherId) await sendGiftDb("me", otherId, g.id, g.cost);
+      capturePostHogEvent(posthog, "gift_sent", { gift_id: g.id, gift_cost: g.cost, match_mode: mode });
       toast.success(`Sent ${g.emoji} ${g.name}!`);
       setShowGifts(false);
     } else {

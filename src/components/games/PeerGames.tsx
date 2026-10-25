@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePostHog } from "posthog-js/react";
 import { toast } from "sonner";
 import { X, Trophy, RotateCcw } from "lucide-react";
 import { GlassCard, GlassCircleButton } from "@/components/glass";
@@ -6,6 +7,7 @@ import { GamepadIcon as Gamepad2 } from "@/components/FaceFrenzyIcons";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { SyncedUno } from "./SyncedUno";
 import type { UnoSide } from "@/lib/games/uno";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 
 type GameId = "uno" | "ttt" | "wyr";
 
@@ -23,6 +25,7 @@ const GAME_META: Record<GameId, { emoji: string; name: string; blurb: string }> 
  * the WebRTC *caller* is always the authoritative host (side "a").
  */
 export const PeerGames = ({ triggerStyle }: { triggerStyle?: React.CSSProperties }) => {
+  const posthog = usePostHog();
   const { sendPeerMessage, onPeerMessage, peerRole, peerName, state: connState } = useMatchConnectionContext();
 
   const [open, setOpen] = useState(false);
@@ -84,6 +87,7 @@ export const PeerGames = ({ triggerStyle }: { triggerStyle?: React.CSSProperties
       toast.error("Not connected to your partner yet");
       return;
     }
+    capturePostHogEvent(posthog, "game_invite_sent", { game_id: g });
     setGame(g);
     setPhase("waiting");
   };
@@ -97,6 +101,7 @@ export const PeerGames = ({ triggerStyle }: { triggerStyle?: React.CSSProperties
   const acceptInvite = () => {
     if (!incomingInvite) return;
     sendPeerMessage({ kind: "game-accept", game: incomingInvite });
+    capturePostHogEvent(posthog, "game_invite_accepted", { game_id: incomingInvite });
     setGame(incomingInvite);
     setIncomingInvite(null);
     setPhase("playing");

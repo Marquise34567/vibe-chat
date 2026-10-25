@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePostHog } from "posthog-js/react";
 import {
   Camera, Check, Loader2, Crown, Coins, Sparkles, LogOut, ChevronRight, Gift,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { getScholarVerified, getScholarEmail, setScholarVerified, isScholarEmail
 import {
   getLocalProfile, saveLocalProfile, setDisplayName as setLocalDisplayName, updateLocalUserMeta, type LocalProfile,
 } from "@/lib/localUser";
+import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
 
 const GENDERS = ["Woman", "Man", "Non-binary", "Trans", "Genderfluid", "Prefer not to say"];
@@ -34,6 +36,7 @@ type ProfileRow = {
 
 const ProfileTab = () => {
   const navigate = useNavigate();
+  const posthog = usePostHog();
   const { user, isLocal, signOut } = useAuth();
   const { tier, setTier: setTierHook } = useTier();
   const { coins, spend, buy } = useCoins();
@@ -153,6 +156,7 @@ const ProfileTab = () => {
     if (isLocal) {
       saveLocalProfile({ display_name: displayName.trim(), gender, country, interests, socials } as Partial<LocalProfile> & { socials?: Record<string, string> });
       updateLocalUserMeta({ display_name: displayName.trim(), gender, country, interests });
+      capturePostHogEvent(posthog, "profile_saved");
       setSaving(false);
       toast.success("Profile saved ✨");
       return;
@@ -164,6 +168,7 @@ const ProfileTab = () => {
     if (error) { toast.error(error.message); return; }
     // Keep the local name (used as the match name) in sync with the DB
     setLocalDisplayName(displayName.trim());
+    capturePostHogEvent(posthog, "profile_saved");
     toast.success("Profile saved ✨");
   };
 

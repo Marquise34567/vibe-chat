@@ -1,15 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate, Outlet } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { usePostHog } from "posthog-js/react";
 import { MatchConnectionProvider } from "@/contexts/MatchConnectionContext";
 import { AppShell } from "@/components/AppShell";
 import { AgeGate } from "@/components/AgeGate";
 import { SplashScreen } from "@/components/SplashScreen";
 import { getAgeVerified } from "@/lib/verification";
+import { posthogLogs } from "@/lib/posthogLogs";
 import StartTab from "./pages/app/StartTab";
 import ChatsTab from "./pages/app/ChatsTab";
 import MomentsTab from "./pages/app/MomentsTab";
@@ -47,7 +49,51 @@ import CamToCamChat from "./pages/seo/CamToCamChat";
 
 const queryClient = new QueryClient();
 
-const App = () => {
+const PostHogIdentity = () => {
+  const { user, loading } = useAuth();
+  const posthog = usePostHog();
+  const previousUserId = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (loading || !user?.id) return;
+
+    if (previousUserId.current && previousUserId.current !== user.id) {
+      posthog.reset();
+      posthogLogs.identityReset(posthog);
+    }
+
+    posthog.identify(user.id);
+    posthogLogs.identityResolved(posthog);
+    previousUserId.current = user.id;
+  }, [loading, posthog, user?.id]);
+
+  return null;
+};
+
+const PostHogAppLogger = () => {
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    posthogLogs.applicationStarted(posthog);
+  }, [posthog]);
+
+  return null;
+};
+
+const PostHogAuthProvider = ({ children }: { children: ReactNode }) => (
+  <AuthProvider>
+    <PostHogAppLogger />
+    <PostHogIdentity />
+    {children}
+  </AuthProvider>
+);
+
+type AppProps = {
+  posthogEnabled: boolean;
+};
+
+const App = ({ posthogEnabled }: AppProps) => {
+  const AuthenticationProvider = posthogEnabled ? PostHogAuthProvider : AuthProvider;
   const [ageOk, setAgeOk] = useState(getAgeVerified());
   const [splash, setSplash] = useState(() => {
     try { return !sessionStorage.getItem("ff:splashed"); } catch { return true; }
@@ -66,7 +112,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AuthProvider>
+          <AuthenticationProvider>
             {splash && <SplashScreen onDone={dismissSplash} />}
             {!ageOk && <AgeGate onDone={() => setAgeOk(true)} />}
             <Routes>
@@ -132,7 +178,7 @@ const App = () => {
 
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </AuthProvider>
+          </AuthenticationProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
