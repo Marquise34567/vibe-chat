@@ -1,0 +1,12 @@
+Remove "X online" chip from match screen; add quiet-hours peak-time hint
+
+- Drop the online counter pill from the match/search top bar — showing
+  "1 online" demoralizes users during off-peak hours
+- Add an animated clock card that appears when the crowd is thin
+  (onlineCount < 12) or the search runs past 20s, telling users the
+  real peak window: 7pm-12am ET & weekends
+- Add ff-clock-hand keyframes for the spinning clock hands
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

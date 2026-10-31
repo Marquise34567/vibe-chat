@@ -21,6 +21,18 @@ const MODE_CHIP: Record<string, { icon: string; label: string }> = {
   blind: { icon: "🎭", label: "Blind" },
 };
 
+// ── Animated clock for the "quiet hours" hint — hands spin at different speeds ──
+const PeakClock = ({ size = 34 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 40 40" style={{ flexShrink: 0 }} aria-hidden="true">
+    <circle cx="20" cy="20" r="17" fill="#FFF4E0" stroke="#FF9F0A" strokeWidth="3" />
+    <line x1="20" y1="20" x2="20" y2="11" stroke="#FF4D8D" strokeWidth="3" strokeLinecap="round"
+      style={{ transformOrigin: "20px 20px", animation: "ff-clock-hand 4s linear infinite" }} />
+    <line x1="20" y1="20" x2="27" y2="23" stroke="#7C5CFF" strokeWidth="3" strokeLinecap="round"
+      style={{ transformOrigin: "20px 20px", animation: "ff-clock-hand 24s linear infinite" }} />
+    <circle cx="20" cy="20" r="2.4" fill="#1F2937" />
+  </svg>
+);
+
 const Match = () => {
   const navigate = useNavigate();
   const posthog = usePostHog();
@@ -114,12 +126,6 @@ const Match = () => {
           <BrandMark size={30} />
           <span className="ff-wordmark" style={{ fontSize: 15 }}>facefrenzy</span>
         </div>
-        {typeof onlineCount === "number" && onlineCount > 0 && (
-          <span style={{ ...chipStyle, gap: 6, padding: "6px 12px" }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.7)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
-            <span style={{ fontSize: 11, fontWeight: 800 }}>{onlineCount.toLocaleString("en-US")} online</span>
-          </span>
-        )}
       </div>
 
       {/* ── Centered search content ── */}
@@ -182,6 +188,29 @@ const Match = () => {
         <div style={{ fontSize: 34, fontWeight: 900, letterSpacing: "-0.5px", color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>
           {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
         </div>
+
+        {/* Quiet-hours hint — appears when the crowd is thin or the wait runs long */}
+        {!showMatched && (onlineCount < 12 || seconds >= 20) && (
+          <div
+            className="animate-fade-in"
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 16px", borderRadius: 22,
+              background: "rgba(255,255,255,0.85)",
+              border: "1px solid rgba(0,0,0,0.05)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+              maxWidth: 320,
+            }}
+          >
+            <PeakClock />
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: BUBBLE.ink }}>It's a little quiet right now</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: BUBBLE.sub, lineHeight: 1.35 }}>
+                Most people hop on 7pm–12am ET &amp; weekends — hang tight, we're still looking.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Cancel — white ghost pill ── */}
