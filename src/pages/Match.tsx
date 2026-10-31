@@ -120,7 +120,7 @@ const Match = () => {
       {/* Floating sticker decor */}
       <FloatingStickers />
 
-      {/* ── Top bar — logo + online chip ── */}
+      {/* ── Top bar — logo ── */}
       <div className="relative z-10 flex items-center justify-between px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 14px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <BrandMark size={30} />
@@ -189,23 +189,29 @@ const Match = () => {
           {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
         </div>
 
-        {/* Quiet-hours hint — appears when the crowd is thin or the wait runs long */}
+        {/* Quiet-hours hint — floats below the top bar when the crowd is thin or the wait runs long */}
         {!showMatched && (onlineCount < 12 || seconds >= 20) && (
           <div
             className="animate-fade-in"
             style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "10px 16px", borderRadius: 22,
-              background: "rgba(255,255,255,0.85)",
+              position: "absolute",
+              top: "calc(env(safe-area-inset-top, 0px) + 62px)",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 20,
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "9px 14px", borderRadius: 18,
+              background: "rgba(255,255,255,0.92)",
               border: "1px solid rgba(0,0,0,0.05)",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-              maxWidth: 320,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+              width: "max-content",
+              maxWidth: "min(320px, 86vw)",
             }}
           >
-            <PeakClock />
+            <PeakClock size={30} />
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: BUBBLE.ink }}>It's a little quiet right now</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: BUBBLE.sub, lineHeight: 1.35 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: BUBBLE.sub, lineHeight: 1.3 }}>
                 Most people hop on 7pm–12am ET &amp; weekends — hang tight, we're still looking.
               </div>
             </div>
