@@ -212,7 +212,7 @@ const Match = () => {
             <div style={{ textAlign: "left" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: BUBBLE.ink }}>It's a little quiet right now</div>
               <div style={{ fontSize: 11, fontWeight: 600, color: BUBBLE.sub, lineHeight: 1.3 }}>
-                Friday &amp; Sunday nights are when the frenzy peaks — hang tight, we're still looking.
+                The frenzy peaks 11pm–4am ET on Fri &amp; Sun nights — hang tight, we're still looking.
               </div>
             </div>
           </div>
