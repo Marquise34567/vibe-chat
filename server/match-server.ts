@@ -26,7 +26,8 @@ import http from "http";
 import type { IncomingMessage } from "http";
 import Stripe from "stripe";
 import {
-  MatchAnalytics, emptyStats, bumpDay, normalizeGender,
+  MatchAnalytics, emptyStats, bumpDay, bumpHourET, normalizeGender, normalizeAge,
+  ageBracket, durationBucket, genderPairKey, pushSample, pushEvent,
   analyticsView, heuristicInsights,
 } from "../shared/analytics";
 
@@ -67,12 +68,21 @@ type Client = {
   gender: string;           // any | woman | man
   scholarOnly: boolean;
   countries: string[];      // region filter — only match people in these countries
-  status: "searching" | "matched" | "in-call";
+  // "idle" = connected (presence/lobby) but NOT in the match queue. Only an
+  // explicit "search" message moves a client to "searching" — otherwise
+  // presence sockets (online counter, invite lobby) would get paired.
+  status: "idle" | "searching" | "matched" | "in-call";
   partnerId?: string;
   matchedAt?: number;             // when the current call started (call-duration stats)
+  searchStartedAt?: number;       // when the current search began (wait-time stats)
   selfGender: string | null;      // user's own gender (analytics bucket)
+  selfAge: number | null;         // user's own age (analytics, sent by client)
+  peerGender: string | null;      // snapshot of the current partner's gender (for call-end events)
+  peerAge: number | null;         // snapshot of the current partner's age
+  peerCountry: string | null;     // snapshot of the current partner's country
   countryCounted?: boolean;       // analytics: already counted in byCountry
   genderCounted?: boolean;        // analytics: already counted in byGender
+  ageCounted?: boolean;           // analytics: already counted in byAgeBracket
   joinedAt: number;
   lastSeen: number;         // last time we got a ping/pong/message from this client
   violations: number;
@@ -103,20 +113,76 @@ const trackGender = (c: Client) => {
   }
 };
 
-/** Call ended — accumulate call duration. */
-const endCall = (c: Client) => {
-  if (c.matchedAt) {
-    stats.totalCalls++;
-    stats.totalCallMs += Date.now() - c.matchedAt;
-    c.matchedAt = undefined;
+const trackAge = (c: Client) => {
+  if (c.selfAge != null && !c.ageCounted) {
+    c.ageCounted = true;
+    const b = ageBracket(c.selfAge);
+    stats.byAgeBracket[b] = (stats.byAgeBracket[b] ?? 0) + 1;
+    pushSample(stats.ageSample, c.selfAge);
   }
+};
+
+/** Search given up before a match (cancel/disconnect) — funnel + event. */
+const abandonSearch = (c: Client, reason: "cancel" | "disconnect") => {
+  if (c.status !== "searching" || c.searchStartedAt == null) return;
+  stats.searchesAbandoned++;
+  pushEvent(stats, {
+    t: Date.now(),
+    kind: "search-abandoned",
+    mode: c.mode,
+    aGender: c.selfGender,
+    bGender: null,
+    aAge: c.selfAge,
+    bAge: null,
+    aCountry: c.country,
+    bCountry: null,
+    waitMs: Date.now() - c.searchStartedAt,
+    reason,
+  });
+  c.searchStartedAt = undefined;
+};
+
+/**
+ * Call ended — accumulate call duration and emit a rich call-end event.
+ * The event + end-reason are only recorded by the side that still has
+ * partnerId set (the initiator), so each call logs once even though
+ * endCall runs for both participants.
+ */
+const endCall = (c: Client, reason: string) => {
+  if (!c.matchedAt) return;
+  const durationMs = Date.now() - c.matchedAt;
+  stats.totalCalls++;
+  stats.totalCallMs += durationMs;
+  pushSample(stats.callMsSample, durationMs);
+  const bucket = durationBucket(durationMs);
+  stats.byDurationBucket[bucket] = (stats.byDurationBucket[bucket] ?? 0) + 1;
+  if (c.partnerId) {
+    stats.byEndReason[reason] = (stats.byEndReason[reason] ?? 0) + 1;
+    pushEvent(stats, {
+      t: Date.now(),
+      kind: "call-end",
+      mode: c.mode,
+      aGender: c.selfGender,
+      bGender: c.peerGender,
+      aAge: c.selfAge,
+      bAge: c.peerAge,
+      aCountry: c.country,
+      bCountry: c.peerCountry,
+      durationMs,
+      reason,
+    });
+  }
+  c.matchedAt = undefined;
+  c.peerGender = null;
+  c.peerAge = null;
+  c.peerCountry = null;
 };
 
 const liveCounts = () => {
   let searching = 0, inCall = 0;
   for (const c of clients.values()) {
     if (c.status === "searching") searching++;
-    else inCall++;
+    else if (c.status === "matched") inCall++;
   }
   return { online: clients.size, searching, inCall };
 };
@@ -443,7 +509,7 @@ const recordViolation = (
         send(partner.ws, { type: "partner-banned", peerId: clientId });
         partner.status = "searching";
         partner.partnerId = undefined;
-        endCall(partner);
+        endCall(partner, "partner-left");
       }
     }
 
@@ -531,19 +597,48 @@ const pairClients = (a: Client, b: Client) => {
   b.partnerId = a.id;
   a.matchedAt = Date.now();
   b.matchedAt = a.matchedAt;
+  // Peer snapshots — lets a call-end event carry both sides' demographics
+  // even after the partner is gone.
+  a.peerGender = b.selfGender;
+  a.peerAge = b.selfAge;
+  a.peerCountry = b.country;
+  b.peerGender = a.selfGender;
+  b.peerAge = a.selfAge;
+  b.peerCountry = a.country;
 
-  // ── Analytics ──
+  // ── Analytics: match event + pairing distributions ──
   stats.totalMatches++;
   bumpDay(stats, "matches");
+  stats.byModeMatches[a.mode] = (stats.byModeMatches[a.mode] ?? 0) + 1;
+  const pairKey = genderPairKey(a.selfGender, b.selfGender);
+  stats.byGenderPair[pairKey] = (stats.byGenderPair[pairKey] ?? 0) + 1;
+  const waitA = a.searchStartedAt != null ? a.matchedAt - a.searchStartedAt : 0;
+  const waitB = b.searchStartedAt != null ? a.matchedAt - b.searchStartedAt : 0;
+  a.searchStartedAt = undefined;
+  b.searchStartedAt = undefined;
+  pushSample(stats.waitMsSample, waitA);
+  pushSample(stats.waitMsSample, waitB);
+  pushEvent(stats, {
+    t: a.matchedAt,
+    kind: "match",
+    mode: a.mode,
+    aGender: a.selfGender,
+    bGender: b.selfGender,
+    aAge: a.selfAge,
+    bAge: b.selfAge,
+    aCountry: a.country,
+    bCountry: b.country,
+    waitMs: Math.max(waitA, waitB),
+  });
 
   // One is the caller (initiator), the other the receiver
-  send(a.ws, { type: "matched", role: "caller", peerId: b.id, peerCountry: b.country, peerName: b.name });
-  send(b.ws, { type: "matched", role: "receiver", peerId: a.id, peerCountry: a.country, peerName: a.name });
+  send(a.ws, { type: "matched", role: "caller", peerId: b.id, peerCountry: b.country, peerName: b.name, peerGender: b.selfGender, peerAge: b.selfAge });
+  send(b.ws, { type: "matched", role: "receiver", peerId: a.id, peerCountry: a.country, peerName: a.name, peerGender: a.selfGender, peerAge: a.selfAge });
 
   console.log(`Matched ${a.id} (${a.name}, ${a.country}) ↔ ${b.id} (${b.name}, ${b.country}) [mode: ${a.mode}]`);
 };
 
-const removeClient = (id: string) => {
+const removeClient = (id: string, reason = "disconnect") => {
   const client = clients.get(id);
   if (!client) return;
 
@@ -554,12 +649,13 @@ const removeClient = (id: string) => {
       send(partner.ws, { type: "partner-left", peerId: id });
       partner.status = "searching";
       partner.partnerId = undefined;
-      endCall(partner);
+      endCall(partner, "partner-left");
     }
   }
 
-  // ── Analytics: session + call duration ──
-  endCall(client);
+  // ── Analytics: abandoned search + session + call duration ──
+  abandonSearch(client, "disconnect");
+  endCall(client, reason);
   stats.sessionsEnded++;
   stats.totalSessionMs += Date.now() - client.joinedAt;
 
@@ -608,19 +704,24 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     gender: "any",
     scholarOnly: false,
     countries: [],
-    status: "searching",
+    status: "idle",
     joinedAt: Date.now(),
     lastSeen: Date.now(),
     violations: 0,
     lastViolationAt: 0,
     recentlySkipped: new Set<string>(),
     selfGender: null,
+    selfAge: null,
+    peerGender: null,
+    peerAge: null,
+    peerCountry: null,
   };
   clients.set(id, client);
 
   // ── Analytics: new connection ──
   stats.totalConnections++;
   bumpDay(stats, "connections");
+  bumpHourET(stats);
 
   // Send assigned ID + real online count
   send(ws, { type: "connected", id, onlineCount: clients.size });
@@ -646,9 +747,12 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         c.country = msg.country ?? null;
         c.name = msg.name ?? c.name;
         if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
+        const regAge = normalizeAge(msg.selfAge);
+        if (regAge != null) c.selfAge = regAge;
         trackCountry(c);
         trackGender(c);
-        console.log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"}`);
+        trackAge(c);
+        console.log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"} age: ${c.selfAge ?? "?"}`);
         break;
       }
 
@@ -669,8 +773,11 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             }
             oldPartner.status = "searching";
             oldPartner.partnerId = undefined;
-            endCall(oldPartner);
+            endCall(oldPartner, "partner-left");
           }
+          // Close out the old call on this side too — keeps matchedAt
+          // from spanning the old call + the new search.
+          endCall(c, "replaced");
         }
         c.status = "searching";
         c.mode = msg.mode ?? "solo";
@@ -679,7 +786,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         c.countries = msg.countries ?? [];
         if (msg.name) c.name = msg.name;
         if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
+        const searchAge = normalizeAge(msg.selfAge);
+        if (searchAge != null) { c.selfAge = searchAge; trackAge(c); }
         c.partnerId = undefined;
+        c.searchStartedAt = Date.now();
 
         // ── Analytics ──
         stats.totalSearches++;
@@ -700,6 +810,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
       // ── Cancel search ──
       case "cancel": {
+        // Gave up searching — record before flipping status off "searching".
+        abandonSearch(c, "cancel");
         // "in-call" = not in the queue — keeps findMatch from pairing a user
         // who already backed out to the lobby.
         c.status = "in-call";
@@ -778,11 +890,11 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             }
             partner.status = "searching";
             partner.partnerId = undefined;
-            endCall(partner);
+            endCall(partner, "partner-left");
           }
         }
         stats.skips++;
-        endCall(c);
+        endCall(c, "skip");
         c.status = "searching";
         c.partnerId = undefined;
         send(ws, { type: "skipped" });
@@ -836,10 +948,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             send(partner.ws, { type: "partner-left", peerId: id });
             partner.status = "searching";
             partner.partnerId = undefined;
-            endCall(partner);
+            endCall(partner, "partner-left");
           }
         }
-        endCall(c);
+        endCall(c, "leave");
         c.status = "in-call";
         c.partnerId = undefined;
         break;
@@ -962,8 +1074,9 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     }
   });
 
-  ws.on("close", () => removeClient(id));
-  ws.on("error", () => removeClient(id));
+  // 4003 = closed by our own ban — attribute the call end accordingly
+  ws.on("close", (code) => removeClient(id, code === 4003 ? "ban" : "disconnect"));
+  ws.on("error", () => removeClient(id, "disconnect"));
 });
 
 // ── Heartbeat: ping all clients + clean up dead connections every 5s ──

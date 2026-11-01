@@ -22,7 +22,8 @@
 
 import { DurableObject } from "cloudflare:workers";
 import {
-  MatchAnalytics, emptyStats, bumpDay, normalizeGender,
+  MatchAnalytics, emptyStats, bumpDay, bumpHourET, normalizeGender, normalizeAge,
+  ageBracket, durationBucket, genderPairKey, pushSample, pushEvent,
   analyticsView, heuristicInsights,
 } from "../shared/analytics";
 
@@ -67,12 +68,21 @@ type ClientState = {
   gender: string;
   scholarOnly: boolean;
   countries: string[];
-  status: "searching" | "matched" | "in-call";
+  // "idle" = connected (presence/lobby) but NOT in the match queue. Only an
+  // explicit "search" message moves a client to "searching" — otherwise
+  // presence sockets (online counter, invite lobby) would get paired.
+  status: "idle" | "searching" | "matched" | "in-call";
   partnerId?: string;
   matchedAt?: number;             // when the current call started (for call-duration stats)
+  searchStartedAt?: number;       // when the current search began (wait-time stats)
   selfGender: string | null;      // user's own gender (analytics bucket)
+  selfAge: number | null;         // user's own age (analytics, sent by client)
+  peerGender: string | null;      // snapshot of the current partner's gender (for call-end events)
+  peerAge: number | null;         // snapshot of the current partner's age
+  peerCountry: string | null;     // snapshot of the current partner's country
   countryCounted?: boolean;       // analytics: already counted in byCountry
   genderCounted?: boolean;        // analytics: already counted in byGender
+  ageCounted?: boolean;           // analytics: already counted in byAgeBracket
   joinedAt: number;
   lastSeen: number;
   violations: number;
@@ -445,14 +455,72 @@ export class Matchmaker extends DurableObject<Env> {
     }
   }
 
-  /** Call ended (skip/leave/disconnect/ban) — accumulate call duration. */
-  private endCall(c: ClientState) {
-    if (c.matchedAt) {
-      this.stats.totalCalls++;
-      this.stats.totalCallMs += Date.now() - c.matchedAt;
-      c.matchedAt = undefined;
+  private trackAge(c: ClientState) {
+    if (c.selfAge != null && !c.ageCounted) {
+      c.ageCounted = true;
+      const b = ageBracket(c.selfAge);
+      this.stats.byAgeBracket[b] = (this.stats.byAgeBracket[b] ?? 0) + 1;
+      pushSample(this.stats.ageSample, c.selfAge);
       this.persistStats();
     }
+  }
+
+  /** Search given up before a match (cancel/disconnect) — funnel + event. */
+  private abandonSearch(c: ClientState, reason: "cancel" | "disconnect") {
+    if (c.status !== "searching" || c.searchStartedAt == null) return;
+    this.stats.searchesAbandoned++;
+    pushEvent(this.stats, {
+      t: Date.now(),
+      kind: "search-abandoned",
+      mode: c.mode,
+      aGender: c.selfGender,
+      bGender: null,
+      aAge: c.selfAge,
+      bAge: null,
+      aCountry: c.country,
+      bCountry: null,
+      waitMs: Date.now() - c.searchStartedAt,
+      reason,
+    });
+    c.searchStartedAt = undefined;
+    this.persistStats();
+  }
+
+  /**
+   * Call ended (skip/leave/disconnect/ban) — accumulate call duration and
+   * emit a rich call-end event. The event + end-reason are only recorded
+   * by the side that still has partnerId set (the initiator), so each
+   * call logs once even though endCall runs for both participants.
+   */
+  private endCall(c: ClientState, reason: string) {
+    if (!c.matchedAt) return;
+    const durationMs = Date.now() - c.matchedAt;
+    this.stats.totalCalls++;
+    this.stats.totalCallMs += durationMs;
+    pushSample(this.stats.callMsSample, durationMs);
+    const bucket = durationBucket(durationMs);
+    this.stats.byDurationBucket[bucket] = (this.stats.byDurationBucket[bucket] ?? 0) + 1;
+    if (c.partnerId) {
+      this.stats.byEndReason[reason] = (this.stats.byEndReason[reason] ?? 0) + 1;
+      pushEvent(this.stats, {
+        t: Date.now(),
+        kind: "call-end",
+        mode: c.mode,
+        aGender: c.selfGender,
+        bGender: c.peerGender,
+        aAge: c.selfAge,
+        bAge: c.peerAge,
+        aCountry: c.country,
+        bCountry: c.peerCountry,
+        durationMs,
+        reason,
+      });
+    }
+    c.matchedAt = undefined;
+    c.peerGender = null;
+    c.peerAge = null;
+    c.peerCountry = null;
+    this.persistStats();
   }
 
   private liveCounts() {
@@ -462,7 +530,7 @@ export class Matchmaker extends DurableObject<Env> {
       if (!c || c.closed) continue;
       online++;
       if (c.status === "searching") searching++;
-      else inCall++;
+      else if (c.status === "matched") inCall++;
     }
     return { online, searching, inCall };
   }
@@ -640,7 +708,7 @@ export class Matchmaker extends DurableObject<Env> {
           this.send(partnerWs, { type: "partner-banned", peerId: client.id });
           partner.status = "searching";
           partner.partnerId = undefined;
-          this.endCall(partner);
+          this.endCall(partner, "partner-left");
           this.putClient(partnerWs, partner);
         }
       }
@@ -725,12 +793,41 @@ export class Matchmaker extends DurableObject<Env> {
     b.partnerId = a.id;
     a.matchedAt = Date.now();
     b.matchedAt = a.matchedAt;
+    // Peer snapshots — lets a call-end event carry both sides' demographics
+    // even after the partner's socket is gone.
+    a.peerGender = b.selfGender;
+    a.peerAge = b.selfAge;
+    a.peerCountry = b.country;
+    b.peerGender = a.selfGender;
+    b.peerAge = a.selfAge;
+    b.peerCountry = a.country;
     this.putClient(aWs, a);
     this.putClient(bWs, b);
 
-    // ── Analytics ──
+    // ── Analytics: match event + pairing distributions ──
     this.stats.totalMatches++;
     bumpDay(this.stats, "matches");
+    this.stats.byModeMatches[a.mode] = (this.stats.byModeMatches[a.mode] ?? 0) + 1;
+    const pairKey = genderPairKey(a.selfGender, b.selfGender);
+    this.stats.byGenderPair[pairKey] = (this.stats.byGenderPair[pairKey] ?? 0) + 1;
+    const waitA = a.searchStartedAt != null ? a.matchedAt - a.searchStartedAt : 0;
+    const waitB = b.searchStartedAt != null ? a.matchedAt - b.searchStartedAt : 0;
+    a.searchStartedAt = undefined;
+    b.searchStartedAt = undefined;
+    pushSample(this.stats.waitMsSample, waitA);
+    pushSample(this.stats.waitMsSample, waitB);
+    pushEvent(this.stats, {
+      t: a.matchedAt,
+      kind: "match",
+      mode: a.mode,
+      aGender: a.selfGender,
+      bGender: b.selfGender,
+      aAge: a.selfAge,
+      bAge: b.selfAge,
+      aCountry: a.country,
+      bCountry: b.country,
+      waitMs: Math.max(waitA, waitB),
+    });
     this.persistStats();
 
     this.send(aWs, {
@@ -739,6 +836,8 @@ export class Matchmaker extends DurableObject<Env> {
       peerId: b.id,
       peerCountry: b.country,
       peerName: b.name,
+      peerGender: b.selfGender,
+      peerAge: b.selfAge,
     });
     this.send(bWs, {
       type: "matched",
@@ -746,6 +845,8 @@ export class Matchmaker extends DurableObject<Env> {
       peerId: a.id,
       peerCountry: a.country,
       peerName: a.name,
+      peerGender: a.selfGender,
+      peerAge: a.selfAge,
     });
 
     console.log(
@@ -789,7 +890,7 @@ export class Matchmaker extends DurableObject<Env> {
     this.putClient(ws, c);
   }
 
-  private async removeClient(ws: WebSocket) {
+  private async removeClient(ws: WebSocket, reason = "disconnect") {
     const c = this.getClient(ws);
     if (!c || c.closed) return;
     c.closed = true;
@@ -802,13 +903,14 @@ export class Matchmaker extends DurableObject<Env> {
         this.send(partnerWs, { type: "partner-left", peerId: c.id });
         partner.status = "searching";
         partner.partnerId = undefined;
-        this.endCall(partner);
+        this.endCall(partner, "partner-left");
         this.putClient(partnerWs, partner);
       }
     }
 
-    // ── Analytics: session + call duration ──
-    this.endCall(c);
+    // ── Analytics: abandoned search + session + call duration ──
+    this.abandonSearch(c, "disconnect");
+    this.endCall(c, reason);
     this.stats.sessionsEnded++;
     this.stats.totalSessionMs += Date.now() - c.joinedAt;
     this.persistStats();
@@ -869,18 +971,23 @@ export class Matchmaker extends DurableObject<Env> {
       gender: "any",
       scholarOnly: false,
       countries: [],
-      status: "searching",
+      status: "idle",
       joinedAt: Date.now(),
       lastSeen: Date.now(),
       violations: 0,
       lastViolationAt: 0,
       recentlySkipped: {},
       selfGender: null,
+      selfAge: null,
+      peerGender: null,
+      peerAge: null,
+      peerCountry: null,
     };
 
     // ── Analytics: connection + country ──
     this.stats.totalConnections++;
     bumpDay(this.stats, "connections");
+    bumpHourET(this.stats);
     this.trackCountry(client);
     this.persistStats();
 
@@ -920,9 +1027,12 @@ export class Matchmaker extends DurableObject<Env> {
         c.country = msg.country ?? c.country;
         c.name = msg.name ?? c.name;
         if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
+        const regAge = normalizeAge(msg.selfAge);
+        if (regAge != null) c.selfAge = regAge;
         this.trackCountry(c);
         this.trackGender(c);
-        console.log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"}`);
+        this.trackAge(c);
+        console.log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"} age: ${c.selfAge ?? "?"}`);
         break;
       }
 
@@ -940,10 +1050,13 @@ export class Matchmaker extends DurableObject<Env> {
             oldPartner.recentlySkipped[id] = now + 60000;
             oldPartner.status = "searching";
             oldPartner.partnerId = undefined;
-            this.endCall(oldPartner);
+            this.endCall(oldPartner, "partner-left");
             this.putClient(oldWs, oldPartner);
             this.send(oldWs, { type: "partner-left", peerId: id });
           }
+          // Close out the old call on this side too — keeps matchedAt
+          // from spanning the old call + the new search.
+          this.endCall(c, "replaced");
         }
         c.status = "searching";
         c.mode = msg.mode ?? "solo";
@@ -952,7 +1065,10 @@ export class Matchmaker extends DurableObject<Env> {
         c.countries = msg.countries ?? [];
         if (msg.name) c.name = msg.name;
         if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
+        const searchAge = normalizeAge(msg.selfAge);
+        if (searchAge != null) { c.selfAge = searchAge; this.trackAge(c); }
         c.partnerId = undefined;
+        c.searchStartedAt = Date.now();
 
         // ── Analytics ──
         this.stats.totalSearches++;
@@ -976,6 +1092,8 @@ export class Matchmaker extends DurableObject<Env> {
 
       // ── Cancel search ──
       case "cancel": {
+        // Gave up searching — record before flipping status off "searching".
+        this.abandonSearch(c, "cancel");
         // "in-call" = not in the queue — keeps findMatch from pairing a user
         // who already backed out to the lobby.
         c.status = "in-call";
@@ -1033,13 +1151,13 @@ export class Matchmaker extends DurableObject<Env> {
             partner.recentlySkipped[id] = expiry;
             partner.status = "searching";
             partner.partnerId = undefined;
-            this.endCall(partner);
+            this.endCall(partner, "partner-left");
             this.putClient(partnerWs, partner);
             this.send(partnerWs, { type: "partner-left", peerId: id });
           }
         }
         this.stats.skips++;
-        this.endCall(c);
+        this.endCall(c, "skip");
         c.status = "searching";
         c.partnerId = undefined;
         this.send(ws, { type: "skipped" });
@@ -1083,11 +1201,11 @@ export class Matchmaker extends DurableObject<Env> {
             this.send(partnerWs, { type: "partner-left", peerId: id });
             partner.status = "searching";
             partner.partnerId = undefined;
-            this.endCall(partner);
+            this.endCall(partner, "partner-left");
             this.putClient(partnerWs, partner);
           }
         }
-        this.endCall(c);
+        this.endCall(c, "leave");
         c.status = "in-call";
         c.partnerId = undefined;
         break;
@@ -1204,12 +1322,13 @@ export class Matchmaker extends DurableObject<Env> {
     this.persistStats();
   }
 
-  async webSocketClose(ws: WebSocket) {
-    await this.removeClient(ws);
+  async webSocketClose(ws: WebSocket, code: number) {
+    // 4003 = closed by our own ban — attribute the call end accordingly
+    await this.removeClient(ws, code === 4003 ? "ban" : "disconnect");
   }
 
   async webSocketError(ws: WebSocket) {
-    await this.removeClient(ws);
+    await this.removeClient(ws, "disconnect");
   }
 
   // ── Heartbeat sweep: ping clients, drop ghosts ──
