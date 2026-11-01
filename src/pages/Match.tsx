@@ -94,6 +94,20 @@ const Match = () => {
     }
   }, [connState, peerId, mode, navigate, posthog]);
 
+  // Auto-widen: after 15s in a thin queue, drop country/gender filters so
+  // a filtered searcher can still overlap with the global pool.
+  const [widened, setWidened] = useState(false);
+  const hasFilters = countries.length > 0 || (gender !== "any" && gender !== "Any");
+  useEffect(() => {
+    if (widened || !hasFilters || connState === "connected") return;
+    if (seconds >= 15 && connState === "searching") {
+      setWidened(true);
+      toast.info("Opening your search to everyone 🌍");
+      search({ mode, gender: "any", scholarOnly, countries: [] });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seconds, widened, hasFilters, connState]);
+
   const handleCancel = () => {
     cancel();
     navigate("/");
