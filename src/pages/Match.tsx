@@ -83,7 +83,7 @@ const Match = () => {
     }, 100);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tier, tierLoading]);
+  }, [tier, tierLoading, mode, gender, scholarOnly, countries.join(",")]);
 
   // Navigate to chat room ONLY when WebRTC is actually connected
   useEffect(() => {
@@ -97,6 +97,7 @@ const Match = () => {
   // Auto-widen: after 15s in a thin queue, drop country/gender filters so
   // a filtered searcher can still overlap with the global pool.
   const [widened, setWidened] = useState(false);
+  const [crossSuggested, setCrossSuggested] = useState(false);
   const hasFilters = countries.length > 0 || (gender !== "any" && gender !== "Any");
   useEffect(() => {
     if (widened || !hasFilters || connState === "connected") return;
@@ -229,6 +230,43 @@ const Match = () => {
                 The frenzy peaks 11pm–4am ET on Fri &amp; Sun nights — hang tight, we're still looking.
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Cross-mode fallback — after 45s in solo, offer a different queue */}
+        {!showMatched && mode === "solo" && seconds >= 45 && !crossSuggested && (
+          <div
+            className="animate-fade-in"
+            style={{
+              position: "absolute",
+              top: "calc(env(safe-area-inset-top, 0px) + 128px)",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 20,
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "9px 14px", borderRadius: 18,
+              background: "rgba(255,255,255,0.92)",
+              border: "1px solid rgba(0,0,0,0.05)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+              width: "max-content",
+              maxWidth: "min(320px, 86vw)",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: BUBBLE.ink, whiteSpace: "nowrap" }}>Still looking?</div>
+            <button
+              onClick={() => { setCrossSuggested(true); navigate("/match?mode=group", { replace: true }); }}
+              className="bub-btn"
+              style={{ ...chipStyle, padding: "6px 12px", fontSize: 12, fontWeight: 800, background: BUBBLE.brand, color: "#fff", border: "none", cursor: "pointer" }}
+            >
+              🎉 Group
+            </button>
+            <button
+              onClick={() => { setCrossSuggested(true); navigate("/match?mode=blind", { replace: true }); }}
+              className="bub-btn"
+              style={{ ...chipStyle, padding: "6px 12px", fontSize: 12, fontWeight: 800, background: BUBBLE.pink, color: "#fff", border: "none", cursor: "pointer" }}
+            >
+              🎭 Blind
+            </button>
           </div>
         )}
       </div>
