@@ -42,7 +42,7 @@ type Profile = {
   socials: Record<string, string> | null;
 };
 
-type Mode = "solo" | "group" | "blind";
+type Mode = "solo" | "group" | "blind" | "text";
 
 const MATCH_SECONDS = 15;
 const EXTEND_SECONDS = 120; // 2 minutes when both users agree to extend
@@ -59,7 +59,21 @@ const ChatRoom = () => {
   // Local + remote video refs come from the shared match connection
   // (lives in MatchConnectionProvider so WebRTC survives navigation).
   // The camera stream is started once in the context — no duplicate getUserMedia.
-  const { remoteVideoRef, localVideoRef: pipVideoRef, localStreamRef, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName } = useMatchConnectionContext();
+  const { remoteVideoRef, localVideoRef: pipVideoRef, localStreamRef, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName, peerAge: connPeerAge, sendPeerMessage, onPeerMessage } = useMatchConnectionContext();
+  // Text mode — pure chat, zero permissions. Messages ride the peer
+  // datachannel when it's up, else the match-server game-relay.
+  const [msgs, setMsgs] = useState<{ me: boolean; text: string }[]>([]);
+  const [draft, setDraft] = useState("");
+  const msgsEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mode !== "text") return;
+    return onPeerMessage((d: any) => {
+      if (d?.type === "chat-text" && typeof d.text === "string") {
+        setMsgs((m) => [...m, { me: false, text: d.text.slice(0, 500) }]);
+      }
+    });
+  }, [mode, onPeerMessage]);
+  useEffect(() => { msgsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
   const [pipActive, setPipActive] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
@@ -97,7 +111,7 @@ const ChatRoom = () => {
         interests: null,
         avatar_url: null,
         subscription_tier: "free",
-        age: null,
+        age: connPeerAge,
         bio: null,
         mood: null,
         is_scholar: null,
@@ -318,6 +332,80 @@ const ChatRoom = () => {
   const otherBadge = TIER_FEATURES[otherTier].badge;
   const isGroup = mode === "group";
   const otherSocials = other?.socials ?? {};
+
+  // ── Text mode — pure chat screen. No video, no camera, zero permissions. ──
+  if (mode === "text") {
+    const sendMsg = () => {
+      const t = draft.trim().slice(0, 500);
+      if (!t) return;
+      sendPeerMessage({ type: "chat-text", text: t, t: Date.now() });
+      setMsgs((m) => [...m, { me: true, text: t }]);
+      setDraft("");
+    };
+    return (
+      <div className="flex flex-col" style={{ height: "100dvh", background: BUBBLE.bg, color: BUBBLE.ink }}>
+        {/* Top bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top, 0px) + 14px) 16px 12px", borderBottom: `1px solid ${BUBBLE.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 20 }}>💬</span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>{connPeerName || "Stranger"}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: BUBBLE.sub }}>text chat · no camera</div>
+            </div>
+          </div>
+          <button onClick={handleExit} className="bub-btn" style={{ width: 38, height: 38, borderRadius: "50%", border: `1px solid ${BUBBLE.border}`, background: BUBBLE.card, color: "#FF4D8D", fontSize: 16, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+        </div>
+
+        {/* Messages */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {msgs.length === 0 && (
+            <div style={{ textAlign: "center", marginTop: 40, color: BUBBLE.sub }}>
+              <div style={{ fontSize: 44, marginBottom: 10, animation: "ff-breathe 2.4s ease-in-out infinite" }}>💬</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Say hi — they're a real person!</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Be respectful — AI moderation is active.</div>
+            </div>
+          )}
+          {msgs.map((m, i) => (
+            <div key={i} style={{
+              alignSelf: m.me ? "flex-end" : "flex-start",
+              maxWidth: "78%",
+              padding: "9px 14px",
+              borderRadius: m.me ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+              background: m.me ? BUBBLE.brand : BUBBLE.card,
+              color: m.me ? "#fff" : BUBBLE.ink,
+              border: m.me ? "none" : `1px solid ${BUBBLE.border}`,
+              fontSize: 14, fontWeight: 600,
+              animation: "ff-slide-up 0.25s ease",
+            }}>{m.text}</div>
+          ))}
+          <div ref={msgsEndRef} />
+        </div>
+
+        {/* Input row */}
+        <div style={{ padding: "10px 12px calc(env(safe-area-inset-bottom, 0px) + 12px)", borderTop: `1px solid ${BUBBLE.border}`, display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={() => { connSkip(); navigate("/match?mode=text", { replace: true }); }}
+            className="bub-btn"
+            style={{ height: 44, padding: "0 14px", borderRadius: 22, border: `1px solid ${BUBBLE.border}`, background: BUBBLE.card, fontSize: 13, fontWeight: 800, color: BUBBLE.sub, cursor: "pointer", whiteSpace: "nowrap" }}
+          >⏭ Next</button>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") sendMsg(); }}
+            placeholder="Say something…"
+            autoFocus
+            maxLength={500}
+            style={{ flex: 1, height: 44, borderRadius: 22, border: `1px solid ${BUBBLE.border}`, background: "#fff", padding: "0 16px", fontSize: 14, fontWeight: 600, color: BUBBLE.ink, outline: "none" }}
+          />
+          <button
+            onClick={sendMsg}
+            className="bub-btn bub-btn-primary"
+            style={{ width: 44, height: 44, borderRadius: "50%", border: "none", background: BUBBLE.brand, color: "#fff", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >➤</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden" style={{ height: "100dvh", background: BUBBLE.bg, color: BUBBLE.ink }}>

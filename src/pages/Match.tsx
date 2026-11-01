@@ -12,13 +12,14 @@ import { BUBBLE, chipStyle, ghostPillStyle } from "@/lib/bubble";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
 
-type Mode = "solo" | "group" | "blind";
+type Mode = "solo" | "group" | "blind" | "text";
 
 const MODE_CHIP: Record<string, { icon: string; label: string }> = {
   solo: { icon: "⚡", label: "Solo" },
   duo: { icon: "👯", label: "Duo" },
   group: { icon: "🎉", label: "Group" },
   blind: { icon: "🎭", label: "Blind" },
+  text: { icon: "💬", label: "Text" },
 };
 
 // ── Animated clock for the "quiet hours" hint — hands spin at different speeds ──
@@ -57,8 +58,9 @@ const Match = () => {
     }
   }, [tier, tierLoading, navigate]);
 
-  // Start webcam immediately on mount (uses the shared match connection stream)
-  useEffect(() => { startCamera(); }, [startCamera]);
+  // Start webcam immediately on mount — EXCEPT text mode, which needs zero
+  // permissions (that's the whole point: the camera-shy can still chat).
+  useEffect(() => { if (mode !== "text") startCamera(); }, [startCamera, mode]);
 
   // Timer
   useEffect(() => {
@@ -85,9 +87,12 @@ const Match = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier, tierLoading, mode, gender, scholarOnly, countries.join(",")]);
 
-  // Navigate to chat room ONLY when WebRTC is actually connected
+  // Navigate to chat room when ready. Text mode goes on "matched" — it
+  // doesn't need WebRTC media (chat relays through the match server),
+  // so waiting for "connected" would stall it forever.
   useEffect(() => {
-    if (connState === "connected" && peerId) {
+    const ready = mode === "text" ? connState === "matched" : connState === "connected";
+    if (ready && peerId) {
       recordMatch();
       capturePostHogEvent(posthog, "match_connected", { match_mode: mode });
       navigate(`/chat/${peerId}?mode=${mode}`, { replace: true });
@@ -126,6 +131,7 @@ const Match = () => {
 
   const modeChip = MODE_CHIP[mode] ?? MODE_CHIP.solo;
   const isBlind = mode === "blind";
+  const isText = mode === "text";
 
   return (
     <div
@@ -167,6 +173,10 @@ const Match = () => {
                   }} />
                 ))}
               </div>
+            </div>
+          ) : isText ? (
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #D6F0FF 0%, #E8F4FF 55%, #FFF0D6 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ fontSize: 72, animation: "ff-breathe 2.4s ease-in-out infinite" }}>💬</div>
             </div>
           ) : (
             <video

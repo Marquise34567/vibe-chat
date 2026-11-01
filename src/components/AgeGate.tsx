@@ -5,7 +5,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { FloatingStickers } from "@/components/FloatingStickers";
 import { BUBBLE } from "@/lib/bubble";
 import { setAgeVerified } from "@/lib/verification";
-import { getDisplayName, setDisplayName } from "@/lib/localUser";
+import { getDisplayName, setDisplayName, saveLocalProfile, getLocalUser } from "@/lib/localUser";
 import { syncVisitorToSupabase } from "@/lib/identitySync";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
@@ -18,22 +18,33 @@ import { toast } from "sonner";
 export const AgeGate = ({ onDone }: { onDone: () => void }) => {
   const [step, setStep] = useState<"age" | "name">("age");
   const [name, setName] = useState(getDisplayName() ?? "");
+  const [age, setAge] = useState("");
   const posthog = usePostHog();
 
   const confirmAge = () => {
     capturePostHogEvent(posthog, "age_confirmed");
     setAgeVerified();
-    // If they already have a name saved, skip straight through
     if (getDisplayName()) { onDone(); return; }
-    setStep("name");
+    // Zero-friction: auto-assign a fun name (changeable later in profile)
+    // instead of a required name wall — Omegle-parity, one tap and you're in.
+    const auto = getLocalUser().user_metadata.display_name ?? "Fren";
+    setDisplayName(auto);
+    void syncVisitorToSupabase();
+    toast.success(`Welcome, ${auto}!`);
+    onDone();
   };
 
   const pickName = () => {
     const trimmed = name.trim();
     if (!trimmed) { toast.error("Pick a name to show when matching"); return; }
     if (trimmed.length > 20) { toast.error("Keep it under 20 characters"); return; }
+    const parsedAge = age.trim() ? parseInt(age.trim(), 10) : null;
+    if (parsedAge != null && (!Number.isFinite(parsedAge) || parsedAge < 16 || parsedAge > 99)) {
+      toast.error("Enter a valid age (16+)"); return;
+    }
     capturePostHogEvent(posthog, "profile_created");
     setDisplayName(trimmed);
+    if (parsedAge != null) saveLocalProfile({ age: parsedAge });
     // Persist the new visitor row immediately (no auth required)
     void syncVisitorToSupabase();
     toast.success(`Let's go, ${trimmed}!`);
@@ -166,6 +177,17 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
             autoFocus
             className="input-glass text-center"
             style={{ fontSize: 17, fontWeight: 700 }}
+            onKeyDown={(e) => e.key === "Enter" && pickName()}
+          />
+          <input
+            type="number"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            placeholder="Your age (optional)"
+            min={16}
+            max={99}
+            className="input-glass text-center"
+            style={{ fontSize: 15, fontWeight: 700 }}
             onKeyDown={(e) => e.key === "Enter" && pickName()}
           />
           <button onClick={pickName} className="bub-btn" style={ctaStyleLocal}>

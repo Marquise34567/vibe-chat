@@ -12,7 +12,7 @@ import {
   CameraRetryIcon as RefreshCw, ChevronRightIcon as ChevronRight,
   ScholarIcon as GraduationCap, UserIcon as User, UserCircleIcon as UserCircle,
   PlayIcon, SoloModeIcon, GroupModeIcon, BlindModeIcon,
-  PlusIcon, LockIcon as Lock,
+  PlusIcon, LockIcon as Lock, MessageIcon,
 } from "@/components/FaceFrenzyIcons";
 import { BrandMark } from "@/components/BrandMark";
 import { FloatingStickers } from "@/components/FloatingStickers";
@@ -20,8 +20,6 @@ import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
 import { useTier } from "@/hooks/useTier";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
-import { getLocalProfile } from "@/lib/localUser";
-import { normalizeGender } from "../../../shared/analytics";
 import { apiBase, SOCIAL_LINKS } from "@/lib/config";
 import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
@@ -37,7 +35,7 @@ import { capturePostHogEvent } from "@/lib/posthogLogs";
    - Blind mode: no camera, pastel wave card instead
 ═══════════════════════════════════════════════════════════════ */
 
-type Mode = "solo" | "group" | "blind";
+type Mode = "solo" | "group" | "blind" | "text";
 type Gender = "both" | "girls" | "guys";
 type Region = "worldwide" | "north-america" | "south-america" | "europe" | "asia" | "africa" | "oceania";
 
@@ -69,8 +67,6 @@ const StartTab = () => {
   const [gender, setGender] = useState<Gender>("both");
   const [region, setRegion] = useState<Region>("worldwide");
   const [scholarOnly, setScholarOnly] = useState(false);
-  const [realOnlineCount, setRealOnlineCount] = useState(0);
-  const [fakeOnlineBase, setFakeOnlineBase] = useState(60760);
   const [matchCount, setMatchCount] = useState(12847);
   const [feedIdx, setFeedIdx] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
@@ -191,13 +187,12 @@ const StartTab = () => {
     }
   }, [plusStatus]);
 
-  useEffect(() => { camStart(); return () => camStop(); }, [camStart, camStop]);
+  // Camera is NOT requested on load — the permission wall is a first-visit
+  // bailer. Preview card offers "Tap to preview"; Match.tsx starts the real
+  // stream once they've committed by tapping Start. Still clean up on unmount.
+  useEffect(() => () => camStop(), [camStop]);
 
-  // ── Decorative counters (fake baseline + real server count) ──
-  useEffect(() => {
-    const t = setInterval(() => setFakeOnlineBase((c) => c + Math.floor(Math.random() * 7) - 3), 3000);
-    return () => clearInterval(t);
-  }, []);
+  // ── Decorative counters ──
   useEffect(() => {
     const t = setInterval(() => setMatchCount((c) => c + Math.floor(Math.random() * 3) + 1), 2000);
     return () => clearInterval(t);
@@ -205,49 +200,6 @@ const StartTab = () => {
   useEffect(() => {
     const t = setInterval(() => setFeedIdx((i) => (i + 1) % ACTIVITY_FEED.length), 3500);
     return () => clearInterval(t);
-  }, []);
-
-  // Displayed online count = fake baseline + real server count
-  const onlineCount = fakeOnlineBase + realOnlineCount;
-
-  // ── Connect to match server for real online count ──
-  useEffect(() => {
-    const MATCH_SERVER_URL =
-      (import.meta as any).env?.VITE_MATCH_SERVER_URL ?? "ws://localhost:8090";
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const connect = () => {
-      try {
-        ws = new WebSocket(MATCH_SERVER_URL);
-        ws.onopen = () => {
-          // Register country so server knows our location
-          fetch("https://ipapi.co/json/").then((r) => r.json()).then((d) => {
-            if (d.country_code && ws?.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: "register", country: d.country_code.toUpperCase(), selfGender: normalizeGender(getLocalProfile().gender) }));
-            }
-          }).catch(() => {});
-        };
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === "presence" || msg.type === "connected" || msg.type === "searching") {
-              if (typeof msg.onlineCount === "number") setRealOnlineCount(msg.onlineCount);
-            }
-          } catch { /* ignore */ }
-        };
-        ws.onclose = () => {
-          reconnectTimer = setTimeout(connect, 5000);
-        };
-        ws.onerror = () => { try { ws?.close(); } catch {} };
-      } catch { /* ignore */ }
-    };
-    connect();
-
-    return () => {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      try { ws?.close(); } catch {}
-    };
   }, []);
 
   const startMatch = () => {
@@ -291,23 +243,25 @@ const StartTab = () => {
     solo:  { desc: "1-on-1 random video chat",            icon: SoloModeIcon,  accent: "#FF9F0A", label: "SOLO"  },
     group: { desc: "Bring friends. Meet more.",           icon: GroupModeIcon, accent: "#E8890B", label: "GROUP" },
     blind: { desc: "Voice first. Cameras reveal at 30s.", icon: BlindModeIcon, accent: "#FF4D8D", label: "BLIND" },
+    text:  { desc: "Chat with text. No camera needed.",   icon: MessageIcon,   accent: "#3B9EF8", label: "TEXT"  },
   };
 
   const accent = friendConnected ? "#22c55e" : modeMeta[mode].accent;
   const modeLabel = friendConnected ? "DUO" : modeMeta[mode].label;
   const isBlind = mode === "blind";
+  const isNoCam = isBlind || mode === "text";
   const stickerLayer = true;
 
   // Scan self-preview in lobby for NSFW — warn but don't kill camera
   useEffect(() => {
-    if (camStatus !== "active" || isBlind) return;
+    if (camStatus !== "active" || isNoCam) return;
     startLobbyScan(videoRef, "local", (report) => {
       console.warn("[moderation] Lobby self-violation:", report);
       setModerationWarning(`Inappropriate content detected on your camera. Please adjust before matching.`);
       setTimeout(() => setModerationWarning(null), 5000);
     });
     return () => stopLobbyScan();
-  }, [camStatus, isBlind, startLobbyScan, stopLobbyScan, videoRef]);
+  }, [camStatus, isNoCam, startLobbyScan, stopLobbyScan, videoRef]);
 
   return (
     <div style={{ position: "relative", minHeight: "100dvh", overflow: "hidden", background: BUBBLE.bg, color: BUBBLE.ink, display: "flex", flexDirection: "column" }} data-room-id={roomId ?? undefined}>
@@ -326,12 +280,6 @@ const StartTab = () => {
 
         {/* Right cluster */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Online pill */}
-          <div style={{ ...chipStyle, padding: "8px 14px" }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.7)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
-            <span style={{ fontSize: 12, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(onlineCount)}</span>
-          </div>
-
           {/* Follow us on X — desktop only, keeps mobile top bar clean */}
           {!isMobile && (
             <a href={SOCIAL_LINKS.x} target="_blank" rel="noopener noreferrer" aria-label="Follow us on X"
@@ -399,7 +347,7 @@ const StartTab = () => {
       <div style={{ position: "absolute", inset: 0, zIndex: 1, overflow: "hidden", pointerEvents: "none" }}>
         <div style={{ position: "absolute", inset: 0 }}>
           {/* Solo camera */}
-          {!isBlind && !friendConnected && (
+          {!isNoCam && !friendConnected && (
             <>
               <video
                 ref={videoRef}
@@ -443,7 +391,7 @@ const StartTab = () => {
           )}
 
           {/* Split-screen — you + friend side by side */}
-          {!isBlind && friendConnected && (
+          {!isNoCam && friendConnected && (
             <div style={{ position: "absolute", inset: 0, display: "flex" }}>
               {/* Left — your camera */}
               <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden" }}>
@@ -472,7 +420,7 @@ const StartTab = () => {
           )}
 
           {/* Waiting for friend overlay — light dim */}
-          {!isBlind && lobbyState === "waiting" && !friendConnected && (
+          {!isNoCam && lobbyState === "waiting" && !friendConnected && (
             <div style={{ position: "absolute", inset: 0, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(255,250,240,0.62)", backdropFilter: "blur(8px)" }}>
               <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: BUBBLE.brand }} />
               <span style={{ fontSize: 16, fontWeight: 800, color: BUBBLE.ink }}>Waiting for friend…</span>
@@ -498,6 +446,17 @@ const StartTab = () => {
               <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${accent}26 0%, transparent 70%)`, filter: "blur(40px)" }} />
               <div style={{ position: "absolute", left: "50%", top: "60%", transform: "translateX(-50%)", fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>
                 🎧 Voice first — cameras stay off
+              </div>
+            </div>
+          )}
+
+          {/* Text mode — blue chat wash, zero permissions needed */}
+          {mode === "text" && (
+            <div style={{ position: "absolute", inset: 0, zIndex: 5, background: "linear-gradient(160deg, #D6F0FF 0%, #E8F4FF 55%, #FFF0D6 100%)" }}>
+              <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${accent}26 0%, transparent 70%)`, filter: "blur(40px)" }} />
+              <div style={{ position: "absolute", left: "50%", top: "46%", transform: "translateX(-50%)", fontSize: 84, animation: "ff-breathe 2.4s ease-in-out infinite" }}>💬</div>
+              <div style={{ position: "absolute", left: "50%", top: "60%", transform: "translateX(-50%)", fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>
+                ✍️ Text only — no camera, no mic
               </div>
             </div>
           )}
@@ -580,7 +539,7 @@ const StartTab = () => {
 
           {/* Mode selector — 3 pills */}
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            {(["solo", "group", "blind"] as Mode[]).map((m, idx) => {
+            {(["solo", "group", "blind", "text"] as Mode[]).map((m, idx) => {
               const meta = modeMeta[m];
               const Icon = meta.icon;
               const selected = mode === m;
