@@ -17,8 +17,8 @@ const COPY: Record<PaywallReason, { emoji: string; title: string; body: string }
   },
   gender: {
     emoji: "💘",
-    title: "Gender filters are a Plus feature",
-    body: "Choose exactly who you meet. Upgrade to Plus to filter by girls, guys, or both.",
+    title: "Matching with girls is a Plus feature",
+    body: "Upgrade to Plus to match with girls only. Free users keep everyone and guys filters.",
   },
   region: {
     emoji: "🌍",

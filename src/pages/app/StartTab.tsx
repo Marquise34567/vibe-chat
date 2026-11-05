@@ -76,12 +76,15 @@ const StartTab = () => {
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
   const [paywall, setPaywall] = useState<PaywallReason | null>(null);
-  const { tier, features, setTier, loading: tierLoading } = useTier();
+  const { tier, setTier, loading: tierLoading } = useTier();
   const isMobile = useIsMobile();
   const isPaid = tier !== "free";
-  const canPickGender = true; // unlocked for everyone — ad revenue covers it
-  // Free tier: worldwide only. Paid: pick any region.
-  const canPickRegions = features.maxCountryFilters === -1;
+  // Girls filter is the premium gate — matching with girls is Plus-only.
+  // Guys/both stay free so free users keep a partial filter.
+  const canPickGirls = isPaid;
+  // Regions unlocked for everyone — ad revenue covers it, and wider
+  // pools match faster (liquidity > gate revenue here).
+  const canPickRegions = true;
   const [sponsors, setSponsors] = useState<{ label: string; link: string; preview?: { title?: string; description?: string; image?: string; favicon?: string } }[]>(() => {
     try {
       const saved = localStorage.getItem("ff_sponsors");
@@ -491,7 +494,7 @@ const StartTab = () => {
                 { id: "girls" as Gender, label: "Girls" },
                 { id: "guys" as Gender, label: "Guys" },
               ]).map((g) => {
-                const locked = !canPickGender && g.id !== "both";
+                const locked = g.id === "girls" && !canPickGirls;
                 const sel = gender === g.id;
                 return (
                   <button key={g.id}
@@ -763,7 +766,7 @@ const StartTab = () => {
           onClose={() => setShowSettings(false)} gender={gender} setGender={setGender}
           scholarOnly={scholarOnly} setScholarOnly={setScholarOnly} scholarVerified={scholarVerified}
           camStatus={camStatus} camError={camError} onRetryCam={camStart}
-          canPickGender={canPickGender}
+          canPickGender={canPickGirls}
           onLockedGender={() => { setShowSettings(false); setPaywall("gender"); }}
         />
       )}
@@ -837,9 +840,8 @@ const rowCard = (selected: boolean, tint: string = BUBBLE.brand): React.CSSPrope
 ═══════════════════════════════════════════════════════════════ */
 const RegionPickerSheet = ({ region, setRegion, onClose, canPickRegions, onLocked }: { region: Region; setRegion: (r: Region) => void; onClose: () => void; canPickRegions: boolean; onLocked: () => void; }) => {
   return (
-    <div className="fixed inset-0 z-[100] flex items-end" style={sheetWrap} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheet-up" style={sheetCard}>
-        <div style={sheetHandle} />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4" style={sheetWrap} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="animate-pop-in" style={{ background: BUBBLE.card, borderRadius: 28, padding: 24, width: "100%", maxWidth: 400, border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.cardShadow, maxHeight: "80dvh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: BUBBLE.ink, letterSpacing: "-0.3px" }}>Pick a region</h2>
           <button onClick={onClose} className="bub-btn" style={sheetCloseBtn}>
@@ -910,7 +912,7 @@ const SettingsSheet = ({
           <div style={{ fontSize: 12, fontWeight: 700, color: BUBBLE.faint, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>Show me</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
             {genders.map((g) => {
-              const locked = !canPickGender && g.id !== "both";
+              const locked = g.id === "girls" && !canPickGender;
               const selected = gender === g.id;
               return (
               <button key={g.id} onClick={() => { if (locked) { onLockedGender(); return; } setGender(g.id); }}
