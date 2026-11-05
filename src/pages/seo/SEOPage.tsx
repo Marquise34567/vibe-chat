@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandMark } from "@/components/BrandMark";
-import { loadAdsterra } from "@/lib/videoAd";
+import { loadAdsterra, loadPopunder } from "@/lib/videoAd";
 
 // ── Page variant: "landing" (marketing hero) vs "article" (X-articles style) ──
 type SEOVariant = "landing" | "article";
@@ -106,9 +106,9 @@ export const SEOPage = ({
   const article = variant === "article";
 
   // Monetize organic search traffic — Adsterra zones self-dock per their
-  // format config. Deliberately no popunder here: it would tank UX signals
-  // on the pages we're trying to rank.
-  useEffect(() => { loadAdsterra(); }, []);
+  // format config + popunder arms for the visitor's next click (they'd
+  // never hit the AgeGate, so this is the only place it can arm).
+  useEffect(() => { loadAdsterra(); loadPopunder(); }, []);
 
   return (
     <SEOVariantContext.Provider value={variant}>

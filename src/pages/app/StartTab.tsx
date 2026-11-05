@@ -22,7 +22,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
 import { apiBase, SOCIAL_LINKS } from "@/lib/config";
 import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
-import { loadLobbyAds, loadLobbyPopunder } from "@/lib/videoAd";
+import { loadLobbyAds, loadLobbyPopunder, loadPopunder } from "@/lib/videoAd";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -94,8 +94,10 @@ const StartTab = () => {
     try { localStorage.setItem("ff_sponsors", JSON.stringify(sponsors)); } catch {}
   }, [sponsors]);
 
-  // Lobby ads — always-on Adsterra zones + lobby popunder
-  useEffect(() => { loadLobbyAds(); loadLobbyPopunder(); }, []);
+  // Lobby ads — always-on Adsterra zones + lobby popunder + the main
+  // popunder zone (return users skip the AgeGate, so it never arms
+  // there — the lobby is the earliest guaranteed touchpoint).
+  useEffect(() => { loadLobbyAds(); loadLobbyPopunder(); loadPopunder(); }, []);
   const scholarVerified = getScholarVerified();
 
   const { videoRef, status: camStatus, error: camError, start: camStart, stop: camStop } = useWebcam();
