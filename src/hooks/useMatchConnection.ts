@@ -18,6 +18,7 @@ import { getLocalProfile } from "@/lib/localUser";
 import { normalizeGender } from "../../shared/analytics";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { pingLocalNotification } from "@/lib/pushNotify";
+import { loadSlider } from "@/lib/videoAd";
 
 const MATCH_SERVER_URL =
   (import.meta as any).env?.VITE_MATCH_SERVER_URL ?? "ws://localhost:8090";
@@ -591,6 +592,10 @@ export function useMatchConnection() {
             "Match found on FaceFrenzy",
             `${data.peerName ?? "Someone"} is waiting — come back to chat`
           );
+
+          // Peak-attention moment — eyes are on screen waiting for the
+          // peer's video. Highest-viewability slot for the ad slider.
+          loadSlider();
 
           // Create peer connection and start WebRTC handshake
           // Try to get camera, but DON'T fail the whole match if camera fails —

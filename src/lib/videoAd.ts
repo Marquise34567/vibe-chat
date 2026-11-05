@@ -4,10 +4,14 @@
 //   ad-break / extend / skip       → HillTopAds (slider + popunder)
 // Every script injects once per session max.
 
-const SLIDER_SRC =
-  "//massivesalad.com/b.XCVMsZdtG/ll0WYWWLcL/WezmX9nuQZEURl/k/P/TCc/1ZOYTXcox/N/DNU/tUNcztU/5TNQzvEC0_O/Qr";
-const POPUNDER_SRC =
-  "//loyal-product.com/cbDM9/6.b-2c5kl/S-W/Qt9xNfzzUS5hNGzkIJ3vMqyY0q3/NfTrk/3cMBjgc/3u";
+const SLIDER_SRCS = [
+  "//massivesalad.com/b.XCVMsZdtG/ll0WYWWLcL/WezmX9nuQZEURl/k/P/TCc/1ZOYTXcox/N/DNU/tUNcztU/5TNQzvEC0_O/Qr",
+  // paste extra HillTopAds slider/VAST zone URLs here — more zones = more impressions
+];
+const POPUNDER_SRCS = [
+  "//loyal-product.com/cbDM9/6.b-2c5kl/S-W/Qt9xNfzzUS5hNGzkIJ3vMqyY0q3/NfTrk/3cMBjgc/3u",
+  // paste extra popunder zone URLs here
+];
 const LOBBY_POPUNDER_SRC =
   "//loyal-product.com/cFD.9S6/bq2X5bl/SJWaQw9lNTz/UQ5FN/zSIy3-MFya0n3eNtTTkk3aMQj_co3z";
 const ADSTERRA_SRCS = [
@@ -33,8 +37,8 @@ const inject = (src: string) => {
 // mounts (they self-dock to page edges per each zone's format config).
 export const loadLobbyAds = () => loadAdsterra();
 
-export const loadSlider = () => inject(SLIDER_SRC);
-export const loadPopunder = () => inject(POPUNDER_SRC);
+export const loadSlider = () => SLIDER_SRCS.forEach(inject);
+export const loadPopunder = () => POPUNDER_SRCS.forEach(inject);
 export const loadLobbyPopunder = () => inject(LOBBY_POPUNDER_SRC);
 export const loadAdsterra = () => ADSTERRA_SRCS.forEach(inject);
 export const loadVideoAd = () => {
