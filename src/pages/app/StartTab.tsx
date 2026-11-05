@@ -11,7 +11,7 @@ import {
   CameraIcon as Camera, CameraOffIcon as CameraOff,
   CameraRetryIcon as RefreshCw, ChevronRightIcon as ChevronRight,
   ScholarIcon as GraduationCap, UserIcon as User, UserCircleIcon as UserCircle,
-  PlayIcon, SoloModeIcon, GroupModeIcon, BlindModeIcon,
+  PlayIcon, SoloModeIcon, BlindModeIcon,
   PlusIcon, LockIcon as Lock, MessageIcon,
 } from "@/components/FaceFrenzyIcons";
 import { BrandMark } from "@/components/BrandMark";
@@ -22,6 +22,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
 import { apiBase, SOCIAL_LINKS } from "@/lib/config";
 import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
+import { loadLobbyAds, loadLobbyPopunder } from "@/lib/videoAd";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -35,7 +36,7 @@ import { capturePostHogEvent } from "@/lib/posthogLogs";
    - Blind mode: no camera, pastel wave card instead
 ═══════════════════════════════════════════════════════════════ */
 
-type Mode = "solo" | "group" | "blind" | "text";
+type Mode = "solo" | "blind" | "text";
 type Gender = "both" | "girls" | "guys";
 type Region = "worldwide" | "north-america" | "south-america" | "europe" | "asia" | "africa" | "oceania";
 
@@ -71,7 +72,6 @@ const StartTab = () => {
   const [feedIdx, setFeedIdx] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
-  const [genderExpanded, setGenderExpanded] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
@@ -79,7 +79,7 @@ const StartTab = () => {
   const { tier, features, setTier, loading: tierLoading } = useTier();
   const isMobile = useIsMobile();
   const isPaid = tier !== "free";
-  const canPickGender = features.canFilterByGender;
+  const canPickGender = true; // unlocked for everyone — ad revenue covers it
   // Free tier: worldwide only. Paid: pick any region.
   const canPickRegions = features.maxCountryFilters === -1;
   const [sponsors, setSponsors] = useState<{ label: string; link: string; preview?: { title?: string; description?: string; image?: string; favicon?: string } }[]>(() => {
@@ -93,6 +93,9 @@ const StartTab = () => {
   useEffect(() => {
     try { localStorage.setItem("ff_sponsors", JSON.stringify(sponsors)); } catch {}
   }, [sponsors]);
+
+  // Lobby ads — always-on Adsterra zones + lobby popunder
+  useEffect(() => { loadLobbyAds(); loadLobbyPopunder(); }, []);
   const scholarVerified = getScholarVerified();
 
   const { videoRef, status: camStatus, error: camError, start: camStart, stop: camStop } = useWebcam();
@@ -241,13 +244,13 @@ const StartTab = () => {
 
   const modeMeta: Record<Mode, { desc: string; icon: typeof SoloModeIcon; accent: string; label: string }> = {
     solo:  { desc: "1-on-1 random video chat",            icon: SoloModeIcon,  accent: "#FF9F0A", label: "SOLO"  },
-    group: { desc: "Bring friends. Meet more.",           icon: GroupModeIcon, accent: "#E8890B", label: "GROUP" },
     blind: { desc: "Voice first. Cameras reveal at 30s.", icon: BlindModeIcon, accent: "#FF4D8D", label: "BLIND" },
     text:  { desc: "Chat with text. No camera needed.",   icon: MessageIcon,   accent: "#3B9EF8", label: "TEXT"  },
   };
 
   const accent = friendConnected ? "#22c55e" : modeMeta[mode].accent;
   const modeLabel = friendConnected ? "DUO" : modeMeta[mode].label;
+  const ModeIcon = modeMeta[mode].icon;
   const isBlind = mode === "blind";
   const isNoCam = isBlind || mode === "text";
   const stickerLayer = true;
@@ -329,169 +332,104 @@ const StartTab = () => {
             {ACTIVITY_FEED[feedIdx].flag2 && ` ${ACTIVITY_FEED[feedIdx].flag2}`}
           </div>
         )}
-
-        <div key={friendConnected ? "duo" : mode} style={{ animation: "ff-slide-up 0.5s ease" }}>
-          <h1 className="ff-heading" style={{ fontSize: "clamp(30px, 9vw, 44px)", fontWeight: 800, letterSpacing: "-1.4px", lineHeight: 1.05, color: BUBBLE.ink, marginBottom: 5, textTransform: "lowercase" }}>
-            {modeLabel} chat
-          </h1>
-          <p style={{ fontSize: 14, color: BUBBLE.sub, fontWeight: 600 }}>
-            {friendConnected ? "You and your friend — ready to match" : modeMeta[mode].desc}
-            {!isMobile && <span style={{ color: BUBBLE.faint }}> · The #1 Omegle Alternative</span>}
-          </p>
-        </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════
-          CAMERA BACKDROP — faint full-bleed layer behind content
-      ═══════════════════════════════════════════════════ */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 1, overflow: "hidden", pointerEvents: "none" }}>
-        <div style={{ position: "absolute", inset: 0 }}>
-          {/* Solo camera */}
-          {!isNoCam && !friendConnected && (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay playsInline muted
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%",
-                  objectFit: "cover", transform: "scaleX(-1)",
-                  objectPosition: "center top",
-                  opacity: camStatus === "active" ? 0.65 : 0,
-                  transition: "opacity 0.6s ease",
-                }}
-              />
-              {/* Camera states overlay — light ink-on-lavender prompts */}
-              {camStatus !== "active" && (
-                <div style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-                  {(camStatus === "denied" || camStatus === "error") && (
-                    <button onClick={camStart} className="bub-btn" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer" }}>
-                      <div style={{ width: 64, height: 64, borderRadius: 22, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.shadow, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {camStatus === "denied" ? <CameraOff style={{ width: 26, height: 26, color: BUBBLE.faint }} /> : <Camera style={{ width: 26, height: 26, color: BUBBLE.faint }} />}
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>{camError || "Tap to enable camera"}</span>
-                    </button>
-                  )}
-                  {camStatus === "requesting" && (
-                    <>
-                      <RefreshCw className="animate-spin" style={{ width: 30, height: 30, color: BUBBLE.brand }} />
-                      <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>Starting camera…</span>
-                    </>
-                  )}
-                  {camStatus === "idle" && (
-                    <button onClick={camStart} className="bub-btn" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer" }}>
-                      <div style={{ width: 64, height: 64, borderRadius: 22, background: BUBBLE.card, border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.shadow, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Camera style={{ width: 26, height: 26, color: BUBBLE.faint }} />
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>Tap to preview</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Split-screen — you + friend side by side */}
-          {!isNoCam && friendConnected && (
-            <div style={{ position: "absolute", inset: 0, display: "flex" }}>
-              {/* Left — your camera */}
-              <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden" }}>
-                <video
-                  ref={videoRef}
-                  autoPlay playsInline muted
-                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", objectPosition: "center top", opacity: 0.6 }}
-                />
-                <div style={{ position: "absolute", bottom: 14, left: 14, ...chipStyle, padding: "5px 12px", fontSize: 11, zIndex: 5 }}>You</div>
-              </div>
-              {/* Right — friend's camera */}
-              <div style={{ width: "50%", height: "100%", position: "relative", overflow: "hidden", background: "#241C14" }}>
-                <video
-                  ref={friendVideoRef}
-                  autoPlay playsInline
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", opacity: 0.6 }}
-                />
-                <div style={{ position: "absolute", bottom: 14, left: 14, ...chipStyle, padding: "5px 12px", fontSize: 11, zIndex: 5 }}>Friend</div>
-                {/* Pulsing green dot for connected */}
-                <div style={{ position: "absolute", top: 14, right: 14, ...chipStyle, padding: "5px 11px", gap: 6, zIndex: 5 }}>
-                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.8)", animation: "ff-core-pulse 2s ease-in-out infinite" }} />
-                  <span style={{ fontSize: 10, fontWeight: 800, color: "#16a34a", textTransform: "uppercase", letterSpacing: "0.5px" }}>Connected</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Waiting for friend overlay — light dim */}
-          {!isNoCam && lobbyState === "waiting" && !friendConnected && (
-            <div style={{ position: "absolute", inset: 0, zIndex: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "rgba(255,250,240,0.62)", backdropFilter: "blur(8px)" }}>
-              <RefreshCw className="animate-spin" style={{ width: 32, height: 32, color: BUBBLE.brand }} />
-              <span style={{ fontSize: 16, fontWeight: 800, color: BUBBLE.ink }}>Waiting for friend…</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: BUBBLE.sub }}>Share your invite link</span>
-            </div>
-          )}
-
-          {/* Blind mode — pastel wave wash (sits above the scrim, inherently soft) */}
-          {isBlind && (
-            <div style={{ position: "absolute", inset: 0, zIndex: 5, background: "linear-gradient(160deg, #FFE8CC 0%, #FFE3EC 55%, #FFF0D6 100%)" }}>
-              {/* Floating voice waves */}
-              <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", display: "flex", alignItems: "center", gap: 7 }}>
+      {/* ═══ SPLIT — camera box left, control panel right (Monkey desktop style) ═══ */}
+      <div style={{ position: "relative", zIndex: 5, flex: isMobile ? 1 : "0 0 auto", minHeight: 0, display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 0 : 14, padding: isMobile ? 0 : "0 16px", width: "100%", maxWidth: isMobile ? undefined : 1060, margin: "0 auto", height: isMobile ? undefined : "min(76vh, 680px)", alignSelf: isMobile ? undefined : "center" }}>
+        {!isMobile && (
+          <div style={{ position: "relative", flex: 1.15, minWidth: 0, borderRadius: 24, overflow: "hidden", background: "#B5B1A8", border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.cardShadow }}>
+            {!isNoCam && (
+              <video ref={videoRef} autoPlay playsInline muted
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", objectPosition: "center top", opacity: camStatus === "active" ? 1 : 0, transition: "opacity 0.6s ease" }} />
+            )}
+            {!isNoCam && camStatus !== "active" && (
+              <button onClick={camStart} className="bub-btn" style={{ position: "absolute", inset: 0, background: "transparent", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                {camStatus === "requesting" ? (
+                  <RefreshCw className="animate-spin" style={{ width: 34, height: 34, color: BUBBLE.brand }} />
+                ) : camStatus === "denied" || camStatus === "error" ? (
+                  <CameraOff style={{ width: 42, height: 42, color: "rgba(46,36,24,0.45)" }} />
+                ) : (
+                  <Camera style={{ width: 42, height: 42, color: "rgba(46,36,24,0.45)" }} />
+                )}
+                <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(46,36,24,0.6)" }}>
+                  {camStatus === "requesting" ? "Starting camera…" : camStatus === "denied" || camStatus === "error" ? (camError || "Tap to enable camera") : "Tap to preview"}
+                </span>
+              </button>
+            )}
+            {isBlind && (
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #2A1622 0%, #1E1424 55%, #191320 100%)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} style={{
-                    width: 7, borderRadius: 4, background: accent,
-                    height: [40, 70, 100, 130, 100, 70, 40][i],
-                    opacity: 0.4,
-                    animation: `ff-wave-bar 1.5s ease-in-out ${i * 0.1}s infinite`,
-                  }} />
+                  <div key={i} style={{ width: 6, borderRadius: 4, background: accent, height: [26, 44, 64, 82, 64, 44, 26][i], opacity: 0.55, animation: `ff-wave-bar 1.5s ease-in-out ${i * 0.1}s infinite` }} />
                 ))}
               </div>
-              {/* Glow */}
-              <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${accent}26 0%, transparent 70%)`, filter: "blur(40px)" }} />
-              <div style={{ position: "absolute", left: "50%", top: "60%", transform: "translateX(-50%)", fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>
-                🎧 Voice first — cameras stay off
-              </div>
-            </div>
-          )}
-
-          {/* Text mode — blue chat wash, zero permissions needed */}
-          {mode === "text" && (
-            <div style={{ position: "absolute", inset: 0, zIndex: 5, background: "linear-gradient(160deg, #D6F0FF 0%, #E8F4FF 55%, #FFF0D6 100%)" }}>
-              <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%, -50%)", width: 300, height: 300, borderRadius: "50%", background: `radial-gradient(circle, ${accent}26 0%, transparent 70%)`, filter: "blur(40px)" }} />
-              <div style={{ position: "absolute", left: "50%", top: "46%", transform: "translateX(-50%)", fontSize: 84, animation: "ff-breathe 2.4s ease-in-out infinite" }}>💬</div>
-              <div style={{ position: "absolute", left: "50%", top: "60%", transform: "translateX(-50%)", fontSize: 13, fontWeight: 700, color: BUBBLE.sub }}>
-                ✍️ Text only — no camera, no mic
-              </div>
-            </div>
-          )}
-
-          {/* Lavender scrim — keeps foreground readable over the faint feed */}
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none",
-            background: "linear-gradient(180deg, rgba(255,250,240,0.92) 0%, rgba(255,250,240,0.5) 24%, rgba(255,250,240,0.38) 50%, rgba(255,250,240,0.5) 72%, rgba(255,250,240,0.88) 100%)",
-          }} />
-
-          {/* Match counter chip — desktop only, declutters mobile */}
-          {!isMobile && (
-            <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 64px)", right: 16, zIndex: 5 }}>
-              <span style={{ ...chipStyle, gap: 6, padding: "6px 13px" }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5B400", boxShadow: "0 0 8px rgba(245,180,0,0.7)", animation: "ff-core-pulse 1.5s ease-in-out infinite" }} />
-                <span style={{ fontSize: 11, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(matchCount)}</span>
-                <span style={{ fontSize: 10, color: BUBBLE.faint, fontWeight: 700 }}>today</span>
+            )}
+            {mode === "text" && (
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #101C2A 0%, #0E1624 55%, #12121C 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>💬</div>
+            )}
+            <div style={{ position: "absolute", bottom: 12, left: 12, zIndex: 6 }}>
+              <span style={{ ...chipStyle, gap: 6, padding: "5px 12px", fontSize: 11 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
+                You
               </span>
             </div>
-          )}
+          </div>
+        )}
+        <div style={{ position: "relative", flex: 1, minWidth: 0, display: "flex", flexDirection: "column", borderRadius: isMobile ? 0 : 24, background: isMobile ? "transparent" : BUBBLE.card, border: isMobile ? "none" : `1px solid ${BUBBLE.border}`, boxShadow: isMobile ? "none" : BUBBLE.cardShadow, padding: isMobile ? 0 : "12px 16px 6px" }}>
+      {/* Mode toggle — top-center pill (Monkey-style) */}
+      <div style={{ position: "relative", zIndex: 10, padding: "2px 20px 0", display: "flex", justifyContent: "center" }}>
+        <div style={{ display: "flex", padding: 4, borderRadius: 20, background: "rgba(255,159,10,0.06)", border: `1px solid ${BUBBLE.border}`, width: "100%", maxWidth: 380 }}>
+          {(["solo", "blind", "text"] as Mode[]).map((m) => {
+            const meta = modeMeta[m];
+            const Icon = meta.icon;
+            const selected = mode === m;
+            return (
+              <button key={m} onClick={() => setMode(m)}
+                style={{
+                  flex: 1, height: 40, borderRadius: 16, border: "none",
+                  background: selected ? BUBBLE.card : "transparent",
+                  boxShadow: selected ? "0 2px 10px rgba(120,72,20,0.10)" : "none",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  cursor: "pointer", transition: "all 0.25s ease",
+                }}
+              >
+                <Icon style={{ width: 17, height: 17, opacity: selected ? 1 : 0.35, transition: "opacity 0.2s ease" }} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: selected ? meta.accent : BUBBLE.faint, letterSpacing: "0.5px" }}>{meta.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Spacer — floats the dock near center (bottom spacer is larger) */}
-      <div style={{ flex: 1, minHeight: 24 }} />
+      {/* ═══ HERO — centered logo + tagline (Monkey-style) ═══ */}
+      <div style={{ position: "relative", zIndex: 5, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, paddingBottom: 18 }}>
+        <BrandMark size={84} />
+        <div className="ff-wordmark" style={{ fontSize: 36, letterSpacing: "-1.2px", marginTop: 12 }}>facefrenzy</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: BUBBLE.sub }}>meet new people face-to-face</div>
+        {lobbyState === "waiting" && (
+          <div style={{ ...chipStyle, gap: 7, marginTop: 12, padding: "7px 15px" }}>
+            <RefreshCw className="animate-spin" style={{ width: 13, height: 13, color: BUBBLE.brand }} />
+            <span style={{ fontSize: 12, fontWeight: 800, color: BUBBLE.ink }}>Waiting for friend…</span>
+          </div>
+        )}
+      </div>
+
+      {/* Match counter chip — desktop only, declutters mobile */}
+      {!isMobile && (
+        <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 64px)", right: 16, zIndex: 6 }}>
+          <span style={{ ...chipStyle, gap: 6, padding: "6px 13px" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5B400", boxShadow: "0 0 8px rgba(245,180,0,0.7)", animation: "ff-core-pulse 1.5s ease-in-out infinite" }} />
+            <span style={{ fontSize: 11, fontWeight: 800, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{fmt(matchCount)}</span>
+            <span style={{ fontSize: 10, color: BUBBLE.faint, fontWeight: 700 }}>today</span>
+          </span>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════
           DOCK — white card with modes, prefs, CTA
       ═══════════════════════════════════════════════════ */}
       <div style={{ position: "relative", zIndex: 10, padding: "10px 14px calc(env(safe-area-inset-bottom, 0px) + 14px)", animation: "ff-dock-rise 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>
         <div style={{
-          borderRadius: 26, padding: "14px 14px 12px", maxWidth: 560, margin: "0 auto",
-          background: BUBBLE.card,
-          border: `1px solid ${BUBBLE.border}`,
-          boxShadow: BUBBLE.cardShadow,
+          padding: "0 6px", maxWidth: 560, margin: "0 auto",
         }}>
           {/* Sponsors — compact strip on mobile (right rail is desktop-only) */}
           {isMobile && (
@@ -537,91 +475,40 @@ const StartTab = () => {
             </div>
           )}
 
-          {/* Mode selector — 3 pills */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            {(["solo", "group", "blind", "text"] as Mode[]).map((m, idx) => {
-              const meta = modeMeta[m];
-              const Icon = meta.icon;
-              const selected = mode === m;
-              return (
-                <button key={m} onClick={() => setMode(m)}
-                  style={{
-                    flex: 1, height: 54, borderRadius: 18,
-                    background: selected ? `${meta.accent}14` : "rgba(255,159,10,0.04)",
-                    border: selected ? `1.5px solid ${meta.accent}66` : `1px solid ${BUBBLE.border}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                    cursor: "pointer",
-                    transition: "all 0.35s cubic-bezier(0.34,1.56,0.64,1)",
-                    transform: selected ? "translateY(-3px)" : "none",
-                    boxShadow: selected ? `0 8px 20px ${meta.accent}26` : "none",
-                    position: "relative", overflow: "hidden",
-                    animation: `ff-pill-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) ${idx * 0.08}s both`,
-                  }}
-                  onMouseEnter={(e) => { if (!selected) e.currentTarget.style.transform = "translateY(-1px)"; }}
-                  onMouseLeave={(e) => { if (!selected) e.currentTarget.style.transform = "translateY(0)"; }}
-                >
-                  {selected && <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 0%, ${meta.accent}14, transparent 70%)`, pointerEvents: "none" }} />}
-                  <Icon style={{ width: 22, height: 22, opacity: selected ? 1 : 0.4, zIndex: 1, animation: selected ? "ff-icon-bounce 0.5s ease" : "none" }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: selected ? meta.accent : BUBBLE.faint, zIndex: 1, letterSpacing: "0.5px" }}>{meta.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
           {/* Preferences row — gender + region + scholar */}
           <div style={{ display: "flex", gap: 8, marginBottom: 12, justifyContent: "center" }}>
-            {/* Gender pill — collapsed shows 1, tap expands */}
+            {/* Gender — minimal text segments, one tap to switch.
+                Locked tiers dim + open the paywall. */}
             <div style={{
-              height: 42, borderRadius: 21, overflow: "hidden",
+              height: 42, borderRadius: 21,
               background: "rgba(255,159,10,0.06)", border: `1px solid ${BUBBLE.border}`,
-              display: "flex", alignItems: "center",
-              transition: "all 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+              display: "flex", alignItems: "center", padding: 3,
             }}>
-              {genderExpanded ? (
-                [
-                  { id: "both" as Gender, label: "Both", icon: "♀♂" },
-                  { id: "girls" as Gender, label: "Girls", icon: "♀" },
-                  { id: "guys" as Gender, label: "Guys", icon: "♂" },
-                ].map((g) => {
-                  const locked = !canPickGender && g.id !== "both";
-                  return (
+              {([
+                { id: "both" as Gender, label: "Both" },
+                { id: "girls" as Gender, label: "Girls" },
+                { id: "guys" as Gender, label: "Guys" },
+              ]).map((g) => {
+                const locked = !canPickGender && g.id !== "both";
+                const sel = gender === g.id;
+                return (
                   <button key={g.id}
-                    onClick={() => {
-                      if (locked) { setGenderExpanded(false); setPaywall("gender"); return; }
-                      setGender(g.id); setGenderExpanded(false);
-                    }}
+                    onClick={() => { if (locked) { setPaywall("gender"); return; } setGender(g.id); }}
                     style={{
-                      height: "calc(100% - 6px)", border: "none", padding: "0 13px", margin: "3px 2px",
+                      height: "100%", border: "none", padding: "0 10px",
                       borderRadius: 18,
-                      background: gender === g.id ? BUBBLE.card : "transparent",
-                      boxShadow: gender === g.id ? "0 2px 8px rgba(120,72,20,0.10)" : "none",
-                      cursor: "pointer", color: gender === g.id ? BUBBLE.brand : BUBBLE.sub,
-                      fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", transition: "all 0.2s ease",
-                      display: "flex", alignItems: "center", gap: 4,
-                      opacity: locked ? 0.55 : 1,
+                      background: sel ? BUBBLE.card : "transparent",
+                      boxShadow: sel ? "0 2px 8px rgba(120,72,20,0.10)" : "none",
+                      cursor: "pointer", color: sel ? BUBBLE.brand : BUBBLE.sub,
+                      fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", transition: "all 0.2s ease",
+                      display: "flex", alignItems: "center", gap: 3,
+                      opacity: locked ? 0.45 : 1,
                     }}>
-                    <span style={{ fontSize: 13, opacity: 0.7 }}>{g.icon}</span>
                     {g.label}
-                    {locked && <Lock style={{ width: 10, height: 10, color: BUBBLE.brand }} />}
+                    {locked && <Lock style={{ width: 9, height: 9, color: BUBBLE.brand }} />}
                   </button>
-                  );
-                })
-              ) : (
-                <button onClick={() => setGenderExpanded(true)}
-                  style={{
-                    height: "100%", border: "none", padding: "0 16px", background: "transparent",
-                    cursor: "pointer", color: BUBBLE.brand, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-                    display: "flex", alignItems: "center", gap: 6,
-                    transition: "transform 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <span style={{ fontSize: 15, opacity: 0.8 }}>{gender === "both" ? "♀♂" : gender === "girls" ? "♀" : "♂"}</span>
-                  {gender === "both" ? "Both" : gender === "girls" ? "Girls" : "Guys"}
-                  <ChevronRight style={{ width: 13, height: 13, color: BUBBLE.faint, transform: "rotate(90deg)" }} />
-                </button>
-              )}
+                );
+              })}
             </div>
 
             {/* Region */}
@@ -638,8 +525,7 @@ const StartTab = () => {
               }}
             >
               <Globe style={{ width: 15, height: 15 }} />
-              <span style={{ fontSize: 14 }}>{REGIONS.find((r) => r.id === region)?.flag}</span>
-              <span style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis" }}>{REGIONS.find((r) => r.id === region)?.label}</span>
+              <span style={{ maxWidth: 76, overflow: "hidden", textOverflow: "ellipsis" }}>{REGIONS.find((r) => r.id === region)?.label}</span>
             </button>
 
             {/* Scholar */}
@@ -677,38 +563,20 @@ const StartTab = () => {
               <PlusIcon style={{ width: 18, height: 18, color: friendConnected ? "#16a34a" : BUBBLE.brand }} />
             </button>
 
-            {/* Start — GROUP requires a friend first, otherwise normal */}
-            {mode === "group" && !friendConnected ? (
-              <button
-                onClick={openInvite}
-                className="bub-btn bub-btn-ghost"
-                style={{
-                  ...ghostPillStyle,
-                  height: 48, padding: "0 24px",
-                  border: "1.5px solid rgba(255,159,10,0.35)",
-                  color: BUBBLE.brand, fontSize: 15, letterSpacing: "0.2px",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  position: "relative",
-                }}
-              >
-                <PlusIcon style={{ width: 16, height: 16 }} />
-                Invite Friends
-              </button>
-            ) : (
-              <button onClick={startMatch}
-                className="bub-btn bub-btn-primary"
-                style={{
-                  ...ctaStyle,
-                  height: 48, padding: "0 30px",
-                  fontSize: 15, letterSpacing: "0.2px",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  position: "relative",
-                }}
-              >
-                <PlayIcon style={{ width: 16, height: 16 }} />
-                Start Video Chat →
-              </button>
-            )}
+            {/* Start */}
+            <button onClick={startMatch}
+              className="bub-btn bub-btn-primary"
+              style={{
+                ...ctaStyle,
+                height: 48, padding: "0 30px",
+                fontSize: 15, letterSpacing: "0.2px",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                position: "relative",
+              }}
+            >
+              <PlayIcon style={{ width: 16, height: 16 }} />
+              Start Video Chat →
+            </button>
 
             {/* Leave friend — only when connected */}
             {friendConnected && (
@@ -726,11 +594,27 @@ const StartTab = () => {
             )}
           </div>
 
-          {/* Free-tier remaining matches — nudges toward Plus */}
+          {/* Free-tier remaining matches — tick meter + nudge toward Plus */}
           {!isPaid && (
-            <div style={{ textAlign: "center", marginTop: 10, fontSize: 11, fontWeight: 600, color: BUBBLE.faint }}>
+            <div style={{ marginTop: 11, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               {matchesLeft() > 0 ? (
-                <span>{matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: BUBBLE.brand, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button></span>
+                <>
+                  <div style={{ display: "flex", gap: 3 }}>
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: 13, height: 4, borderRadius: 2,
+                          background: i < matchesLeft() ? BUBBLE.brand : "rgba(120,72,20,0.12)",
+                          transition: "background 0.3s ease",
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: BUBBLE.faint }}>
+                    {matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: BUBBLE.brand, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button>
+                  </div>
+                </>
               ) : (
                 <button onClick={() => setPaywall("limit")} style={{ color: "#e11d48", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
                   Out of free matches today — unlock Plus
@@ -740,9 +624,8 @@ const StartTab = () => {
           )}
         </div>
       </div>
-
-      {/* Bottom spacer — larger than the top one so the dock sits just above center */}
-      <div style={{ flex: 1.5, minHeight: 24 }} />
+        </div>
+      </div>
 
       {/* ═══════════════════════════════════════════════════
           SPONSOR BOXES — right rail, desktop only (mobile gets

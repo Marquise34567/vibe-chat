@@ -124,7 +124,7 @@ export const PeerGames = ({ triggerStyle }: { triggerStyle?: React.CSSProperties
     <>
       {/* Trigger — sits in the call controls row */}
       <GlassCircleButton onClick={() => setOpen(true)} aria-label="Play a game" style={triggerStyle}>
-        <Gamepad2 className="w-5 h-5" strokeWidth={2.5} />
+        <span style={{ fontSize: 22, lineHeight: 1 }}>🎮</span>
       </GlassCircleButton>
 
       {/* Incoming invite modal — shows even while the panel is closed */}

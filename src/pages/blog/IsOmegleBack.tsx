@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "../seo/SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, buildArticleSchema } from "../seo/SEOPage";
 import { useEffect } from "react";
 
 const AUTHOR = "Maya Chen";
@@ -32,12 +32,15 @@ const IsOmegleBack = () => {
 
   return (
     <SEOPage
+      variant="article"
+      tag="Explainer"
+      byline={{ author: AUTHOR, role: ROLE, updated: UPDATED }}
+      readTime="5 min read"
       title="Is Omegle Back? (2026 Update)"
       subtitle="No, Omegle is not coming back. Here's what happened, what replaced it, and where to find the best Omegle alternative in 2026."
       faqSchema={faqToJson(faqs)}
       articleSchema={articleSchema}
     >
-      <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
         <H2>No, Omegle is not back — and it's not coming back</H2>

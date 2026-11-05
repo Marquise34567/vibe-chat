@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "../seo/SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, buildArticleSchema } from "../seo/SEOPage";
 import { useEffect } from "react";
 
 const AUTHOR = "Maya Chen";
@@ -32,12 +32,15 @@ const OmegleAlternativeNoSignup = () => {
 
   return (
     <SEOPage
+      variant="article"
+      tag="Guide"
+      byline={{ author: AUTHOR, role: ROLE, updated: UPDATED }}
+      readTime="4 min read"
       title="Omegle Alternative No Signup — Free Video Chat Without Registration"
       subtitle="The best Omegle alternative that doesn't require signup. No email, no account, no download. Pick a name and start chatting instantly — like Omegle, but safer."
       faqSchema={faqToJson(faqs)}
       articleSchema={articleSchema}
     >
-      <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
         <H2>FaceFrenzy is the best Omegle alternative with no signup</H2>

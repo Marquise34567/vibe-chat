@@ -12,7 +12,7 @@ const SEO_ROUTES: Record<string, SeoMeta> = {
     path: "/",
     title: "FaceFrenzy — #1 Omegle Alternative for Random Video Chat",
     description:
-      "FaceFrenzy is the #1 Omegle alternative for random video chat with real people — no bots, no fake profiles. 16+ age gated, AI moderated, one-click start. Talk to strangers worldwide via 1-on-1, group, and blind video chat.",
+      "FaceFrenzy is the #1 Omegle alternative for random video chat with real people — no bots, no fake profiles. 18+ age gated, AI moderated, one-click start. Talk to strangers worldwide via 1-on-1, group, and blind video chat.",
   },
   "/omegle-alternative": {
     path: "/omegle-alternative",
@@ -170,7 +170,89 @@ const SEO_ROUTES: Record<string, SeoMeta> = {
     description:
       "The 10 best random video chat apps in 2026, ranked. Talk to strangers free — most don't even need a download. See why FaceFrenzy ranks #1.",
   },
+  "/random-video-chat-no-sign-up": {
+    path: "/random-video-chat-no-sign-up",
+    title: "Random Video Chat — No Sign Up, No Email, No App | FaceFrenzy",
+    description:
+      "The fastest way to video chat with strangers. No account, no download, no waiting. Tap start and you're live in seconds. Free, AI moderated, 16+.",
+  },
+  "/group-video-chat-strangers": {
+    path: "/group-video-chat-strangers",
+    title: "Group Video Chat with Strangers — Random Group Calls | FaceFrenzy",
+    description:
+      "Why settle for one stranger? FaceFrenzy group mode drops 3-4 random people into one video call. Free, instant, no signup, AI moderated.",
+  },
+  "/blind-date-video-chat": {
+    path: "/blind-date-video-chat",
+    title: "Blind Date Video Chat — Voice First, Reveal at 30 Seconds | FaceFrenzy",
+    description:
+      "A blind date with a stranger, every match. Audio only for 30 seconds — then both cameras reveal at once. Talk first, judge later.",
+  },
+  "/voice-chat-with-strangers": {
+    path: "/voice-chat-with-strangers",
+    title: "Voice Chat with Strangers — Random Audio Chat, Free | FaceFrenzy",
+    description:
+      "No camera? No problem. Voice chat with random people worldwide — anonymous, instant, free. Blind mode keeps it audio-first.",
+  },
+  "/college-video-chat": {
+    path: "/college-video-chat",
+    title: "College Video Chat — Meet Students from Other Universities | FaceFrenzy",
+    description:
+      "Random video chat for students. Meet people from other campuses worldwide, turn on Scholar mode to filter for students, no signup needed.",
+  },
+  "/websites-like-omegle": {
+    path: "/websites-like-omegle",
+    title: "Websites Like Omegle — Random Video Chat Sites That Work in 2026 | FaceFrenzy",
+    description:
+      "Omegle is gone, but the concept lives on. See how the top Omegle-style sites compare on bots, safety, signup, and price — and why FaceFrenzy wins.",
+  },
+  "/cam-to-cam-chat": {
+    path: "/cam-to-cam-chat",
+    title: "Cam to Cam Chat with Strangers — Free & Instant | FaceFrenzy",
+    description:
+      "Real cam-to-cam video chat: your webcam, their webcam, one tap. Peer-to-peer, encrypted, free — no signup, no app.",
+  },
+  // Legacy/alias routes — canonical points at the real page so Google
+  // consolidates these as duplicates instead of indexing thin variants.
+  "/omegle-alternatives": {
+    path: "/best-omegle-alternatives",
+    title: "10 Best Omegle Alternatives in 2026 — Sites Like Omegle, Ranked | FaceFrenzy",
+    description:
+      "The 10 best Omegle alternatives in 2026, ranked. Sites like Omegle that still work — free random video chat, no signup, no bots. See why FaceFrenzy ranks #1.",
+  },
+  "/monkey-app-alternative": {
+    path: "/monkey-app-alternatives",
+    title: "10 Best Monkey App Alternatives in 2026 — No Download Needed | FaceFrenzy",
+    description:
+      "The 10 best Monkey app alternatives in 2026. Random video chat without the download or signup — see why FaceFrenzy is the #1 free Monkey alternative.",
+  },
+  "/chatroulette-alternative": {
+    path: "/best-chatroulette-alternatives",
+    title: "10 Best Chatroulette Alternatives in 2026 — Sites Like Chatroulette | FaceFrenzy",
+    description:
+      "The 10 best Chatroulette alternatives in 2026, ranked. Sites like Chatroulette with real users, no bots, better moderation — see why FaceFrenzy ranks #1.",
+  },
 };
+
+// Client routes that legitimately serve the SPA shell. Anything else gets a
+// real 404 so Google drops junk URLs instead of reporting soft 404s.
+const APP_PATHS = new Set([
+  "/",
+  "/chats",
+  "/moments",
+  "/cards",
+  "/profile",
+  "/app",
+  "/app/chats",
+  "/app/moments",
+  "/app/cards",
+  "/app/profile",
+  "/match",
+  "/plus",
+  "/admin",
+]);
+
+const APP_PREFIXES = ["/chat/"];
 
 // Edge function that serves the SPA index.html with per-route <title>,
 // <meta description>, and <link canonical> injected — so Google sees unique
@@ -182,6 +264,8 @@ export default function handler(req, res) {
   if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
 
   const seo = SEO_ROUTES[path];
+  const isAppPath =
+    APP_PATHS.has(path) || APP_PREFIXES.some((p) => path.startsWith(p));
 
   // Read the built index.html
   let html: string;
@@ -248,5 +332,7 @@ export default function handler(req, res) {
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=300, s-maxage=3600");
-  res.status(200).send(html);
+  // Unknown path → real 404 so Google de-indexes junk instead of
+  // reporting soft 404s. React still renders its NotFound UI.
+  res.status(seo || isAppPath ? 200 : 404).send(html);
 }

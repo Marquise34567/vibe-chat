@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePostHog } from "posthog-js/react";
 import { Shield, ArrowRight, User } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
@@ -9,6 +9,7 @@ import { getDisplayName, setDisplayName, saveLocalProfile, getLocalUser } from "
 import { syncVisitorToSupabase } from "@/lib/identitySync";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
+import { loadSlider, loadPopunder } from "@/lib/videoAd";
 
 /**
  * AgeGate — shown on first visit. Confirms 16+ then asks the user to pick
@@ -16,22 +17,38 @@ import { toast } from "sonner";
  * Locket-style: warm cream canvas, floating stickers, chunky white card.
  */
 export const AgeGate = ({ onDone }: { onDone: () => void }) => {
-  const [step, setStep] = useState<"age" | "name">("age");
+  const [step, setStep] = useState<"age" | "name" | "ad">("age");
   const [name, setName] = useState(getDisplayName() ?? "");
   const [age, setAge] = useState("");
+  const [adLeft, setAdLeft] = useState(6);
   const posthog = usePostHog();
+
+  // Ad step countdown — auto-continue when it hits zero
+  useEffect(() => {
+    if (step !== "ad") return;
+    const t = setInterval(() => setAdLeft((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [step]);
+  useEffect(() => {
+    if (step === "ad" && adLeft <= 0) onDone();
+  }, [adLeft, step, onDone]);
 
   const confirmAge = () => {
     capturePostHogEvent(posthog, "age_confirmed");
     setAgeVerified();
-    if (getDisplayName()) { onDone(); return; }
-    // Zero-friction: auto-assign a fun name (changeable later in profile)
-    // instead of a required name wall — Omegle-parity, one tap and you're in.
-    const auto = getLocalUser().user_metadata.display_name ?? "Fren";
-    setDisplayName(auto);
-    void syncVisitorToSupabase();
-    toast.success(`Welcome, ${auto}!`);
-    onDone();
+    if (!getDisplayName()) {
+      // Zero-friction: auto-assign a fun name (changeable later in profile)
+      // instead of a required name wall — Omegle-parity, one tap and you're in.
+      const auto = getLocalUser().user_metadata.display_name ?? "Fren";
+      setDisplayName(auto);
+      void syncVisitorToSupabase();
+      toast.success(`Welcome, ${auto}!`);
+    }
+    // Route through the ad break before the lobby — slider plays in the
+    // break screen, popunder arms for the next click.
+    loadSlider();
+    loadPopunder();
+    setStep("ad");
   };
 
   const pickName = () => {
@@ -39,8 +56,8 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
     if (!trimmed) { toast.error("Pick a name to show when matching"); return; }
     if (trimmed.length > 20) { toast.error("Keep it under 20 characters"); return; }
     const parsedAge = age.trim() ? parseInt(age.trim(), 10) : null;
-    if (parsedAge != null && (!Number.isFinite(parsedAge) || parsedAge < 16 || parsedAge > 99)) {
-      toast.error("Enter a valid age (16+)"); return;
+    if (parsedAge != null && (!Number.isFinite(parsedAge) || parsedAge < 18 || parsedAge > 99)) {
+      toast.error("Enter a valid age (18+)"); return;
     }
     capturePostHogEvent(posthog, "profile_created");
     setDisplayName(trimmed);
@@ -114,9 +131,9 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
               <Shield style={{ width: 20, height: 20, color: BUBBLE.brand, flexShrink: 0, marginTop: 2 }} strokeWidth={2.5} />
               <div style={{ fontSize: 13 }}>
-                <div style={{ fontWeight: 800, marginBottom: 6, color: BUBBLE.ink }}>Before you enter:</div>
+                <div style={{ fontWeight: 800, marginBottom: 6, color: BUBBLE.ink }}>By continuing you agree to our Terms:</div>
                 <ul style={{ color: BUBBLE.sub, fontWeight: 600, lineHeight: 1.7, listStyle: "disc", paddingLeft: 18 }}>
-                  <li>You must be <strong style={{ color: BUBBLE.ink }}>16 years or older</strong></li>
+                  <li>You must be <strong style={{ color: BUBBLE.ink }}>18 years or older</strong></li>
                   <li>You'll be matched with <strong style={{ color: BUBBLE.ink }}>real people</strong>, not bots</li>
                   <li>No fake profiles, no creeps</li>
                   <li>Be respectful — AI moderation is active</li>
@@ -130,13 +147,56 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
             className="bub-btn"
             style={ctaStyleLocal}
           >
-            I'm 16 or older <ArrowRight style={{ width: 20, height: 20 }} strokeWidth={2.5} />
+            I agree — I'm 18 or older <ArrowRight style={{ width: 20, height: 20 }} strokeWidth={2.5} />
           </button>
+          <p style={{ marginTop: 12, fontSize: 11, fontWeight: 600, color: BUBBLE.faint, lineHeight: 1.5 }}>
+            By continuing you accept the <a href="/safety" style={{ color: BUBBLE.sub, fontWeight: 700 }}>Terms & Conditions</a> and confirm you're 18+.
+          </p>
           <button
             onClick={() => { setAgeVerified(); onDone(); }}
-            style={{ marginTop: 12, fontSize: 12, fontWeight: 700, color: BUBBLE.faint, background: "none", border: "none", cursor: "pointer" }}
+            style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: BUBBLE.faint, background: "none", border: "none", cursor: "pointer" }}
           >
-            I'm not 16 yet — exit
+            I'm not 18 yet — exit
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Ad break — shown between the age confirm and the lobby. The video
+  // slider loads while a short countdown keeps the screen up.
+  if (step === "ad") {
+    return (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+        style={{ background: BUBBLE.bg, color: BUBBLE.ink }}
+      >
+        <FloatingStickers />
+        <div className="animate-pop-in" style={cardStyle}>
+          <div style={{ fontSize: 44, marginBottom: 10 }}>📺</div>
+          <h1 style={{ fontFamily: '"Baloo 2", "Nunito", sans-serif', fontSize: 24, fontWeight: 800, letterSpacing: "-0.5px", marginBottom: 6 }}>
+            one quick ad
+          </h1>
+          <p style={{ color: BUBBLE.sub, fontWeight: 600, fontSize: 14, marginBottom: 22 }}>
+            keeps facefrenzy free for everyone
+          </p>
+          <div
+            style={{
+              width: 52, height: 52, margin: "0 auto 18px", borderRadius: "50%",
+              border: `3px solid ${BUBBLE.brand}`, borderTopColor: "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              animation: "ff-icon-bounce 0.5s ease",
+            }}
+          >
+            <span style={{ fontSize: 18, fontWeight: 900, color: BUBBLE.brand, fontVariantNumeric: "tabular-nums" }}>{Math.max(adLeft, 0)}</span>
+          </div>
+          <button
+            onClick={onDone}
+            disabled={adLeft > 3}
+            className="bub-btn"
+            style={{ ...ctaStyleLocal, opacity: adLeft > 3 ? 0.45 : 1 }}
+          >
+            {adLeft > 3 ? `Continue in ${adLeft - 3}s` : "Skip ad →"}
           </button>
         </div>
       </div>
@@ -184,7 +244,7 @@ export const AgeGate = ({ onDone }: { onDone: () => void }) => {
             value={age}
             onChange={(e) => setAge(e.target.value)}
             placeholder="Your age (optional)"
-            min={16}
+            min={18}
             max={99}
             className="input-glass text-center"
             style={{ fontSize: 15, fontWeight: 700 }}

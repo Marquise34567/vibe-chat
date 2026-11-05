@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "../seo/SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, buildArticleSchema } from "../seo/SEOPage";
 import { useEffect } from "react";
 
 const AUTHOR = "Maya Chen";
@@ -33,12 +33,15 @@ const WhatHappenedToOmegle = () => {
 
   return (
     <SEOPage
+      variant="article"
+      tag="Explainer"
+      byline={{ author: AUTHOR, role: ROLE, updated: UPDATED }}
+      readTime="5 min read"
       title="What Happened to Omegle?"
       subtitle="Omegle shut down permanently on November 8, 2023. Here's the full story of why it closed, what happened to its 28 million users, and what replaced it in 2026."
       faqSchema={faqToJson(faqs)}
       articleSchema={articleSchema}
     >
-      <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
         <H2>The short answer: Omegle shut down November 8, 2023</H2>

@@ -25,8 +25,12 @@ const makeVSPage = (data: VSData) => {
 
     return (
       <SEOPage
+        variant="article"
+        tag="Comparison"
         title={data.title}
         subtitle={data.subtitle}
+        byline={{ author: "FaceFrenzy Team", role: "Editorial", updated: "November 2026" }}
+        readTime="4 min read"
         faqSchema={faqToJson(data.faqs)}
       >
         <Section>

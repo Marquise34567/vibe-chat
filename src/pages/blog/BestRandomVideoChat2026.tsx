@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "../seo/SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, buildArticleSchema } from "../seo/SEOPage";
 import { useEffect } from "react";
 
 const AUTHOR = "Maya Chen";
@@ -32,12 +32,15 @@ const BestRandomVideoChat2026 = () => {
 
   return (
     <SEOPage
+      variant="article"
+      tag="Roundup"
+      byline={{ author: AUTHOR, role: ROLE, updated: UPDATED }}
+      readTime="7 min read"
       title="Best Random Video Chat Sites in 2026"
       subtitle="Ranked by safety, features, and real-user experience. Industry data from Q1 2026, head-to-head comparison, and why FaceFrenzy ranks #1."
       faqSchema={faqToJson(faqs)}
       articleSchema={articleSchema}
     >
-      <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
         <H2>The best random video chat site in 2026 is FaceFrenzy</H2>

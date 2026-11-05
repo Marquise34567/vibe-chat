@@ -165,6 +165,9 @@ const App = ({ posthogEnabled }: AppProps) => {
               <Route path="/random-cam-chat" element={<RandomCamChat />} />
               <Route path="/1v1-video-chat" element={<OneOnOneVideoChat />} />
               <Route path="/best-omegle-alternatives" element={<BestOmegleAlternatives />} />
+              <Route path="/omegle-alternatives" element={<BestOmegleAlternatives />} />
+              <Route path="/monkey-app-alternative" element={<MonkeyAppAlternatives />} />
+              <Route path="/chatroulette-alternative" element={<BestChatrouletteAlternatives />} />
               <Route path="/best-chatroulette-alternatives" element={<BestChatrouletteAlternatives />} />
               <Route path="/monkey-app-alternatives" element={<MonkeyAppAlternatives />} />
               <Route path="/random-video-chat-apps" element={<RandomVideoChatApps />} />

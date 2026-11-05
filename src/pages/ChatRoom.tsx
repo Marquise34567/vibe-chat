@@ -12,6 +12,8 @@ import { gradientFor, initialFor, GIFTS } from "@/lib/config";
 import { sendGift as sendGiftDb } from "@/lib/supabaseQueries";
 import { SOCIAL_PLATFORMS, formatSocialUrl } from "@/lib/socialLinks";
 import { BUBBLE, chipStyle } from "@/lib/bubble";
+import { matchesLeft } from "@/lib/limits";
+import { loadSlider, loadAdsterra } from "@/lib/videoAd";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { PeerGames } from "@/components/games/PeerGames";
 import { AttentionCheck } from "@/components/AttentionCheck";
@@ -19,7 +21,6 @@ import { useAttentionTracking } from "@/hooks/useAttentionTracking";
 
 import { toast } from "sonner";
 import {
-  MicIcon as Mic, MicOffIcon as MicOff, CameraIcon as Video, CameraOffIcon as VideoOff,
   SkipIcon as SkipForward, HeartIcon as Heart, FlagIcon as Flag, ExitIcon as ArrowLeft,
   SparkleIcon as Sparkles, TranslateIcon as Languages, RewindIcon as Rewind, LockIcon as Lock,
   GiftIcon as Gift, CoinsIcon as Coins,
@@ -120,7 +121,6 @@ const ChatRoom = () => {
       }
     : null;
 
-  const [muted, setMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
   const [hdOn, setHdOn] = useState(false);
   const [translateOn, setTranslateOn] = useState(false);
@@ -239,6 +239,7 @@ const ChatRoom = () => {
   }, [translateOn, hasRemoteVideo]);
 
   const handleSkip = (auto = false) => {
+    loadSlider(); // skip = constant churn — HillTopAds slot
     if (skipping) return; // prevent double-skip during delay
     if (!auto) capturePostHogEvent(posthog, "chat_skipped", { match_mode: mode });
     if (otherId) { lastSkippedRef.current = otherId; setLastSkipped(otherId); addRecentlySeen(otherId); }
@@ -254,10 +255,17 @@ const ChatRoom = () => {
 
   const handleExtend = () => {
     if (extendRequested) return; // already requested
+    loadSlider(); // wants to keep talking = peak engagement — slider slot
     setExtendRequested(true);
     requestExtend();
     toast("Extend requested — waiting for their answer…");
   };
+
+  // ── Repeat matcher (≥2 free matches used today) — monetize engaged users ──
+  useEffect(() => {
+    if (matchesLeft() <= 8) loadAdsterra();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Partner accepted the extend request ──
   useEffect(() => {
@@ -325,6 +333,7 @@ const ChatRoom = () => {
   };
 
   const handleExit = () => {
+    loadAdsterra(); // leaving = natural break — Adsterra slot
     connDisconnect();
     navigate("/");
   };
@@ -397,7 +406,7 @@ const ChatRoom = () => {
             placeholder="Say something…"
             autoFocus
             maxLength={500}
-            style={{ flex: 1, height: 44, borderRadius: 22, border: `1px solid ${BUBBLE.border}`, background: "#fff", padding: "0 16px", fontSize: 14, fontWeight: 600, color: BUBBLE.ink, outline: "none" }}
+            style={{ flex: 1, height: 44, borderRadius: 22, border: `1px solid ${BUBBLE.border}`, background: BUBBLE.card, padding: "0 16px", fontSize: 14, fontWeight: 600, color: BUBBLE.ink, outline: "none" }}
           />
           <button
             onClick={sendMsg}
@@ -414,22 +423,68 @@ const ChatRoom = () => {
       {/* Hidden canvas for attention tracking (reads frames from the pip webcam video) */}
       <canvas ref={canvasRef} width={160} height={120} className="hidden" />
 
-      {/* Top bar — padded below the notch/status bar */}
-      <div className="px-4 pb-2 flex items-center justify-between" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
+      {/* Top bar — Exit | countdown | status chips */}
+      <div className="px-4 pb-2 flex items-center justify-between" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)", position: "relative", minHeight: 44 }}>
         <button
           onClick={handleExit}
-          className="bub-btn bub-btn-ghost text-sm font-semibold flex items-center gap-1.5"
+          className="bub-btn text-sm font-semibold flex items-center gap-1.5"
           style={{ ...chipStyle, padding: "7px 14px", color: BUBBLE.ink }}
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={2.5} /> Exit
         </button>
+
+        {/* Center countdown — ome.tv-style clock at top center */}
+        <div
+          style={{
+            position: "absolute", left: "50%", transform: "translateX(-50%)",
+            display: "flex", alignItems: "center", gap: 8,
+          }}
+        >
+          <div
+            style={{
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "7px 15px", borderRadius: 999,
+              background: BUBBLE.card,
+              border: `1px solid ${extended ? "rgba(34,197,94,0.4)" : BUBBLE.border}`,
+              boxShadow: "inset 0 -2px 0 rgba(120,72,20,0.05), 0 2px 8px rgba(120,72,20,0.06)",
+            }}
+          >
+            {extended ? (
+              <span className="text-sm font-bold flex items-center gap-1" style={{ color: BUBBLE.green }}>
+                <Heart className="w-4 h-4" strokeWidth={2.5} /> Extended
+              </span>
+            ) : (
+              <span style={{ fontSize: 17, fontWeight: 900, color: remaining <= 5 ? "#FF5C5C" : BUBBLE.ink, fontVariantNumeric: "tabular-nums", letterSpacing: "0.5px" }}>
+                {String(Math.floor(remaining / 60)).padStart(2, "0")}:{String(remaining % 60).padStart(2, "0")}
+              </span>
+            )}
+          </div>
+          {!extended && !extendRequested && !(isBlind && !blindRevealed) && (
+            <button
+              onClick={handleExtend}
+              className="bub-btn"
+              style={{
+                padding: "7px 13px", borderRadius: 999,
+                background: BUBBLE.brandSoft, border: "1px solid rgba(255,159,10,0.40)",
+                color: BUBBLE.brand, fontSize: 11, fontWeight: 800, cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+              }}
+            >
+              <Plus className="w-3 h-3" strokeWidth={2.5} /> Extend
+            </button>
+          )}
+          {extendRequested && !extended && (
+            <span style={{ ...chipStyle, padding: "7px 12px", fontSize: 11, color: BUBBLE.faint }} className="animate-pulse">waiting…</span>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
-          <span style={{ ...chipStyle, gap: 6, padding: "5px 12px", fontSize: 11, color: "#dc2626", border: "1px solid rgba(220,38,38,0.25)", background: "rgba(220,38,38,0.07)" }}><span className="live-dot" /> LIVE</span>
-          {hdOn && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: BUBBLE.brand, border: "1px solid rgba(255,159,10,0.3)", background: BUBBLE.brandSoft }}>HD</span>}
+          <span style={{ ...chipStyle, gap: 6, padding: "5px 12px", fontSize: 11, color: "#FF5C5C", border: "1px solid rgba(255,92,92,0.30)", background: "rgba(255,92,92,0.10)" }}><span className="live-dot" /> LIVE</span>
+          {hdOn && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: BUBBLE.brand, border: "1px solid rgba(255,159,10,0.35)", background: BUBBLE.brandSoft }}>HD</span>}
           {isGroup && <span style={{ ...chipStyle, gap: 5, padding: "5px 12px", fontSize: 11 }}><Users className="w-3 h-3" strokeWidth={2.5} /> Group</span>}
-          {isBlind && !blindRevealed && <span style={{ ...chipStyle, gap: 5, padding: "5px 12px", fontSize: 11, color: BUBBLE.pink, border: "1px solid rgba(255,77,141,0.3)", background: "rgba(255,77,141,0.07)" }}><EyeOff className="w-3 h-3" strokeWidth={2.5} /> Blind</span>}
-          {attentionState === "idle" && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: "#D97706", border: "1px solid rgba(217,119,6,0.3)", background: "rgba(245,158,11,0.10)" }}>idle</span>}
-          {attentionState === "away" && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: "#e11d48", border: "1px solid rgba(225,29,72,0.3)", background: "rgba(225,29,72,0.08)" }}>away</span>}
+          {isBlind && !blindRevealed && <span style={{ ...chipStyle, gap: 5, padding: "5px 12px", fontSize: 11, color: BUBBLE.pink, border: "1px solid rgba(255,77,141,0.35)", background: "rgba(255,77,141,0.10)" }}><EyeOff className="w-3 h-3" strokeWidth={2.5} /> Blind</span>}
+          {attentionState === "idle" && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: "#F5B400", border: "1px solid rgba(245,180,0,0.35)", background: "rgba(245,180,0,0.10)" }}>idle</span>}
+          {attentionState === "away" && <span style={{ ...chipStyle, padding: "5px 12px", fontSize: 11, color: "#FF5C5C", border: "1px solid rgba(255,92,92,0.35)", background: "rgba(255,92,92,0.10)" }}>away</span>}
         </div>
       </div>
 
@@ -443,29 +498,29 @@ const ChatRoom = () => {
         <>
           {/* Blind date: audio-only mode */}
           {isBlind && !blindRevealed ? (
-            <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-600 to-rose-500" />
+            <div className="relative flex-1 min-h-0 overflow-hidden" style={{ borderRadius: 24, border: `4px solid ${BUBBLE.card}`, boxShadow: BUBBLE.cardShadow }}>
+              <div className="absolute inset-0" style={{ background: "linear-gradient(160deg, #FFE8CC 0%, #FFE3EC 55%, #FFF0D6 100%)" }} />
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
                 <div className={`text-8xl mb-4 transition-all duration-500 ${balloonPopped ? "scale-0 opacity-0" : "animate-float"}`}>
                   🎈
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Blind Date</h2>
-                <p className="text-white/80 mb-4">Audio only — get to know them first!</p>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: BUBBLE.ink }}>Blind Date</h2>
+                <p className="mb-4" style={{ color: BUBBLE.sub }}>Audio only — get to know them first!</p>
                 <div style={{ ...chipStyle, padding: "12px 24px", marginBottom: 16 }}>
                   <span style={{ fontSize: 30, fontWeight: 900, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{blindCountdown}</span>
                   <span style={{ fontSize: 14, color: BUBBLE.sub, fontWeight: 700, marginLeft: 4 }}>sec until reveal</span>
                 </div>
                 <div className="flex items-end gap-1 h-12">
                   {[...Array(7)].map((_, i) => (
-                    <div key={i} className="w-1.5 bg-white/60 rounded-full animate-wave" style={{ animationDelay: `${i * 0.1}s`, height: "100%" }} />
+                    <div key={i} className="w-1.5 rounded-full animate-wave" style={{ animationDelay: `${i * 0.1}s`, height: "100%", background: "rgba(255,77,141,0.45)" }} />
                   ))}
                 </div>
-                <p className="text-white/60 text-xs mt-4">Cameras reveal when the balloon pops 🎉</p>
+                <p className="text-xs mt-4" style={{ color: BUBBLE.faint }}>Cameras reveal when the balloon pops 🎉</p>
               </div>
             </div>
           ) : (
             /* ── Tile layout based on participant count ── */
-            <div className="relative flex-1 min-h-0 flex flex-col">
+            <div className="relative flex-1 min-h-0 flex flex-col md:px-4">
               <VideoTileLayout
                 mode={mode}
                 groupSize={parseInt(params.get("groupSize") ?? "2", 10) || 2}
@@ -498,41 +553,9 @@ const ChatRoom = () => {
             </div>
           )}
 
-          {/* Timer — below the video tiles */}
-          {(
-            <div className="flex items-center justify-center">
-              <div style={{ ...chipStyle, padding: "8px 18px", gap: 8, display: "inline-flex", alignItems: "center" }}>
-                {extended ? (
-                  <span className="text-sm font-bold text-emerald-600 flex items-center gap-1">
-                    <Heart className="w-4 h-4" strokeWidth={2.5} /> Extended
-                  </span>
-                ) : (
-                  <>
-                    <span style={{ fontSize: 24, fontWeight: 900, color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>{remaining}</span>
-                    <span style={{ fontSize: 12, color: BUBBLE.faint, fontWeight: 700 }}>sec</span>
-                    {!extendRequested && (
-                      <button
-                        onClick={handleExtend}
-                        className="bub-btn bub-btn-ghost"
-                        style={{
-                          marginLeft: 4, padding: "6px 14px", borderRadius: 999,
-                          background: BUBBLE.brandSoft, border: "1px solid rgba(255,159,10,0.35)",
-                          color: BUBBLE.brand, fontSize: 12, fontWeight: 800, cursor: "pointer",
-                          display: "inline-flex", alignItems: "center", gap: 4,
-                        }}
-                      >
-                        <Plus className="w-3 h-3" strokeWidth={2.5} /> Extend
-                      </button>
-                    )}
-                    {extendRequested && <span style={{ fontSize: 12, color: BUBBLE.faint, fontWeight: 700 }} className="animate-pulse">waiting…</span>}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
         </>
 
-        {/* Controls bar — Mic, Camera, Games, Skip */}
+        {/* Controls bar — Games, Skip */}
         <div
           className="p-3 flex items-center justify-center gap-3 md:gap-4"
           style={{
@@ -542,17 +565,9 @@ const ChatRoom = () => {
             boxShadow: BUBBLE.cardShadow,
           }}
         >
-          <CallBtn onClick={() => setMuted((m) => !m)} off={muted} aria-label="Mic">
-            {muted ? <MicOff className="w-5 h-5" strokeWidth={2.5} /> : <Mic className="w-5 h-5" strokeWidth={2.5} />}
-          </CallBtn>
-          {(!isBlind || blindRevealed) && (
-            <CallBtn onClick={() => setCamOff((v) => !v)} off={camOff} aria-label="Camera">
-              {camOff ? <VideoOff className="w-5 h-5" strokeWidth={2.5} /> : <Video className="w-5 h-5" strokeWidth={2.5} />}
-            </CallBtn>
-          )}
           <PeerGames triggerStyle={callTriggerStyle} />
-          <CallBtn onClick={() => handleSkip()} size="lg" primary aria-label="Skip">
-            <SkipForward className="w-6 h-6" strokeWidth={2.5} />
+          <CallBtn onClick={() => handleSkip()} size="lg" primary aria-label="Next person">
+            <span style={{ fontSize: 26, lineHeight: 1 }}>⏭️</span>
           </CallBtn>
         </div>
 
@@ -574,7 +589,7 @@ const ChatRoom = () => {
                 <div className="p-4 flex flex-col items-center gap-1" style={{ borderRadius: 18, background: "rgba(255,159,10,0.04)", border: `1px solid ${BUBBLE.border}` }}>
                   <span className="text-4xl">{g.emoji}</span>
                   <span className="text-xs font-bold" style={{ color: BUBBLE.ink }}>{g.name}</span>
-                  <span className="text-xs font-bold flex items-center gap-0.5" style={{ color: "#D97706" }}>
+                  <span className="text-xs font-bold flex items-center gap-0.5" style={{ color: BUBBLE.brand }}>
                     <Coins className="w-3 h-3" strokeWidth={2.5} /> {g.cost}
                   </span>
                 </div>
@@ -654,8 +669,13 @@ const ChatRoom = () => {
             <SkipForward style={{ width: 28, height: 28, color: BUBBLE.brand }} />
           </div>
           <span style={{ fontSize: 18, fontWeight: 800, color: BUBBLE.ink }}>Finding someone new…</span>
-          <div style={{ width: 120, height: 4, borderRadius: 2, background: "rgba(255,159,10,0.15)", overflow: "hidden" }}>
-            <div style={{ width: "100%", height: "100%", background: BUBBLE.brand, animation: "ff-shimmer 1.2s ease-in-out" }} />
+          <div style={{ width: 140, height: 5, borderRadius: 3, background: "rgba(255,159,10,0.15)", overflow: "hidden" }}>
+            <div style={{
+              width: "100%", height: "100%",
+              background: "linear-gradient(90deg, transparent 0%, #FF9F0A 45%, #FFB340 50%, #FF9F0A 55%, transparent 100%)",
+              backgroundSize: "200% 100%",
+              animation: "ff-shimmer 1.1s linear infinite",
+            }} />
           </div>
         </div>
       )}
@@ -677,8 +697,8 @@ const ChatRoom = () => {
           }}>
             <div style={{
               width: 64, height: 64, borderRadius: 32,
-              background: "linear-gradient(135deg, rgba(255,77,141,0.14), rgba(255,159,10,0.14))",
-              border: "1px solid rgba(255,77,141,0.3)",
+              background: "linear-gradient(135deg, rgba(255,77,141,0.16), rgba(255,159,10,0.16))",
+              border: "1px solid rgba(255,77,141,0.35)",
               display: "flex", alignItems: "center", justifyContent: "center",
               animation: "ff-core-pulse 1.5s ease-in-out infinite",
             }}>
@@ -692,7 +712,7 @@ const ChatRoom = () => {
             </div>
             <div style={{ display: "flex", gap: 10, width: "100%" }}>
               <button onClick={declineExtend}
-                className="bub-btn bub-btn-ghost"
+                className="bub-btn"
                 style={{
                   flex: 1, height: 48, borderRadius: 999,
                   background: "rgba(255,159,10,0.05)", border: `1px solid ${BUBBLE.border}`,
@@ -788,14 +808,10 @@ const VideoTileLayout = ({
   // Responsive layout via Tailwind classes — no JS viewport detection needed.
   // Mobile (portrait): tiles stack top/bottom (flex-col).
   // Desktop (md+):     tiles sit side-by-side (flex-row), original behavior.
+  // Arena style: separated rounded panels.
   const containerClass =
-    "relative flex-1 min-h-0 overflow-hidden flex flex-col md:flex-row gap-0.5 items-stretch";
-  const containerStyle: React.CSSProperties = {
-    background: "#FFFFFF",
-    borderRadius: 26,
-    border: `4px solid ${BUBBLE.card}`,
-    boxShadow: BUBBLE.cardShadow,
-  };
+    "relative flex-1 min-h-0 flex flex-col md:flex-row gap-2.5 md:gap-[14px] items-stretch md:flex-none md:self-center w-full md:max-w-[1060px] md:h-[min(76vh,680px)]";
+  const containerStyle: React.CSSProperties = {};
 
   if (participantCount === 2) {
     // ── 2 people: 50/50 split — top/bottom on mobile, left/right on desktop ──
@@ -805,6 +821,7 @@ const VideoTileLayout = ({
         <div className="h-1/2 md:h-auto md:w-1/2 relative">
           <VideoTile person={otherPerson} gradientSeed={otherId ?? "x"} remoteVideoRef={remoteVideoRef} translateOn={translateOn} caption={caption} onSocials={onSocials} />
         </div>
+
         {/* You */}
         <div className="h-1/2 md:h-auto md:w-1/2 relative">
           <VideoTile person={you} camOff={camOff} pipVideoRef={pipVideoRef} pipStatus={pipStatus} />
@@ -823,8 +840,9 @@ const VideoTileLayout = ({
         <div className="h-1/2 md:h-auto md:w-1/2 relative">
           <VideoTile person={otherPerson} gradientSeed={otherId ?? "x"} remoteVideoRef={remoteVideoRef} translateOn={translateOn} caption={caption} onSocials={onSocials} />
         </div>
+
         {/* You + friend side by side */}
-        <div className="h-1/2 md:h-auto md:w-1/2 flex gap-0.5">
+        <div className="h-1/2 md:h-auto md:w-1/2 flex gap-2.5">
           <div className="w-1/2 relative">
             <VideoTile person={you} camOff={camOff} pipVideoRef={pipVideoRef} pipStatus={pipStatus} />
           </div>
@@ -843,7 +861,7 @@ const VideoTileLayout = ({
   return (
     <div className={containerClass} style={containerStyle}>
       {/* Stranger's team: stranger + their friend */}
-      <div className="h-1/2 md:h-auto md:w-1/2 flex flex-row md:flex-col gap-0.5">
+      <div className="h-1/2 md:h-auto md:w-1/2 flex flex-row md:flex-col gap-2.5">
         <div className="w-1/2 md:w-auto md:h-1/2 relative">
           <VideoTile person={otherPerson} gradientSeed={otherId ?? "x"} remoteVideoRef={remoteVideoRef} translateOn={translateOn} caption={caption} onSocials={onSocials} />
         </div>
@@ -851,8 +869,9 @@ const VideoTileLayout = ({
           <VideoTile person={{ id: "stranger-friend", name: "Their Friend", isFriend: true }} gradientSeed="stranger-friend" />
         </div>
       </div>
+
       {/* Your team: you + your friend */}
-      <div className="h-1/2 md:h-auto md:w-1/2 flex flex-row md:flex-col gap-0.5">
+      <div className="h-1/2 md:h-auto md:w-1/2 flex flex-row md:flex-col gap-2.5">
         <div className="w-1/2 md:w-auto md:h-1/2 relative">
           <VideoTile person={you} camOff={camOff} pipVideoRef={pipVideoRef} pipStatus={pipStatus} />
         </div>
@@ -900,13 +919,24 @@ const VideoTile = ({
   }, [remoteVideoRef]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        borderRadius: 24,
+        background: "#1C1712",
+        border: `4px solid ${BUBBLE.card}`,
+        boxShadow: BUBBLE.cardShadow,
+      }}
+    >
       {/* Background */}
       {person.isYou ? (
         camOff ? (
           <>
-            <div className="absolute inset-0 bg-gradient-to-br from-accent to-secondary" />
-            <div className="absolute inset-0 flex items-center justify-center text-white/90 text-sm font-semibold">📷 cam off</div>
+            <div className="absolute inset-0" style={{ background: "#B5B1A8" }} />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <span style={{ fontSize: 34 }}>📷</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(46,36,24,0.55)" }}>cam off</span>
+            </div>
           </>
         ) : (
           <>
@@ -921,8 +951,9 @@ const VideoTile = ({
               style={{ transform: "scaleX(-1)", objectPosition: "center top" }}
             />
             {pipStatus !== "active" && (
-              <div className="absolute inset-0 bg-gradient-to-br from-accent to-secondary flex items-center justify-center">
-                <span className="text-white/90 text-sm font-semibold">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: "#B5B1A8" }}>
+                <span style={{ fontSize: 34 }}>📷</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(46,36,24,0.55)" }}>
                   Starting camera…
                 </span>
               </div>
@@ -943,17 +974,18 @@ const VideoTile = ({
               style={{ objectPosition: "center top" }}
             />
           )}
-          {/* Fallback gradient + initial — shown when no remote stream */}
+          {/* Fallback — warm gray box like the lobby, shown when no remote stream */}
           {!hasRemote && (
             <>
-              <div className={`absolute inset-0 bg-gradient-to-br ${grad}`} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
+              <div className="absolute inset-0" style={{ background: "#B5B1A8" }} />
               {person.avatarUrl && (
                 <img src={person.avatarUrl} alt={person.name} className="absolute inset-0 w-full h-full object-cover" />
               )}
               {!person.avatarUrl && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-white/90 text-5xl font-bold drop-shadow-lg">{initial}</span>
+                  <div style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,255,255,0.55)", border: `3px solid ${BUBBLE.card}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 30, fontWeight: 800, color: "rgba(46,36,24,0.55)" }}>{initial}</span>
+                  </div>
                 </div>
               )}
             </>
@@ -1015,7 +1047,7 @@ const VideoTile = ({
 };
 
 /* ════════════════════════════════════════════════════════════════
-   CallBtn — white bubbly circle button for the call controls.
+   CallBtn — dark glass circle button for the call controls.
    `off` = the feature is disabled (pink tint). `primary` = gradient.
    ════════════════════════════════════════════════════════════════ */
 const CallBtn = ({
@@ -1036,11 +1068,11 @@ const CallBtn = ({
   return (
     <button
       onClick={onClick}
-      className={`bub-btn ${primary ? "bub-btn-primary" : "bub-btn-ghost"}`}
+      className={`bub-btn ${primary ? "bub-btn-primary" : ""}`}
       style={{
         width: dim, height: dim, borderRadius: dim / 2, flexShrink: 0,
-        background: primary ? BUBBLE.grad : off ? "rgba(255,77,141,0.10)" : BUBBLE.card,
-        border: primary ? "none" : off ? "1.5px solid rgba(255,77,141,0.35)" : `1px solid ${BUBBLE.border}`,
+        background: primary ? BUBBLE.grad : off ? "rgba(255,77,141,0.14)" : BUBBLE.card,
+        border: primary ? "none" : off ? "1.5px solid rgba(255,77,141,0.40)" : `1px solid ${BUBBLE.border}`,
         color: primary ? "#fff" : off ? BUBBLE.pink : BUBBLE.ink,
         display: "flex", alignItems: "center", justifyContent: "center",
         cursor: "pointer",
@@ -1058,11 +1090,11 @@ const callTriggerStyle: React.CSSProperties = {
   background: BUBBLE.card,
   border: `1px solid ${BUBBLE.border}`,
   color: BUBBLE.ink,
-  boxShadow: "0 3px 12px rgba(120,72,20,0.08)",
+  boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
 };
 
 /* ════════════════════════════════════════════════════════════════
-   BubbleSheet — light bottom sheet for in-call popups.
+   BubbleSheet — dark bottom sheet for in-call popups.
    ════════════════════════════════════════════════════════════════ */
 const BubbleSheet = ({
   open,

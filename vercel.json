@@ -3,36 +3,16 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
+  "redirects": [
+    { "source": "/omegle-alternatives", "destination": "/best-omegle-alternatives", "permanent": true },
+    { "source": "/monkey-app-alternative", "destination": "/monkey-app-alternatives", "permanent": true },
+    { "source": "/chatroulette-alternative", "destination": "/best-chatroulette-alternatives", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/sitemap-pages.xml", "destination": "/api/sitemap" },
     { "source": "/robots.txt", "destination": "/api/robots" },
-    { "source": "/omegle-alternative", "destination": "/api/ssr" },
-    { "source": "/talk-to-strangers", "destination": "/api/ssr" },
-    { "source": "/safety", "destination": "/api/ssr" },
-    { "source": "/vs/ometv", "destination": "/api/ssr" },
-    { "source": "/vs/emerald-chat", "destination": "/api/ssr" },
-    { "source": "/vs/chatroulette", "destination": "/api/ssr" },
-    { "source": "/vs/monkey", "destination": "/api/ssr" },
-    { "source": "/vs/bazoocam", "destination": "/api/ssr" },
-    { "source": "/vs/chatspin", "destination": "/api/ssr" },
-    { "source": "/vs/chatrandom", "destination": "/api/ssr" },
-    { "source": "/vs/shagle", "destination": "/api/ssr" },
-    { "source": "/vs/camsurf", "destination": "/api/ssr" },
-    { "source": "/vs/joingy", "destination": "/api/ssr" },
-    { "source": "/free-omegle-alternative", "destination": "/api/ssr" },
-    { "source": "/anonymous-video-chat", "destination": "/api/ssr" },
-    { "source": "/random-cam-chat", "destination": "/api/ssr" },
-    { "source": "/1v1-video-chat", "destination": "/api/ssr" },
-    { "source": "/best-omegle-alternatives", "destination": "/api/ssr" },
-    { "source": "/best-chatroulette-alternatives", "destination": "/api/ssr" },
-    { "source": "/monkey-app-alternatives", "destination": "/api/ssr" },
-    { "source": "/random-video-chat-apps", "destination": "/api/ssr" },
-    { "source": "/blog/is-omegle-back", "destination": "/api/ssr" },
-    { "source": "/blog/what-happened-to-omegle", "destination": "/api/ssr" },
-    { "source": "/blog/best-random-video-chat-2026", "destination": "/api/ssr" },
-    { "source": "/blog/how-to-stay-safe", "destination": "/api/ssr" },
-    { "source": "/blog/omegle-alternative-no-signup", "destination": "/api/ssr" },
-    { "source": "/((?!llms.txt|facefrenzy2026.txt).*)", "destination": "/" }
+    { "source": "/((?!llms.txt|facefrenzy2026.txt).*)", "destination": "/api/ssr" }
   ],
   "headers": [
     {

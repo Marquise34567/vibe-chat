@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "../seo/SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, buildArticleSchema } from "../seo/SEOPage";
 import { useEffect } from "react";
 
 const AUTHOR = "Maya Chen";
@@ -32,12 +32,15 @@ const HowToStaySafe = () => {
 
   return (
     <SEOPage
+      variant="article"
+      tag="Guide"
+      byline={{ author: AUTHOR, role: ROLE, updated: UPDATED }}
+      readTime="5 min read"
       title="How to Stay Safe on Random Video Chat"
       subtitle="A complete guide to protecting your privacy and staying safe while using random video chat sites in 2026. Privacy tips, red flags, and how to choose a safe platform."
       faqSchema={faqToJson(faqs)}
       articleSchema={articleSchema}
     >
-      <ArticleMeta author={AUTHOR} role={ROLE} updated={UPDATED} />
 
       <Section>
         <H2>Random video chat is safe if you follow these rules</H2>
