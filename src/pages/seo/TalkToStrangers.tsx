@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson } from "./SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, RelatedLinks } from "./SEOPage";
 import { useEffect } from "react";
 
 const faqs = [
@@ -77,6 +77,16 @@ const TalkToStrangers = () => {
           You should still use common sense: don't share personal information, don't send money, and
           trust your instincts. If a conversation feels off, skip it.
         </P>
+      </Section>
+
+      <Section>
+        <RelatedLinks links={[
+          { href: "/anonymous-video-chat", label: "Anonymous Video Chat" },
+          { href: "/random-cam-chat", label: "Random Cam Chat" },
+          { href: "/voice-chat-with-strangers", label: "Voice Chat with Strangers" },
+          { href: "/group-video-chat-strangers", label: "Group Video Chat" },
+          { href: "/safety", label: "Safety & Moderation" },
+        ]} />
       </Section>
 
       <Section>

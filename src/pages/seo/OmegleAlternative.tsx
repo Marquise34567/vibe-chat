@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson } from "./SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, RelatedLinks } from "./SEOPage";
 import { useEffect } from "react";
 
 const faqs = [
@@ -79,6 +79,18 @@ const OmegleAlternative = () => {
           <LI>Hit "Start Video Chat" — you're matched instantly</LI>
           <LI>Don't like your match? Tap skip and get a new one</LI>
         </UL>
+      </Section>
+
+      <Section>
+        <RelatedLinks links={[
+          { href: "/free-omegle-alternative", label: "Free Omegle Alternative" },
+          { href: "/best-omegle-alternatives", label: "10 Best Omegle Alternatives" },
+          { href: "/websites-like-omegle", label: "Websites Like Omegle" },
+          { href: "/vs/ometv", label: "FaceFrenzy vs OmeTV" },
+          { href: "/vs/emerald-chat", label: "FaceFrenzy vs Emerald Chat" },
+          { href: "/random-video-chat-no-sign-up", label: "Video Chat, No Sign Up" },
+          { href: "/blog/what-happened-to-omegle", label: "What Happened to Omegle" },
+        ]} />
       </Section>
 
       <Section>

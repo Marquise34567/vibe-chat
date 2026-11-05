@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, ComparisonTable } from "./SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, FAQ, faqToJson, ComparisonTable, RelatedLinks } from "./SEOPage";
 import { useEffect } from "react";
 
 export default function WebsitesLikeOmegle() {
@@ -56,6 +56,16 @@ export default function WebsitesLikeOmegle() {
       <Section>
         <H2>5. Monkey — TikTok-style, mostly paid</H2>
         <P>Monkey modernized the format with a slick mobile app, but most useful features sit behind a paywall and it leans heavily on a younger US audience.</P>
+      </Section>
+
+      <Section>
+        <RelatedLinks links={[
+          { href: "/best-omegle-alternatives", label: "10 Best Omegle Alternatives" },
+          { href: "/omegle-alternative", label: "Best Omegle Alternative" },
+          { href: "/best-chatroulette-alternatives", label: "Chatroulette Alternatives" },
+          { href: "/vs/ometv", label: "FaceFrenzy vs OmeTV" },
+          { href: "/vs/emerald-chat", label: "FaceFrenzy vs Emerald Chat" },
+        ]} />
       </Section>
 
       <Section>

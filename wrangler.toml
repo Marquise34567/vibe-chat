@@ -4,10 +4,13 @@ compatibility_date = "2025-09-17"
 
 [vars]
 FRONTEND_URL = "https://www.facefrenzy.fun"
-# Matchmaker is sharded per continent (mm-<continent>-<i>). SUBSHARDS adds
-# extra shards to the big regions (NA/EU/AS): "1" = one DO per continent
-# (~10-20k sockets each); "4" ≈ 16 DOs total for ~100k concurrency.
-SUBSHARDS = "1"
+# Web Push pool pings — public key is safe to commit. Pair it with:
+#   npx wrangler secret put VAPID_PRIVATE_KEY
+#   npx wrangler secret put VAPID_SUB   (e.g. mailto:you@domain)
+# And set VITE_VAPID_PUBLIC_KEY to this same value in Vercel env.
+VAPID_PUBLIC_KEY = "BJ9ff5lJHg6_qLtDDzyiM0X7ZysKLN5NUKWfh4X6Z8N5NGRXBrYWLiS5qg7G6oe7kr4j-t2Oy08zSdQOLNKwIis"
+# Matchmaker runs as a single global DO (mm-global-0) — continental
+# sharding was reverted because it fractured the worldwide queue.
 
 # STRIPE_SECRET_KEY is set via: npx wrangler secret put STRIPE_SECRET_KEY
 # ADMIN_KEY (optional) protects /api/analytics + /api/insights:

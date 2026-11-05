@@ -17,6 +17,7 @@ import { usePostHog } from "posthog-js/react";
 import { getLocalProfile } from "@/lib/localUser";
 import { normalizeGender } from "../../shared/analytics";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
+import { pingLocalNotification } from "@/lib/pushNotify";
 
 const MATCH_SERVER_URL =
   (import.meta as any).env?.VITE_MATCH_SERVER_URL ?? "ws://localhost:8090";
@@ -585,6 +586,12 @@ export function useMatchConnection() {
             self_age: selfAge(),
           }));
 
+          // Tab open but backgrounded → local notification pulls them back.
+          pingLocalNotification(
+            "Match found on FaceFrenzy",
+            `${data.peerName ?? "Someone"} is waiting — come back to chat`
+          );
+
           // Create peer connection and start WebRTC handshake
           // Try to get camera, but DON'T fail the whole match if camera fails —
           // we can still receive the peer's video/audio without sending ours.
@@ -860,6 +867,14 @@ export function useMatchConnection() {
     nameRef.current = name;
   }, []);
 
+  // ── Ship a Web Push subscription so the server can ping us later ──
+  const sendPushSubscription = useCallback(
+    (subscription: unknown) => {
+      sendMsg({ type: "push-sub", subscription, visitorId: getLocalProfile().id });
+    },
+    [sendMsg]
+  );
+
   // ── Skip current partner (does NOT auto-search — client navigates to Match view) ──
   const skip = useCallback(() => {
     trackCallEnd("skip");
@@ -1003,6 +1018,7 @@ export function useMatchConnection() {
     skip,
     cancel,
     disconnect,
+    sendPushSubscription,
     requestExtend,
     acceptExtend,
     declineExtend,

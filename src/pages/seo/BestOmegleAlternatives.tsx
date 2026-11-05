@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema } from "./SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, ArticleMeta, buildArticleSchema, RelatedLinks } from "./SEOPage";
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
@@ -121,6 +121,18 @@ const BestOmegleAlternatives = () => {
       <Section>
         <H2>How we ranked these sites</H2>
         <P>This ranking is based on five criteria: bot presence (real people vs scripted accounts), age verification, moderation quality (AI real-time vs manual reactive), feature set (1-on-1 only vs group and blind modes), and cost (truly free vs freemium paywall). Traffic data is sourced from the State of Random Video Chat 2026 industry report and Semrush estimates. Each platform was tested firsthand to verify signup requirements, bot presence, and feature availability. Rankings reflect each platform's state as of September 2026. For a broader look at the category beyond Omegle replacements, see <A to="/blog/best-random-video-chat-2026">the best random video chat sites of 2026</A>, or read <A to="/blog/what-happened-to-omegle">what happened to Omegle</A> and <A to="/blog/is-omegle-back">whether Omegle is coming back</A>.</P>
+      </Section>
+
+      <Section>
+        <RelatedLinks links={[
+          { href: "/omegle-alternative", label: "Best Omegle Alternative" },
+          { href: "/free-omegle-alternative", label: "Free Omegle Alternative" },
+          { href: "/monkey-app-alternatives", label: "Monkey App Alternatives" },
+          { href: "/best-chatroulette-alternatives", label: "Chatroulette Alternatives" },
+          { href: "/vs/ometv", label: "FaceFrenzy vs OmeTV" },
+          { href: "/vs/emerald-chat", label: "FaceFrenzy vs Emerald Chat" },
+          { href: "/vs/chatroulette", label: "FaceFrenzy vs Chatroulette" },
+        ]} />
       </Section>
 
       <Section>

@@ -26,6 +26,7 @@ import {
   ageBracket, durationBucket, genderPairKey, pushSample, pushEvent,
   analyticsView, heuristicInsights, trackUniqueVisitor, mergeAnalytics,
 } from "../shared/analytics";
+import { sendPushTickle } from "../shared/webpush";
 
 interface Env {
   MATCHMAKER: DurableObjectNamespace;
@@ -39,6 +40,9 @@ interface Env {
   SUBSHARDS?: string;             // extra DO shards for NA/EU/AS — "1" = off, raise at scale
   TURN_KEY_ID?: string;           // Cloudflare Calls TURN key (optional)
   TURN_API_TOKEN?: string;        // Cloudflare Calls API token (optional)
+  VAPID_PUBLIC_KEY?: string;      // Web Push — "someone's online" pings
+  VAPID_PRIVATE_KEY?: string;     // secret: npx wrangler secret put VAPID_PRIVATE_KEY
+  VAPID_SUB?: string;             // mailto: contact embedded in the VAPID JWT
 }
 
 const SPONSOR_PRICE_CENTS_PER_DAY = 500; // $5/day
@@ -66,14 +70,24 @@ const VIOLATION_COOLDOWN_MS = 5000; // Ignore duplicate reports within 5s
 const GHOST_TIMEOUT_MS = 45000;
 const SWEEP_INTERVAL_MS = 5000;
 
-// ── Sharding: one Matchmaker DO per continent (+ optional subshards) ──
-// A single global DO is the scaling bottleneck — one isolate, one thread.
-// Users are routed to the DO for their continent (request.cf.continent),
-// or the continent their region filter targets (?shard=). Lobby rooms pin
-// to the shard embedded in the room ID (?room=r-<cont><i>-xxxx) so host
-// and guest always land on the same DO. SUBSHARDS splits the biggest
-// regions further (mm-na-0..N) — raise via wrangler vars as traffic grows;
-// "1" = one DO per continent, which keeps small queues maximally liquid.
+// ── Web Push pool pings ──
+// Per-subscriber cooldown so a burst of searches can't spam one browser.
+const PUSH_COOLDOWN_MS = 30 * 60 * 1000;
+type StoredPushSub = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  updatedAt: number;
+  lastPushAt: number;
+};
+
+// ── Sharding: SINGLE global Matchmaker DO ──
+// Per-continent DOs were tried and reverted: each DO has its own isolated
+// queue, so a US user could never match a BR user even on "Worldwide" —
+// the pool fractured into nearly-empty continent queues and everyone sat
+// in queue forever. One DO = one liquid global queue (a single isolate
+// handles ~5-7k concurrent sockets; revisit sharding only well past that,
+// and then it needs a cross-DO match broker, not queue isolation).
+const GLOBAL_SHARD = "mm-global-0";
 const CONTINENTS = ["AF", "AS", "EU", "NA", "OC", "SA"] as const;
 
 const subshardsFor = (env: Env, c: string): number =>
@@ -83,33 +97,22 @@ const subshardsFor = (env: Env, c: string): number =>
 
 const shardName = (c: string, i: number) => `mm-${c.toLowerCase()}-${i}`;
 
-const hashStr = (s: string): number => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-};
 
 /** Which Matchmaker DO should host this socket? */
-const shardForRequest = (request: Request, env: Env): string => {
+const shardForRequest = (request: Request): string => {
   const url = new URL(request.url);
-  // Lobby joins carry the room's home shard (?room=r-NA2-xxxx)
+  // Lobby joins carry the room's home shard (?room=r-NA2-xxxx) — legacy
+  // room pins still honored so host and guest land on the same DO.
   const room = url.searchParams.get("room") ?? "";
   const m = room.match(/^r-([a-z]{2})(\d+)-/i);
   if (m) return shardName(m[1], parseInt(m[2], 10));
-  // Region-filtered searches can target another continent (?shard=EU)
-  const hint = (url.searchParams.get("shard") ?? "").toUpperCase();
-  const cont = (CONTINENTS as readonly string[]).includes(hint)
-    ? hint
-    : ((request.cf?.continent as string | undefined) ?? "NA");
-  const n = subshardsFor(env, cont);
-  // Stable per-user shard — the same visitorId/IP always lands on the
-  // same DO, which also makes daily unique counts exact.
-  const key = url.searchParams.get("v") || request.headers.get("cf-connecting-ip") || "";
-  return shardName(cont, n > 1 ? hashStr(key) % n : 0);
+  return GLOBAL_SHARD;
 };
 
-const allShardNames = (env: Env): string[] =>
-  CONTINENTS.flatMap((c) => Array.from({ length: subshardsFor(env, c) }, (_, i) => shardName(c, i)));
+const allShardNames = (env: Env): string[] => [
+  GLOBAL_SHARD,
+  ...CONTINENTS.flatMap((c) => Array.from({ length: subshardsFor(env, c) }, (_, i) => shardName(c, i))),
+];
 
 /** Aggregate stats + live counts across every shard DO. */
 const aggregateStats = async (env: Env) => {
@@ -511,7 +514,7 @@ export default {
       const country = request.cf?.country;
       if (country) headers.set("x-client-country", String(country));
 
-      const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(shardForRequest(request, env)));
+      const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(shardForRequest(request)));
       return stub.fetch(new Request(request.url, { method: request.method, headers }));
     }
 
@@ -1097,6 +1100,48 @@ export class Matchmaker extends DurableObject<Env> {
     this.putClient(ws, c);
   }
 
+  /**
+   * Liquidity ping — when someone searches and finds no one, tickle every
+   * stored push subscription (except their own and people already online)
+   * so an earlier visitor can come back and meet this searcher.
+   */
+  private async pingPoolSubscribers(searcher: ClientState) {
+    const publicKey = this.env.VAPID_PUBLIC_KEY;
+    const privateKey = this.env.VAPID_PRIVATE_KEY;
+    if (!publicKey || !privateKey) return;
+    const cfg = {
+      publicKey,
+      privateKey,
+      subject: this.env.VAPID_SUB ?? "mailto:admin@facefrenzy.fun",
+    };
+
+    // Skip subscribers who are online right now — they can just match.
+    const onlineVisitors = new Set<string>();
+    for (const sock of this.ctx.getWebSockets()) {
+      const oc = this.getClient(sock);
+      if (oc?.visitorId && !oc.closed) onlineVisitors.add(oc.visitorId);
+    }
+
+    const subs = await this.ctx.storage.list<StoredPushSub>({ prefix: "push:" });
+    const now = Date.now();
+    for (const [key, sub] of subs) {
+      const vid = key.slice(5);
+      if (vid === searcher.visitorId || onlineVisitors.has(vid)) continue;
+      if (now - sub.lastPushAt < PUSH_COOLDOWN_MS) continue;
+      try {
+        const status = await sendPushTickle({ endpoint: sub.endpoint, keys: sub.keys }, cfg);
+        if (status === 404 || status === 410) {
+          await this.ctx.storage.delete(key); // subscription is gone for good
+        } else {
+          sub.lastPushAt = now;
+          await this.ctx.storage.put(key, sub);
+        }
+      } catch {
+        // transient push failure — keep the sub, retry on the next search
+      }
+    }
+  }
+
   private async removeClient(ws: WebSocket, reason = "disconnect") {
     const c = this.getClient(ws);
     if (!c || c.closed) return;
@@ -1312,7 +1357,40 @@ export class Matchmaker extends DurableObject<Env> {
           this.pairClients(ws, c, match.ws, match.client);
         } else {
           this.send(ws, { type: "searching", onlineCount: this.clientCount(), searching: this.liveCounts().searching });
+          // No one compatible right now — ping departed subscribers so an
+          // earlier visitor can come back and meet this searcher.
+          this.ctx.waitUntil(this.pingPoolSubscribers(c));
         }
+        break;
+      }
+
+      // ── Web Push: store/drop the browser subscription used for
+      // "someone's online" pings after the tab closes ──
+      case "push-sub": {
+        this.markIdentified(c, msg.visitorId);
+        const sub = msg.subscription;
+        if (
+          c.visitorId &&
+          sub &&
+          typeof sub.endpoint === "string" &&
+          typeof sub.keys?.p256dh === "string" &&
+          typeof sub.keys?.auth === "string"
+        ) {
+          const prev = await this.ctx.storage.get<StoredPushSub>(`push:${c.visitorId}`);
+          const rec: StoredPushSub = {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+            updatedAt: Date.now(),
+            lastPushAt: prev?.lastPushAt ?? 0,
+          };
+          await this.ctx.storage.put(`push:${c.visitorId}`, rec);
+        }
+        break;
+      }
+
+      case "push-unsub": {
+        this.markIdentified(c, msg.visitorId);
+        if (c.visitorId) await this.ctx.storage.delete(`push:${c.visitorId}`);
         break;
       }
 

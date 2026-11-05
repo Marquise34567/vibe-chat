@@ -1,4 +1,4 @@
-import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson } from "./SEOPage";
+import { SEOPage, Section, H2, P, UL, LI, ComparisonTable, FAQ, faqToJson, RelatedLinks } from "./SEOPage";
 import { useEffect } from "react";
 
 export default function FreeOmegleAlternative() {
@@ -57,6 +57,16 @@ export default function FreeOmegleAlternative() {
           <LI><strong>Group mode:</strong> Chat with 3-4 people simultaneously in a dynamic video grid.</LI>
           <LI><strong>Blind mode:</strong> Voice-first dating — cameras stay off for 30 seconds while you talk, then reveal.</LI>
         </UL>
+      </Section>
+
+      <Section>
+        <RelatedLinks links={[
+          { href: "/omegle-alternative", label: "Best Omegle Alternative" },
+          { href: "/random-video-chat-no-sign-up", label: "Video Chat, No Sign Up" },
+          { href: "/anonymous-video-chat", label: "Anonymous Video Chat" },
+          { href: "/talk-to-strangers", label: "Talk to Strangers" },
+          { href: "/blog/omegle-alternative-no-signup", label: "Omegle Alternative, No Signup" },
+        ]} />
       </Section>
 
       <Section>

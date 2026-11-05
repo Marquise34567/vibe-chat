@@ -30,6 +30,7 @@ import {
   ageBracket, durationBucket, genderPairKey, pushSample, pushEvent,
   analyticsView, heuristicInsights, trackUniqueVisitor,
 } from "../shared/analytics";
+import { sendPushTickle } from "../shared/webpush";
 
 // Railway sets PORT; locally use MATCH_SERVER_PORT or default 8090
 const PORT = parseInt(process.env.PORT ?? process.env.MATCH_SERVER_PORT ?? "8090", 10);
@@ -41,6 +42,17 @@ const stripe = process.env.STRIPE_SECRET_KEY
 const SPONSOR_PRICE_ID = "price_1UB1KZGpSBEuGOflxD7YoPw7";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.facefrenzy.fun";
 const ADMIN_KEY = process.env.ADMIN_KEY ?? ""; // optional — protects /api/analytics + /api/insights
+
+// ── Web Push pool pings ("someone's online" → departed subscribers) ──
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
+const VAPID_SUB = process.env.VAPID_SUB ?? "mailto:admin@facefrenzy.fun";
+const PUSH_COOLDOWN_MS = 30 * 60 * 1000;
+const pushSubs = new Map<string, {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  lastPushAt: number;
+}>();
 
 // ── Subscription pricing (mirrors worker/match-worker.ts) ──
 const PLUS_PRICES: Record<string, { amount: number; interval: "week" | "month" | "year"; name: string }> = {
@@ -148,6 +160,30 @@ const markIdentified = (c: Client, visitorId?: unknown) => {
   trackUniqueVisitor(stats, c.visitorId);
 };
 
+/**
+ * Liquidity ping — when someone searches and finds no one, tickle every
+ * stored push subscription (except their own and people already online)
+ * so an earlier visitor can come back and meet this searcher.
+ */
+const pingPoolSubscribers = (searcher: Client) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  const cfg = { publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY, subject: VAPID_SUB };
+  const onlineVisitors = new Set(
+    [...clients.values()].map((o) => o.visitorId).filter((v): v is string => !!v)
+  );
+  const now = Date.now();
+  for (const [vid, sub] of pushSubs) {
+    if (vid === searcher.visitorId || onlineVisitors.has(vid)) continue;
+    if (now - sub.lastPushAt < PUSH_COOLDOWN_MS) continue;
+    sendPushTickle(sub, cfg)
+      .then((status) => {
+        if (status === 404 || status === 410) pushSubs.delete(vid);
+        else sub.lastPushAt = now;
+      })
+      .catch(() => {});
+  }
+};
+
 /** Search given up before a match (cancel/disconnect) — funnel + event. */
 const abandonSearch = (c: Client, reason: "cancel" | "disconnect") => {
   if (c.status !== "searching" || c.searchStartedAt == null) return;
@@ -220,6 +256,11 @@ const adminOk = (req: IncomingMessage): boolean => {
 };
 
 // ── HTTP server (handles Stripe checkout + upgrades to WebSocket) ──
+// Per-event console.log costs real CPU under mass-join (thousands of
+// lines/sec). MATCH_QUIET=1 silences chatter for load tests/production.
+const QUIET = !!process.env.MATCH_QUIET;
+const log = QUIET ? (..._a: unknown[]) => {} : console.log;
+
 const server = http.createServer(async (req, res) => {
   // CORS headers — allow prod frontend + localhost dev origins
   const origin = req.headers.origin ?? "";
@@ -482,7 +523,9 @@ const server = http.createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-server.listen(PORT, () => {
+// Backlog 8192 (default 511) — absorbs join bursts so the kernel queues
+// handshakes instead of ECONNREFUSED-ing them while the event loop is busy.
+server.listen(PORT, 8192, () => {
   console.log(`FaceFrenzy match server running on :${PORT}`);
 });
 
@@ -491,12 +534,21 @@ const send = (ws: WebSocket, msg: object) => {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 };
 
-// Broadcast real online + queue counts to every connected client
+// Broadcast real online + queue counts to every connected client.
+// DEBOUNCED: a burst of joins/leaves collapses into one fanout per
+// window instead of one O(N) broadcast per socket event — previously
+// O(N²) serialized sends during mass-join, which saturated the event
+// loop and starved the accept queue (~1-2k concurrent joins max).
+let presenceTimer: ReturnType<typeof setTimeout> | null = null;
 const broadcastOnlineCount = () => {
-  const live = liveCounts();
-  for (const c of clients.values()) {
-    send(c.ws, { type: "presence", onlineCount: live.online, searching: live.searching });
-  }
+  if (presenceTimer) return; // a fanout is already scheduled — coalesce
+  presenceTimer = setTimeout(() => {
+    presenceTimer = null;
+    const live = liveCounts();
+    for (const c of clients.values()) {
+      send(c.ws, { type: "presence", onlineCount: live.online, searching: live.searching });
+    }
+  }, 300);
 };
 
 // Check if an IP is currently banned
@@ -513,7 +565,7 @@ const isIpBanned = (ip: string): boolean => {
 // Ban an IP for BAN_DURATION_MS
 const banIp = (ip: string, reason: string) => {
   bannedIps.set(ip, Date.now() + BAN_DURATION_MS);
-  console.log(`[moderation] IP ${ip} banned for 24h: ${reason}`);
+  log(`[moderation] IP ${ip} banned for 24h: ${reason}`);
 };
 
 /**
@@ -535,7 +587,7 @@ const recordViolation = (
   client.violations += 1;
   stats.violations++;
 
-  console.log(
+  log(
     `[moderation] Violation #${client.violations} for ${clientId}: ` +
     `${nsfwClass} (${(probability * 100).toFixed(1)}%) source=${source}`
   );
@@ -573,7 +625,7 @@ const recordViolation = (
       try { client.ws.close(4003, "Banned"); } catch {}
     }, 500);
 
-    console.log(`[moderation] Client ${clientId} banned and disconnected`);
+    log(`[moderation] Client ${clientId} banned and disconnected`);
   }
 };
 
@@ -639,7 +691,7 @@ const findMatch = (client: Client): Client | null => {
 const pairClients = (a: Client, b: Client) => {
   // Safety check — don't pair if either already has a partner
   if (a.partnerId || b.partnerId) {
-    console.log(`pairClients skipped: ${a.id} partner=${a.partnerId}, ${b.id} partner=${b.partnerId}`);
+    log(`pairClients skipped: ${a.id} partner=${a.partnerId}, ${b.id} partner=${b.partnerId}`);
     return;
   }
 
@@ -687,7 +739,7 @@ const pairClients = (a: Client, b: Client) => {
   send(a.ws, { type: "matched", role: "caller", peerId: b.id, peerCountry: b.country, peerName: b.name, peerGender: b.selfGender, peerAge: b.selfAge });
   send(b.ws, { type: "matched", role: "receiver", peerId: a.id, peerCountry: a.country, peerName: a.name, peerGender: a.selfGender, peerAge: a.selfAge });
 
-  console.log(`Matched ${a.id} (${a.name}, ${a.country}) ↔ ${b.id} (${b.name}, ${b.country}) [mode: ${a.mode}]`);
+  log(`Matched ${a.id} (${a.name}, ${a.country}) ↔ ${b.id} (${b.name}, ${b.country}) [mode: ${a.mode}]`);
 };
 
 const removeClient = (id: string, reason = "disconnect") => {
@@ -731,7 +783,7 @@ const removeClient = (id: string, reason = "disconnect") => {
   }
 
   clients.delete(id);
-  console.log(`Client ${id} (${client.country ?? "??"}) disconnected (${clients.size} online)`);
+  log(`Client ${id} (${client.country ?? "??"}) disconnected (${clients.size} online)`);
   broadcastOnlineCount();
 };
 
@@ -743,7 +795,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
   // ── Check IP ban ──
   if (isIpBanned(ip)) {
-    console.log(`[moderation] Banned IP ${ip} rejected`);
+    log(`[moderation] Banned IP ${ip} rejected`);
     send(ws, { type: "banned", reason: "You are banned for content policy violations", duration: 0 });
     ws.close(4003, "Banned");
     return;
@@ -779,7 +831,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
   // Send assigned ID + real online count
   send(ws, { type: "connected", id, onlineCount: clients.size });
 
-  console.log(`Client ${id} connected (${clients.size} online) from ${ip}`);
+  log(`Client ${id} connected (${clients.size} online) from ${ip}`);
   broadcastOnlineCount();
 
   ws.on("message", (data: string) => {
@@ -806,7 +858,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         trackCountry(c);
         trackGender(c);
         trackAge(c);
-        console.log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"} age: ${c.selfAge ?? "?"}`);
+        log(`Client ${id} registered country: ${c.country} name: ${c.name} gender: ${c.selfGender ?? "?"} age: ${c.selfAge ?? "?"}`);
         break;
       }
 
@@ -851,7 +903,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         stats.byMode[c.mode] = (stats.byMode[c.mode] ?? 0) + 1;
         trackGender(c);
 
-        console.log(`Client ${id} searching: mode=${c.mode} gender=${c.gender} countries=${c.countries.join(",") || "global"} scholar=${c.scholarOnly}`);
+        log(`Client ${id} searching: mode=${c.mode} gender=${c.gender} countries=${c.countries.join(",") || "global"} scholar=${c.scholarOnly}`);
 
         // Try to find a match immediately
         const match = findMatch(c);
@@ -859,7 +911,37 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           pairClients(c, match);
         } else {
           send(ws, { type: "searching", onlineCount: clients.size, searching: liveCounts().searching });
+          // No one compatible — ping departed subscribers so an earlier
+          // visitor can come back and meet this searcher.
+          pingPoolSubscribers(c);
         }
+        break;
+      }
+
+      // ── Web Push: store/drop the browser subscription used for
+      // "someone's online" pings after the tab closes ──
+      case "push-sub": {
+        markIdentified(c, msg.visitorId);
+        const sub = msg.subscription;
+        if (
+          c.visitorId &&
+          sub &&
+          typeof sub.endpoint === "string" &&
+          typeof sub.keys?.p256dh === "string" &&
+          typeof sub.keys?.auth === "string"
+        ) {
+          pushSubs.set(c.visitorId, {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+            lastPushAt: pushSubs.get(c.visitorId)?.lastPushAt ?? 0,
+          });
+        }
+        break;
+      }
+
+      case "push-unsub": {
+        markIdentified(c, msg.visitorId);
+        if (c.visitorId) pushSubs.delete(c.visitorId);
         break;
       }
 
@@ -881,12 +963,12 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           const partner = clients.get(c.partnerId);
           if (partner) {
             send(partner.ws, { type: "offer", sdp: msg.sdp, peerId: id });
-            console.log(`Signaling offer: ${id} → ${c.partnerId}`);
+            log(`Signaling offer: ${id} → ${c.partnerId}`);
           } else {
-            console.log(`Signaling offer: ${id} → ${c.partnerId} (partner not found!)`);
+            log(`Signaling offer: ${id} → ${c.partnerId} (partner not found!)`);
           }
         } else {
-          console.log(`Signaling offer: ${id} has no partnerId!`);
+          log(`Signaling offer: ${id} has no partnerId!`);
         }
         break;
       }
@@ -897,12 +979,12 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           const partner = clients.get(c.partnerId);
           if (partner) {
             send(partner.ws, { type: "answer", sdp: msg.sdp, peerId: id });
-            console.log(`Signaling answer: ${id} → ${c.partnerId}`);
+            log(`Signaling answer: ${id} → ${c.partnerId}`);
           } else {
-            console.log(`Signaling answer: ${id} → ${c.partnerId} (partner not found!)`);
+            log(`Signaling answer: ${id} → ${c.partnerId} (partner not found!)`);
           }
         } else {
-          console.log(`Signaling answer: ${id} has no partnerId!`);
+          log(`Signaling answer: ${id} has no partnerId!`);
         }
         break;
       }
@@ -1018,7 +1100,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         const roomId = `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         lobbyRooms.set(roomId, { hostId: id });
         send(ws, { type: "lobby-created", roomId });
-        console.log(`Lobby room ${roomId} created by ${id}`);
+        log(`Lobby room ${roomId} created by ${id}`);
         break;
       }
 
@@ -1041,7 +1123,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           send(host.ws, { type: "lobby-friend-joined", roomId, role: "caller", friendId: id });
         }
         send(ws, { type: "lobby-joined", roomId, role: "receiver", friendId: room.hostId });
-        console.log(`Lobby room ${roomId}: guest ${id} joined`);
+        log(`Lobby room ${roomId}: guest ${id} joined`);
         break;
       }
 
@@ -1143,14 +1225,14 @@ setInterval(() => {
   for (const [id, c] of clients) {
     // Remove clients with dead WebSockets immediately
     if (c.ws.readyState !== WebSocket.OPEN) {
-      console.log(`Removing dead client ${id} (ws not open)`);
+      log(`Removing dead client ${id} (ws not open)`);
       removeClient(id);
       cleaned++;
       continue;
     }
     // Remove clients we haven't heard from in a while (ghosts that don't respond to ping)
     if (now - c.lastSeen > GHOST_TIMEOUT_MS) {
-      console.log(`Removing ghost client ${id} (no activity for ${Math.round((now - c.lastSeen)/1000)}s)`);
+      log(`Removing ghost client ${id} (no activity for ${Math.round((now - c.lastSeen)/1000)}s)`);
       removeClient(id);
       cleaned++;
       continue;

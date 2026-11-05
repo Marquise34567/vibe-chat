@@ -1,6 +1,17 @@
-import { ReactNode } from "react";
+import { ReactNode, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandMark } from "@/components/BrandMark";
+
+// ── Page variant: "landing" (marketing hero) vs "article" (X-articles style) ──
+type SEOVariant = "landing" | "article";
+const SEOVariantContext = createContext<SEOVariant>("landing");
+const useVariant = () => useContext(SEOVariantContext);
+
+// Article palette — near-black ink on white, warm gray body text
+const A_INK = "#17130E";
+const A_BODY = "#4B423A";
+const A_MUTED = "rgba(60,50,35,0.55)";
+const A_LINE = "rgba(0,0,0,0.08)";
 
 // ── Design tokens (light, bubbly theme) ──
 const INK = "#33291C";
@@ -36,12 +47,16 @@ const Chip = ({ icon, children }: { icon: string; children: ReactNode }) => (
   </span>
 );
 
-const ModeCard = ({ icon, name, tag, accent }: { icon: string; name: string; tag: string; accent: string }) => (
-  <div
+const ModeCard = ({ icon, name, tag, accent, href }: { icon: string; name: string; tag: string; accent: string; href?: string }) => {
+  const navigate = useNavigate();
+  return (
+  <a
+    href={href}
+    onClick={href ? (e) => { e.preventDefault(); navigate(href); } : undefined}
     style={{
       flex: "1 1 160px", maxWidth: 220, padding: "16px 14px",
       borderRadius: 20, background: CARD, border: `1px solid ${BORDER}`,
-      boxShadow: SHADOW, textAlign: "center",
+      boxShadow: SHADOW, textAlign: "center", textDecoration: "none", display: "block",
     }}
   >
     <div
@@ -56,12 +71,14 @@ const ModeCard = ({ icon, name, tag, accent }: { icon: string; name: string; tag
     </div>
     <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginBottom: 2 }}>{name}</div>
     <div style={{ fontSize: 12, color: SUB, lineHeight: 1.35 }}>{tag}</div>
-  </div>
-);
+  </a>
+  );
+};
 
 /**
  * SEOPage — shared layout for all SEO/landing pages.
- * Light, bubbly design with CTA to start chatting.
+ * variant="landing": bubbly marketing hero + content.
+ * variant="article": X-articles style — white, minimal, left-aligned prose.
  */
 export const SEOPage = ({
   title,
@@ -69,17 +86,27 @@ export const SEOPage = ({
   children,
   faqSchema,
   articleSchema,
+  variant = "landing",
+  tag,
+  byline,
+  readTime,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
   faqSchema?: object[];
   articleSchema?: object;
+  variant?: SEOVariant;
+  tag?: string;
+  byline?: { author: string; role?: string; updated?: string };
+  readTime?: string;
 }) => {
   const navigate = useNavigate();
+  const article = variant === "article";
 
   return (
-    <div style={{ minHeight: "100dvh", background: BG, color: INK, display: "flex", flexDirection: "column" }}>
+    <SEOVariantContext.Provider value={variant}>
+    <div style={{ minHeight: "100dvh", background: article ? "#FFFFFF" : BG, color: INK, display: "flex", flexDirection: "column" }}>
       {/* Article schema */}
       {articleSchema && (
         <script
@@ -105,26 +132,80 @@ export const SEOPage = ({
           borderBottom: `1px solid ${BORDER}`,
         }}
       >
-        <button onClick={() => navigate("/")} style={{ display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer" }}>
+        <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} style={{ display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", cursor: "pointer", textDecoration: "none" }}>
           <BrandMark size={32} />
           <span className="ff-wordmark" style={{ fontSize: 16 }}>facefrenzy</span>
-        </button>
-        <button
-          onClick={() => navigate("/")}
+        </a>
+        <a
+          href="/"
+          onClick={(e) => { e.preventDefault(); navigate("/"); }}
           style={{
-            padding: "9px 20px", borderRadius: 999, background: GRAD,
+            padding: article ? "8px 18px" : "9px 20px", borderRadius: 999,
+            background: article ? "#FF9F0A" : GRAD,
             color: "#fff", fontSize: 13, fontWeight: 800, border: "none", cursor: "pointer",
-            boxShadow: CTA_SHADOW,
+            boxShadow: article ? "none" : CTA_SHADOW, textDecoration: "none",
           }}
         >
           Start Chatting →
-        </button>
+        </a>
       </nav>
 
+      {article ? (
+        <>
+          {/* ── Article header (X-articles style) ── */}
+          <header style={{ padding: "52px 20px 0", maxWidth: 700, margin: "0 auto", width: "100%" }}>
+            {tag && (
+              <span
+                style={{
+                  display: "inline-block", marginBottom: 18, padding: "5px 12px", borderRadius: 999,
+                  background: "rgba(255,159,10,0.10)", color: "#C96F00",
+                  fontSize: 12, fontWeight: 800, letterSpacing: "0.6px", textTransform: "uppercase",
+                }}
+              >
+                {tag}
+              </span>
+            )}
+            <h1 style={{ fontSize: "clamp(30px, 5.6vw, 42px)", fontWeight: 800, letterSpacing: "-1.2px", lineHeight: 1.12, marginBottom: 16, color: A_INK }}>
+              {title}
+            </h1>
+            <p style={{ fontSize: 19, color: A_MUTED, lineHeight: 1.55, marginBottom: 26 }}>
+              {subtitle}
+            </p>
+            {byline && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 24 }}>
+                <div
+                  style={{
+                    width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+                    background: "linear-gradient(135deg, #FFB340, #FF7A00)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 17, fontWeight: 800, color: "#fff",
+                  }}
+                >
+                  {byline.author.charAt(0)}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: A_INK }}>{byline.author}</div>
+                  <div style={{ fontSize: 13, color: A_MUTED }}>
+                    {[byline.role, byline.updated && `Updated ${byline.updated}`, readTime].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div style={{ borderTop: `1px solid ${A_LINE}` }} />
+          </header>
+
+          {/* Article content — narrow left-aligned column */}
+          <div id="seo-content" style={{ flex: 1, padding: "10px 20px 40px", maxWidth: 700, margin: "0 auto", width: "100%" }}>
+            {children}
+            <ArticleCTA />
+          </div>
+        </>
+      ) : (
+        <>
       {/* Hero */}
       <div style={{ padding: "56px 20px 36px", textAlign: "center", maxWidth: 780, margin: "0 auto" }}>
         <div style={{ marginBottom: 20 }}>
-          <Chip icon="✨">Free random video chat · No signup · 16+</Chip>
+          <Chip icon="✨">Free random video chat · No signup · 18+</Chip>
         </div>
         <h1 style={{ fontSize: "clamp(30px, 6.5vw, 50px)", fontWeight: 900, letterSpacing: "-1.6px", lineHeight: 1.08, marginBottom: 14, color: INK }}>
           {title}
@@ -142,16 +223,17 @@ export const SEOPage = ({
 
         {/* CTAs */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginBottom: 40 }}>
-          <button
-            onClick={() => navigate("/")}
+          <a
+            href="/"
+            onClick={(e) => { e.preventDefault(); navigate("/"); }}
             style={{
               padding: "15px 34px", borderRadius: 999, background: GRAD,
               color: "#fff", fontSize: 16, fontWeight: 800, border: "none", cursor: "pointer",
-              boxShadow: CTA_SHADOW,
+              boxShadow: CTA_SHADOW, textDecoration: "none",
             }}
           >
             Start Video Chat →
-          </button>
+          </a>
           <button
             onClick={() => document.getElementById("seo-content")?.scrollIntoView({ behavior: "smooth" })}
             style={{
@@ -166,9 +248,9 @@ export const SEOPage = ({
 
         {/* Mode cards */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
-          <ModeCard icon="⚡" name="Solo" tag="1-on-1 random video chat" accent="#FF9F0A" />
-          <ModeCard icon="🎉" name="Group" tag="3-4 people in one call" accent="#FF4D8D" />
-          <ModeCard icon="🎭" name="Blind" tag="Voice first, reveal at 30s" accent="#38BDF8" />
+          <ModeCard icon="⚡" name="Solo" tag="1-on-1 random video chat" accent="#FF9F0A" href="/1v1-video-chat" />
+          <ModeCard icon="🎉" name="Group" tag="3-4 people in one call" accent="#FF4D8D" href="/group-video-chat-strangers" />
+          <ModeCard icon="🎭" name="Blind" tag="Voice first, reveal at 30s" accent="#38BDF8" href="/blind-date-video-chat" />
         </div>
       </div>
 
@@ -176,6 +258,8 @@ export const SEOPage = ({
       <div id="seo-content" style={{ flex: 1, padding: "8px 20px 60px", maxWidth: 760, margin: "0 auto", width: "100%" }}>
         {children}
       </div>
+        </>
+      )}
 
       {/* Footer */}
       <footer style={{ padding: "28px 20px", borderTop: `1px solid ${BORDER}`, textAlign: "center", background: "rgba(255,255,255,0.5)" }}>
@@ -214,60 +298,138 @@ export const SEOPage = ({
           <FooterLink href="/blog/how-to-stay-safe" label="How to Stay Safe" navigate={navigate} />
           <FooterLink href="/blog/omegle-alternative-no-signup" label="Omegle Alternative No Signup" navigate={navigate} />
         </div>
-        <p style={{ fontSize: 12, color: FAINT }}>© 2026 FaceFrenzy. Random video chat with real people. 16+ only.</p>
+        <p style={{ fontSize: 12, color: FAINT }}>© 2026 FaceFrenzy. Random video chat with real people. 18+ only.</p>
       </footer>
+    </div>
+    </SEOVariantContext.Provider>
+  );
+};
+
+// Quiet end-of-article CTA — bordered card, not a banner ad
+const ArticleCTA = () => {
+  const navigate = useNavigate();
+  return (
+    <div
+      style={{
+        marginTop: 44, padding: "26px 24px", borderRadius: 20, textAlign: "center",
+        border: "1px solid rgba(255,159,10,0.30)",
+        background: "linear-gradient(180deg, #FFF9EF, #FFF3DD)",
+      }}
+    >
+      <div style={{ fontSize: 19, fontWeight: 800, color: A_INK, marginBottom: 4 }}>
+        Try FaceFrenzy free
+      </div>
+      <p style={{ fontSize: 14, color: A_MUTED, marginBottom: 16 }}>
+        Random video chat with real people. No signup, no download.
+      </p>
+      <a
+        href="/"
+        onClick={(e) => { e.preventDefault(); navigate("/"); }}
+        style={{
+          padding: "12px 28px", borderRadius: 999,
+          background: "linear-gradient(180deg, #FFB340, #FF9F0A)",
+          color: "#fff", fontSize: 14, fontWeight: 800, border: "none", cursor: "pointer",
+          textDecoration: "none", display: "inline-block",
+        }}
+      >
+        Start Video Chat →
+      </a>
     </div>
   );
 };
 
 const FooterLink = ({ href, label, navigate }: { href: string; label: string; navigate: (path: string) => void }) => (
-  <button onClick={() => navigate(href)} style={{ fontSize: 12, color: SUB, background: "none", border: "none", cursor: "pointer" }}>{label}</button>
+  <a href={href} onClick={(e) => { e.preventDefault(); navigate(href); }} style={{ fontSize: 12, color: SUB, background: "none", border: "none", cursor: "pointer", textDecoration: "none" }}>{label}</a>
 );
 
 // ── Reusable styled components ──
-export const Section = ({ children, style }: { children: ReactNode; style?: React.CSSProperties }) => (
-  <section style={{ marginBottom: 32, ...style }}>{children}</section>
-);
+export const Section = ({ children, style }: { children: ReactNode; style?: React.CSSProperties }) => {
+  const v = useVariant();
+  return <section style={{ marginBottom: v === "article" ? 36 : 32, ...style }}>{children}</section>;
+};
 
-export const H2 = ({ children }: { children: ReactNode }) => (
-  <h2 style={{ fontSize: 24, fontWeight: 800, color: INK, marginBottom: 12, marginTop: 8, letterSpacing: "-0.5px" }}>{children}</h2>
-);
+export const H2 = ({ children }: { children: ReactNode }) => {
+  const v = useVariant();
+  return (
+    <h2 style={{ fontSize: v === "article" ? 23 : 24, fontWeight: 800, color: v === "article" ? A_INK : INK, marginBottom: 14, marginTop: v === "article" ? 40 : 8, letterSpacing: "-0.5px" }}>{children}</h2>
+  );
+};
 
-export const P = ({ children }: { children: ReactNode }) => (
-  <p style={{ fontSize: 15, color: SUB, lineHeight: 1.65, marginBottom: 12 }}>{children}</p>
-);
+export const P = ({ children }: { children: ReactNode }) => {
+  const v = useVariant();
+  return (
+    <p
+      style={
+        v === "article"
+          ? { fontSize: 17, color: A_BODY, lineHeight: 1.75, marginBottom: 16 }
+          : { fontSize: 15, color: SUB, lineHeight: 1.65, marginBottom: 12 }
+      }
+    >
+      {children}
+    </p>
+  );
+};
 
-export const UL = ({ children }: { children: ReactNode }) => (
-  <ul style={{ listStyle: "none", padding: 0, marginBottom: 16 }}>{children}</ul>
-);
+export const UL = ({ children }: { children: ReactNode }) => {
+  const v = useVariant();
+  return <ul style={{ listStyle: "none", padding: 0, marginBottom: v === "article" ? 20 : 16 }}>{children}</ul>;
+};
 
-export const LI = ({ children }: { children: ReactNode }) => (
-  <li
-    style={{
-      fontSize: 15, color: SUB, lineHeight: 1.6, marginBottom: 10,
-      padding: "12px 16px 12px 42px", position: "relative",
-      background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14,
-      boxShadow: "0 1px 6px rgba(120,72,20,0.04)",
-    }}
-  >
-    <span
+// Strings containing inline markup (e.g. "<strong>…</strong>") are rendered
+// as HTML so bold lead-ins work; elements pass through untouched.
+const LIBody = ({ children }: { children: ReactNode }) =>
+  typeof children === "string" && /<\/?[a-z]/i.test(children) ? (
+    <span dangerouslySetInnerHTML={{ __html: children }} />
+  ) : (
+    <>{children}</>
+  );
+
+export const LI = ({ children }: { children: ReactNode }) => {
+  const v = useVariant();
+  if (v === "article") {
+    return (
+      <li
+        style={{
+          fontSize: 16, color: A_BODY, lineHeight: 1.7, marginBottom: 8,
+          paddingLeft: 28, position: "relative",
+        }}
+      >
+        <span style={{ position: "absolute", left: 0, top: 4, color: "#FF9F0A", fontSize: 13, fontWeight: 900 }}>✓</span>
+        <LIBody>{children}</LIBody>
+      </li>
+    );
+  }
+  return (
+    <li
       style={{
-        position: "absolute", left: 14, top: 14, width: 18, height: 18, borderRadius: "50%",
-        background: "rgba(255,159,10,0.12)", color: VIOLET,
-        fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 15, color: SUB, lineHeight: 1.6, marginBottom: 10,
+        padding: "12px 16px 12px 42px", position: "relative",
+        background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14,
+        boxShadow: "0 1px 6px rgba(120,72,20,0.04)",
       }}
     >
-      ✓
-    </span>
-    {children}
-  </li>
-);
+      <span
+        style={{
+          position: "absolute", left: 14, top: 14, width: 18, height: 18, borderRadius: "50%",
+          background: "rgba(255,159,10,0.12)", color: VIOLET,
+          fontSize: 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        ✓
+      </span>
+      <LIBody>{children}</LIBody>
+    </li>
+  );
+};
 
-export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; age: string; mods: string; signup: string; free: string; highlight?: boolean }[] }) => (
-  <div style={{ overflowX: "auto", marginBottom: 24, borderRadius: 18, background: CARD, border: `1px solid ${BORDER}`, boxShadow: SHADOW }}>
+export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; age: string; mods: string; signup: string; free: string; highlight?: boolean }[] }) => {
+  const v = useVariant();
+  const art = v === "article";
+  return (
+  <div style={{ overflowX: "auto", marginBottom: 24, borderRadius: art ? 14 : 18, background: CARD, border: `1px solid ${art ? A_LINE : BORDER}`, boxShadow: art ? "none" : SHADOW }}>
     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
       <thead>
-        <tr style={{ borderBottom: `1px solid ${BORDER}`, background: "rgba(255,159,10,0.05)" }}>
+        <tr style={{ borderBottom: `1px solid ${art ? A_LINE : BORDER}`, background: art ? "rgba(0,0,0,0.025)" : "rgba(255,159,10,0.05)" }}>
           <th style={{ textAlign: "left", padding: "12px 10px", color: FAINT, fontWeight: 700 }}>Site</th>
           <th style={{ textAlign: "center", padding: "12px 8px", color: FAINT, fontWeight: 700 }}>Bots?</th>
           <th style={{ textAlign: "center", padding: "12px 8px", color: FAINT, fontWeight: 700 }}>Age Gate</th>
@@ -286,7 +448,7 @@ export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; 
               {r.name}{r.highlight && " ←"}
             </td>
             <td style={{ textAlign: "center", padding: "12px 8px", color: r.bots === "No" ? "#16a34a" : "#dc2626" }}>{r.bots}</td>
-            <td style={{ textAlign: "center", padding: "12px 8px", color: r.age === "16+" ? "#16a34a" : "#d97706" }}>{r.age}</td>
+            <td style={{ textAlign: "center", padding: "12px 8px", color: r.age === "18+" ? "#16a34a" : "#d97706" }}>{r.age}</td>
             <td style={{ textAlign: "center", padding: "12px 8px", color: r.mods === "AI" ? "#16a34a" : "#d97706" }}>{r.mods}</td>
             <td style={{ textAlign: "center", padding: "12px 8px", color: r.signup === "None" ? "#16a34a" : "#d97706" }}>{r.signup}</td>
             <td style={{ textAlign: "center", padding: "12px 8px", color: r.free === "Yes" ? "#16a34a" : "#dc2626" }}>{r.free}</td>
@@ -295,22 +457,42 @@ export const ComparisonTable = ({ rows }: { rows: { name: string; bots: string; 
       </tbody>
     </table>
   </div>
-);
+  );
+};
 
-export const FAQ = ({ items }: { items: { q: string; a: string }[] }) => (
-  <div style={{ marginBottom: 24 }}>
-    {items.map((item, i) => (
-      <details key={i} style={{ marginBottom: 10, borderRadius: 16, background: CARD, border: `1px solid ${BORDER}`, overflow: "hidden", boxShadow: "0 1px 6px rgba(120,72,20,0.04)" }}>
-        <summary style={{ padding: "15px 18px", fontSize: 15, fontWeight: 700, color: INK, cursor: "pointer", listStyle: "none" }}>
-          {item.q}
-        </summary>
-        <div style={{ padding: "0 18px 15px", fontSize: 14, color: SUB, lineHeight: 1.65 }}>
-          {item.a}
-        </div>
-      </details>
-    ))}
-  </div>
-);
+export const FAQ = ({ items }: { items: { q: string; a: string }[] }) => {
+  const v = useVariant();
+  if (v === "article") {
+    return (
+      <div style={{ marginBottom: 24 }}>
+        {items.map((item, i) => (
+          <details key={i} style={{ borderTop: i === 0 ? "none" : `1px solid ${A_LINE}` }}>
+            <summary style={{ padding: "16px 0", fontSize: 16, fontWeight: 700, color: A_INK, cursor: "pointer", listStyle: "none" }}>
+              {item.q}
+            </summary>
+            <div style={{ padding: "0 0 16px", fontSize: 15, color: A_BODY, lineHeight: 1.7 }}>
+              {item.a}
+            </div>
+          </details>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginBottom: 24 }}>
+      {items.map((item, i) => (
+        <details key={i} style={{ marginBottom: 10, borderRadius: 16, background: CARD, border: `1px solid ${BORDER}`, overflow: "hidden", boxShadow: "0 1px 6px rgba(120,72,20,0.04)" }}>
+          <summary style={{ padding: "15px 18px", fontSize: 15, fontWeight: 700, color: INK, cursor: "pointer", listStyle: "none" }}>
+            {item.q}
+          </summary>
+          <div style={{ padding: "0 18px 15px", fontSize: 14, color: SUB, lineHeight: 1.65 }}>
+            {item.a}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+};
 
 export const faqToJson = (items: { q: string; a: string }[]) =>
   items.map((item) => ({
@@ -319,23 +501,59 @@ export const faqToJson = (items: { q: string; a: string }[]) =>
     acceptedAnswer: { "@type": "Answer" as const, text: item.a },
   }));
 
+/**
+ * In-content related links — real <a href> anchors Google can follow,
+ * styled as pill links under a "Keep exploring" heading.
+ */
+export const RelatedLinks = ({ links }: { links: { href: string; label: string }[] }) => {
+  const navigate = useNavigate();
+  const v = useVariant();
+  const article = v === "article";
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.5px", textTransform: "uppercase", color: article ? A_MUTED : FAINT, marginBottom: 10 }}>
+        Keep exploring
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {links.map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            onClick={(e) => { e.preventDefault(); navigate(l.href); }}
+            style={{
+              padding: "8px 15px", borderRadius: 999,
+              background: article ? "#FFF9EF" : CARD,
+              border: `1px solid ${article ? "rgba(255,159,10,0.25)" : BORDER}`,
+              fontSize: 13, fontWeight: 700, color: article ? "#C96F00" : INK,
+              textDecoration: "none",
+            }}
+          >
+            {l.label} →
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ── Advertorial listicle primitives (numbered rows, visual tiles, CTAs) ──
 
 /** Big CTA button used inside listicle rows + banners */
 export const ListicleCTA = ({ label = "Start Video Chat — Free" }: { label?: string }) => {
   const navigate = useNavigate();
   return (
-    <button
-      onClick={() => navigate("/")}
+    <a
+      href="/"
+      onClick={(e) => { e.preventDefault(); navigate("/"); }}
       style={{
         marginTop: 10, padding: "12px 26px", borderRadius: 999,
         background: GRAD,
         color: "#fff", fontSize: 14, fontWeight: 800, border: "none", cursor: "pointer",
-        boxShadow: CTA_SHADOW,
+        boxShadow: CTA_SHADOW, textDecoration: "none", display: "inline-block",
       }}
     >
       {label}
-    </button>
+    </a>
   );
 };
 
@@ -427,17 +645,18 @@ export const ListicleBanner = ({
       <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginBottom: 18, lineHeight: 1.5 }}>
         {subtitle}
       </p>
-      <button
-        onClick={() => navigate("/")}
+      <a
+        href="/"
+        onClick={(e) => { e.preventDefault(); navigate("/"); }}
         style={{
           padding: "13px 32px", borderRadius: 999,
           background: "#fff",
           color: INK, fontSize: 15, fontWeight: 800, border: "none", cursor: "pointer",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.18)", textDecoration: "none", display: "inline-block",
         }}
       >
         {cta}
-      </button>
+      </a>
     </div>
   );
 };

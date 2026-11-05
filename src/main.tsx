@@ -37,6 +37,12 @@ const posthogOptions = posthogHostConfigured
 const posthogEnabled = Boolean(posthogKeyConfigured && posthogOptions);
 const app = <App posthogEnabled={posthogEnabled} />;
 
+// Register the push service worker early — it only handles "someone's
+// online" ping events, no fetch interception.
+if ("serviceWorker" in navigator && import.meta.env.VITE_VAPID_PUBLIC_KEY) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
 createRoot(document.getElementById("root")!).render(
   posthogEnabled ? (
     <PostHogProvider apiKey={posthogKey} options={posthogOptions}>

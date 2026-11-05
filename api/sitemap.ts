@@ -9,13 +9,13 @@ export default function handler(_req: unknown, res: VercelLikeResponse) {
 
   const urls = [
     { loc: "https://www.facefrenzy.fun/", priority: "1.0", freq: "daily", lastmod: today },
-    { loc: "https://www.facefrenzy.fun/omegle-alternative", priority: "0.9", freq: "weekly", lastmod: "2026-09-01" },
-    { loc: "https://www.facefrenzy.fun/free-omegle-alternative", priority: "0.9", freq: "weekly", lastmod: "2026-09-01" },
-    { loc: "https://www.facefrenzy.fun/talk-to-strangers", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
+    { loc: "https://www.facefrenzy.fun/omegle-alternative", priority: "0.9", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/free-omegle-alternative", priority: "0.9", freq: "weekly", lastmod: today },
+    { loc: "https://www.facefrenzy.fun/talk-to-strangers", priority: "0.8", freq: "weekly", lastmod: today },
     { loc: "https://www.facefrenzy.fun/anonymous-video-chat", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/random-cam-chat", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
     { loc: "https://www.facefrenzy.fun/1v1-video-chat", priority: "0.8", freq: "weekly", lastmod: "2026-09-01" },
-    { loc: "https://www.facefrenzy.fun/best-omegle-alternatives", priority: "0.9", freq: "weekly", lastmod: "2026-09-23" },
+    { loc: "https://www.facefrenzy.fun/best-omegle-alternatives", priority: "0.9", freq: "weekly", lastmod: today },
     { loc: "https://www.facefrenzy.fun/best-chatroulette-alternatives", priority: "0.9", freq: "weekly", lastmod: "2026-10-05" },
     { loc: "https://www.facefrenzy.fun/monkey-app-alternatives", priority: "0.9", freq: "weekly", lastmod: "2026-10-05" },
     { loc: "https://www.facefrenzy.fun/random-video-chat-apps", priority: "0.9", freq: "weekly", lastmod: "2026-10-05" },
