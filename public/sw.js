@@ -5,7 +5,7 @@
 self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification("Someone's on FaceFrenzy", {
-      body: "A stranger just started searching — come say hi.",
+      body: "People are in the frenzy right now — jump in and match.",
       icon: "/favicon.svg",
       badge: "/favicon.svg",
       tag: "ff-pool-ping",

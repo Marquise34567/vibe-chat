@@ -48,6 +48,7 @@ const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
 const VAPID_SUB = process.env.VAPID_SUB ?? "mailto:admin@facefrenzy.fun";
 const PUSH_COOLDOWN_MS = 30 * 60 * 1000;
+const HOT_POOL_THRESHOLD = 3; // searchers in queue = "the frenzy is live" ping
 const pushSubs = new Map<string, {
   endpoint: string;
   keys: { p256dh: string; auth: string };
@@ -161,11 +162,12 @@ const markIdentified = (c: Client, visitorId?: unknown) => {
 };
 
 /**
- * Liquidity ping — when someone searches and finds no one, tickle every
- * stored push subscription (except their own and people already online)
- * so an earlier visitor can come back and meet this searcher.
+ * Liquidity ping — tickle every stored push subscription except people
+ * already online (they can just match) and the `except` set. Fired when
+ * the pool gains liquidity: a searcher finds no one, a match pairs, or
+ * the queue stays hot — so departed visitors come back when it counts.
  */
-const pingPoolSubscribers = (searcher: Client) => {
+const pingOfflineSubs = (except: ReadonlySet<string>) => {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
   const cfg = { publicKey: VAPID_PUBLIC_KEY, privateKey: VAPID_PRIVATE_KEY, subject: VAPID_SUB };
   const onlineVisitors = new Set(
@@ -173,7 +175,7 @@ const pingPoolSubscribers = (searcher: Client) => {
   );
   const now = Date.now();
   for (const [vid, sub] of pushSubs) {
-    if (vid === searcher.visitorId || onlineVisitors.has(vid)) continue;
+    if (except.has(vid) || onlineVisitors.has(vid)) continue;
     if (now - sub.lastPushAt < PUSH_COOLDOWN_MS) continue;
     sendPushTickle(sub, cfg)
       .then((status) => {
@@ -740,6 +742,10 @@ const pairClients = (a: Client, b: Client) => {
   send(b.ws, { type: "matched", role: "receiver", peerId: a.id, peerCountry: a.country, peerName: a.name, peerGender: a.selfGender, peerAge: a.selfAge });
 
   log(`Matched ${a.id} (${a.name}, ${a.country}) ↔ ${b.id} (${b.name}, ${b.country}) [mode: ${a.mode}]`);
+
+  // A match just happened — proof of liquidity. Ping offline subs
+  // ("the frenzy is live") so departed visitors come back while it's hot.
+  pingOfflineSubs(new Set([a.visitorId, b.visitorId].filter((v): v is string => !!v)));
 };
 
 const removeClient = (id: string, reason = "disconnect") => {
@@ -913,7 +919,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           send(ws, { type: "searching", onlineCount: clients.size, searching: liveCounts().searching });
           // No one compatible — ping departed subscribers so an earlier
           // visitor can come back and meet this searcher.
-          pingPoolSubscribers(c);
+          pingOfflineSubs(new Set(c.visitorId ? [c.visitorId] : []));
         }
         break;
       }
@@ -1241,4 +1247,7 @@ setInterval(() => {
     send(c.ws, { type: "ping" });
   }
   if (cleaned > 0) broadcastOnlineCount();
+  // Hot pool — enough searchers waiting that matches are likely. Ping
+  // offline subs; the per-sub cooldown keeps this from spamming.
+  if (liveCounts().searching >= HOT_POOL_THRESHOLD) pingOfflineSubs(new Set());
 }, 5000);

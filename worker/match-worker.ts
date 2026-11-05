@@ -73,6 +73,7 @@ const SWEEP_INTERVAL_MS = 5000;
 // ── Web Push pool pings ──
 // Per-subscriber cooldown so a burst of searches can't spam one browser.
 const PUSH_COOLDOWN_MS = 30 * 60 * 1000;
+const HOT_POOL_THRESHOLD = 3; // searchers in queue = "the frenzy is live" ping
 type StoredPushSub = {
   endpoint: string;
   keys: { p256dh: string; auth: string };
@@ -1062,6 +1063,12 @@ export class Matchmaker extends DurableObject<Env> {
     console.log(
       `Matched ${a.id} (${a.name}, ${a.country}) ↔ ${b.id} (${b.name}, ${b.country}) [mode: ${a.mode}]`
     );
+
+    // A match just happened — proof of liquidity. Ping offline subs
+    // ("the frenzy is live") so departed visitors come back while it's hot.
+    this.ctx.waitUntil(
+      this.pingOfflineSubs(new Set([a.visitorId, b.visitorId].filter((v): v is string => !!v)))
+    );
   }
 
   // ── Lobby helpers ──
@@ -1101,11 +1108,12 @@ export class Matchmaker extends DurableObject<Env> {
   }
 
   /**
-   * Liquidity ping — when someone searches and finds no one, tickle every
-   * stored push subscription (except their own and people already online)
-   * so an earlier visitor can come back and meet this searcher.
+   * Liquidity ping — tickle every stored push subscription except people
+   * already online (they can just match) and the `except` set. Fired when
+   * the pool gains liquidity: a searcher finds no one, a match pairs, or
+   * the queue stays hot — so departed visitors come back when it counts.
    */
-  private async pingPoolSubscribers(searcher: ClientState) {
+  private async pingOfflineSubs(except: ReadonlySet<string>) {
     const publicKey = this.env.VAPID_PUBLIC_KEY;
     const privateKey = this.env.VAPID_PRIVATE_KEY;
     if (!publicKey || !privateKey) return;
@@ -1126,7 +1134,7 @@ export class Matchmaker extends DurableObject<Env> {
     const now = Date.now();
     for (const [key, sub] of subs) {
       const vid = key.slice(5);
-      if (vid === searcher.visitorId || onlineVisitors.has(vid)) continue;
+      if (except.has(vid) || onlineVisitors.has(vid)) continue;
       if (now - sub.lastPushAt < PUSH_COOLDOWN_MS) continue;
       try {
         const status = await sendPushTickle({ endpoint: sub.endpoint, keys: sub.keys }, cfg);
@@ -1359,7 +1367,7 @@ export class Matchmaker extends DurableObject<Env> {
           this.send(ws, { type: "searching", onlineCount: this.clientCount(), searching: this.liveCounts().searching });
           // No one compatible right now — ping departed subscribers so an
           // earlier visitor can come back and meet this searcher.
-          this.ctx.waitUntil(this.pingPoolSubscribers(c));
+          this.ctx.waitUntil(this.pingOfflineSubs(new Set(c.visitorId ? [c.visitorId] : [])));
         }
         break;
       }
@@ -1668,6 +1676,12 @@ export class Matchmaker extends DurableObject<Env> {
 
     // Flush analytics on every sweep
     this.persistStats();
+
+    // Hot pool — enough searchers waiting that matches are likely. Ping
+    // offline subs; the per-sub cooldown keeps this from spamming.
+    if (this.liveCounts().searching >= HOT_POOL_THRESHOLD) {
+      this.ctx.waitUntil(this.pingOfflineSubs(new Set()));
+    }
 
     // Keep sweeping while anyone is connected; let the DO sleep when empty
     if (this.ctx.getWebSockets().length > 0) {
