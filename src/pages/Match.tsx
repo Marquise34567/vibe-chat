@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { usePostHog } from "posthog-js/react";
 import { useMatchConnectionContext } from "@/contexts/MatchConnectionContext";
 import { getDisplayName } from "@/lib/localUser";
 import { RadarPulse, CloseIcon } from "@/components/MatchIcons";
@@ -9,7 +8,6 @@ import { FloatingStickers } from "@/components/FloatingStickers";
 import { recordMatch, matchesLeft } from "@/lib/limits";
 import { useTier } from "@/hooks/useTier";
 import { BUBBLE, chipStyle, ghostPillStyle } from "@/lib/bubble";
-import { capturePostHogEvent } from "@/lib/posthogLogs";
 import { toast } from "sonner";
 
 type Mode = "solo" | "group" | "blind" | "text";
@@ -36,7 +34,6 @@ const PeakClock = ({ size = 34 }: { size?: number }) => (
 
 const Match = () => {
   const navigate = useNavigate();
-  const posthog = usePostHog();
   const [params] = useSearchParams();
 
   const countries = useMemo(() => params.get("countries")?.split(",").filter(Boolean) ?? [], [params]);
@@ -47,7 +44,7 @@ const Match = () => {
   const [seconds, setSeconds] = useState(0);
   const { tier, loading: tierLoading } = useTier();
 
-  const { state: connState, onlineCount, peerId, peerName, search, cancel, setDisplayName, startCamera, localVideoRef } = useMatchConnectionContext();
+  const { state: connState, onlineCount, searchingCount, peerId, peerName, search, cancel, setDisplayName, startCamera, localVideoRef } = useMatchConnectionContext();
 
   // Hard paywall — free users hit the daily match cap → bounce to /plus
   useEffect(() => {
@@ -90,14 +87,15 @@ const Match = () => {
   // Navigate to chat room when ready. Text mode goes on "matched" — it
   // doesn't need WebRTC media (chat relays through the match server),
   // so waiting for "connected" would stall it forever.
+  // (The "match_connected" PostHog event lives in useMatchConnection —
+  // it only fires once the peer's video verifiably renders frames.)
   useEffect(() => {
     const ready = mode === "text" ? connState === "matched" : connState === "connected";
     if (ready && peerId) {
       recordMatch();
-      capturePostHogEvent(posthog, "match_connected", { match_mode: mode });
       navigate(`/chat/${peerId}?mode=${mode}`, { replace: true });
     }
-  }, [connState, peerId, mode, navigate, posthog]);
+  }, [connState, peerId, mode, navigate]);
 
   // Auto-widen: after 15s in a thin queue, drop country/gender filters so
   // a filtered searcher can still overlap with the global pool.
@@ -208,6 +206,13 @@ const Match = () => {
             {showMatched ? (peerName ? `Matched with ${peerName}!` : "Match found!") : "Finding your match"}
           </h2>
           <p style={{ fontSize: 15, color: BUBBLE.sub, fontWeight: 600 }}>{statusText}</p>
+          {/* Queue depth — honest "someone's actually here" feedback keeps
+              searchers from bouncing during thin hours */}
+          {connState === "searching" && searchingCount > 0 && (
+            <p style={{ fontSize: 12, color: BUBBLE.sub, fontWeight: 700, marginTop: 4 }}>
+              {searchingCount} {searchingCount === 1 ? "person" : "people"} looking right now
+            </p>
+          )}
         </div>
 
         <div style={{ fontSize: 34, fontWeight: 900, letterSpacing: "-0.5px", color: BUBBLE.ink, fontVariantNumeric: "tabular-nums" }}>

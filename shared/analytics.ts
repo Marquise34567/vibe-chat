@@ -29,11 +29,11 @@ export type MatchEvent = {
 
 export type MatchAnalytics = {
   startedAt: number;            // when stats collection began (ms)
-  totalConnections: number;     // websocket connections seen
+  totalConnections: number;     // identified clients (register/search/lobby) — NOT raw sockets
   totalSearches: number;        // "search" requests
   totalMatches: number;         // pairs formed
   totalCalls: number;           // participant-call-ends (≈2 per solo call)
-  sessionsEnded: number;        // connections closed
+  sessionsEnded: number;        // identified connections closed
   totalSessionMs: number;       // sum of session durations
   totalCallMs: number;          // sum of participant call durations
   skips: number;                // skip presses
@@ -52,8 +52,9 @@ export type MatchAnalytics = {
   callMsSample: number[];       // bounded reservoir of call durations → median/p90
   waitMsSample: number[];       // bounded reservoir of queue waits → median wait
   recentEvents: MatchEvent[];   // ring buffer of the last events (admin live feed)
-  days: Record<string, { connections: number; matches: number }>; // YYYY-MM-DD
+  days: Record<string, { connections: number; matches: number; uniques?: number }>; // YYYY-MM-DD
   byHourET: Record<string, number>; // connections per hour of day in ET ("0"-"23")
+  uniqueVisitorDay: Record<string, string>; // visitorId → last dayKey counted (daily dedupe)
 };
 
 export const emptyStats = (): MatchAnalytics => ({
@@ -83,6 +84,7 @@ export const emptyStats = (): MatchAnalytics => ({
   recentEvents: [],
   days: {},
   byHourET: {},
+  uniqueVisitorDay: {},
 });
 
 export const dayKey = (ts = Date.now()): string =>
@@ -105,10 +107,34 @@ export const bumpHourET = (stats: MatchAnalytics, ts = Date.now()) => {
   stats.byHourET[h] = (stats.byHourET[h] ?? 0) + 1;
 };
 
+/**
+ * Daily unique visitors — the real DAU number. A visitorId (stable local
+ * UUID sent by the client) counts once per UTC day no matter how many
+ * sockets it opens (reconnects, lobby + match sockets, multi-tab).
+ */
+export const trackUniqueVisitor = (stats: MatchAnalytics, id: unknown) => {
+  if (typeof id !== "string" || !id || id.length > 128) return;
+  const k = dayKey();
+  if (stats.uniqueVisitorDay[id] === k) return; // already counted today
+  stats.uniqueVisitorDay[id] = k;
+  const d = (stats.days[k] ??= { connections: 0, matches: 0 });
+  d.uniques = (d.uniques ?? 0) + 1;
+  // Bound the map — entries from other days can never match again, so
+  // drop them once the map gets large.
+  if (Object.keys(stats.uniqueVisitorDay).length > 20_000) {
+    for (const vid of Object.keys(stats.uniqueVisitorDay)) {
+      if (stats.uniqueVisitorDay[vid] !== k) delete stats.uniqueVisitorDay[vid];
+    }
+  }
+};
+
 /** Normalize a profile gender string into an analytics bucket. */
 export const normalizeGender = (raw: string | null | undefined): string => {
   const g = (raw ?? "").trim().toLowerCase();
   if (!g || g === "prefer not to say") return "unspecified";
+  // Already-normalized values pass through — clients normalize before
+  // sending, and without this "unspecified" fell through to "other".
+  if (g === "unspecified" || g === "other") return g;
   if (g === "woman" || g === "female" || g === "girl") return "woman";
   if (g === "man" || g === "male" || g === "guy") return "man";
   if (g === "non-binary" || g === "nonbinary" || g === "nb") return "non-binary";
@@ -138,6 +164,44 @@ export const pushEvent = (stats: MatchAnalytics, ev: MatchEvent) => {
   if (stats.recentEvents.length > EVENT_CAP) {
     stats.recentEvents.splice(0, stats.recentEvents.length - EVENT_CAP);
   }
+};
+
+/**
+ * Merge one shard's MatchAnalytics into an aggregate — used when the
+ * matchmaker is sharded per continent and /api/analytics fans out.
+ * Daily uniques merge exactly: a visitorId hashes to ONE shard per day,
+ * so the same user can never be counted in two shards' days.
+ */
+export const mergeAnalytics = (into: MatchAnalytics, from: MatchAnalytics) => {
+  into.totalConnections += from.totalConnections ?? 0;
+  into.totalSearches += from.totalSearches ?? 0;
+  into.totalMatches += from.totalMatches ?? 0;
+  into.totalCalls += from.totalCalls ?? 0;
+  into.sessionsEnded += from.sessionsEnded ?? 0;
+  into.totalSessionMs += from.totalSessionMs ?? 0;
+  into.totalCallMs += from.totalCallMs ?? 0;
+  into.skips += from.skips ?? 0;
+  into.searchesAbandoned += from.searchesAbandoned ?? 0;
+  into.violations += from.violations ?? 0;
+  into.bans += from.bans ?? 0;
+  for (const rec of ["byCountry", "byGender", "byMode", "byModeMatches", "byGenderPair", "byAgeBracket", "byEndReason", "byDurationBucket", "byHourET"] as const) {
+    for (const [k, v] of Object.entries(from[rec] ?? {})) {
+      into[rec][k] = (into[rec][k] ?? 0) + v;
+    }
+  }
+  for (const [k, d] of Object.entries(from.days ?? {})) {
+    const t = (into.days[k] ??= { connections: 0, matches: 0 });
+    t.connections += d.connections;
+    t.matches += d.matches;
+    t.uniques = (t.uniques ?? 0) + (d.uniques ?? 0);
+  }
+  for (const [vid, k] of Object.entries(from.uniqueVisitorDay ?? {})) {
+    if (!into.uniqueVisitorDay[vid] || into.uniqueVisitorDay[vid] < k) into.uniqueVisitorDay[vid] = k;
+  }
+  into.ageSample = [...into.ageSample, ...(from.ageSample ?? [])].slice(-SAMPLE_CAP);
+  into.callMsSample = [...into.callMsSample, ...(from.callMsSample ?? [])].slice(-SAMPLE_CAP);
+  into.waitMsSample = [...into.waitMsSample, ...(from.waitMsSample ?? [])].slice(-SAMPLE_CAP);
+  into.recentEvents = [...into.recentEvents, ...(from.recentEvents ?? [])].sort((a, b) => a.t - b.t).slice(-EVENT_CAP);
 };
 
 export const percentile = (arr: number[], p: number): number | null => {
@@ -197,6 +261,8 @@ export const analyticsView = (stats: MatchAnalytics, live: { online: number; sea
     p90CallSec: sec(percentile(stats.callMsSample, 90)),
     medianWaitSec: sec(median(stats.waitMsSample)),
     p90WaitSec: sec(percentile(stats.waitMsSample, 90)),
+    // Real DAU — distinct visitorIds seen today (reconnects collapse to 1)
+    uniquesToday: stats.days[dayKey()]?.uniques ?? 0,
     topCountries,
     topGenders,
     topModes,

@@ -59,7 +59,7 @@ const ChatRoom = () => {
   // Local + remote video refs come from the shared match connection
   // (lives in MatchConnectionProvider so WebRTC survives navigation).
   // The camera stream is started once in the context — no duplicate getUserMedia.
-  const { remoteVideoRef, localVideoRef: pipVideoRef, localStreamRef, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName, peerAge: connPeerAge, sendPeerMessage, onPeerMessage } = useMatchConnectionContext();
+  const { remoteVideoRef, localVideoRef: pipVideoRef, localStreamRef, state: connState, skip: connSkip, disconnect: connDisconnect, extendRequestFrom, extendAccepted: connExtendAccepted, requestExtend, acceptExtend, declineExtend, peerId: connPeerId, peerCountry: connPeerCountry, peerName: connPeerName, peerAge: connPeerAge, sendPeerMessage, onPeerMessage, setHd } = useMatchConnectionContext();
   // Text mode — pure chat, zero permissions. Messages ride the peer
   // datachannel when it's up, else the match-server game-relay.
   const [msgs, setMsgs] = useState<{ me: boolean; text: string }[]>([]);
@@ -301,8 +301,10 @@ const ChatRoom = () => {
 
   const toggleHd = () => {
     if (!features.hdVideo) { toast.error("HD video is a VIP feature."); return; }
-    setHdOn((v) => !v);
-    toast.success(hdOn ? "HD off" : "HD on 🎥");
+    const next = !hdOn;
+    setHdOn(next);
+    void setHd(next); // real bitrate/fps upgrade on the outbound track
+    toast.success(next ? "HD on 🎥" : "HD off");
   };
   const toggleTranslate = () => {
     if (!features.liveTranslate) { toast.error("Live captions are a VIP feature."); return; }

@@ -28,7 +28,7 @@ import Stripe from "stripe";
 import {
   MatchAnalytics, emptyStats, bumpDay, bumpHourET, normalizeGender, normalizeAge,
   ageBracket, durationBucket, genderPairKey, pushSample, pushEvent,
-  analyticsView, heuristicInsights,
+  analyticsView, heuristicInsights, trackUniqueVisitor,
 } from "../shared/analytics";
 
 // Railway sets PORT; locally use MATCH_SERVER_PORT or default 8090
@@ -56,6 +56,12 @@ const PLUS_PRICES: Record<string, { amount: number; interval: "week" | "month" |
 const MAX_VIOLATIONS = 3;          // Auto-ban after this many violations
 const BAN_DURATION_MS = 86400000;  // 24 hour ban
 const VIOLATION_COOLDOWN_MS = 5000; // Ignore duplicate reports within 5s
+// Silence before a client is reaped. Kept generous (45s) because mobile
+// browsers suspend JS timers when the tab is backgrounded — a 10s cutoff
+// caused constant disconnect/reconnect churn (each reconnect = a counted
+// connection). findMatch still enforces a 5s freshness check, so suspended
+// searchers can never actually be paired while backgrounded.
+const GHOST_TIMEOUT_MS = 45000;
 
 // ── Types ──
 type Client = {
@@ -83,6 +89,8 @@ type Client = {
   countryCounted?: boolean;       // analytics: already counted in byCountry
   genderCounted?: boolean;        // analytics: already counted in byGender
   ageCounted?: boolean;           // analytics: already counted in byAgeBracket
+  counted?: boolean;              // analytics: client identified (register/search/lobby)
+  visitorId?: string | null;      // stable per-browser ID — daily unique dedupe
   joinedAt: number;
   lastSeen: number;         // last time we got a ping/pong/message from this client
   violations: number;
@@ -120,6 +128,24 @@ const trackAge = (c: Client) => {
     stats.byAgeBracket[b] = (stats.byAgeBracket[b] ?? 0) + 1;
     pushSample(stats.ageSample, c.selfAge);
   }
+};
+
+/**
+ * Count a client in connection stats — called on the FIRST purposeful
+ * message (register/search/lobby), not at socket-open. Silent sockets
+ * (bots, probes, health checks, people who bounce before registering)
+ * never pollute totalConnections/byCountry/days.
+ */
+const markIdentified = (c: Client, visitorId?: unknown) => {
+  if (typeof visitorId === "string" && visitorId && visitorId.length <= 128 && !c.visitorId) {
+    c.visitorId = visitorId;
+  }
+  if (c.counted) return;
+  c.counted = true;
+  stats.totalConnections++;
+  bumpDay(stats, "connections");
+  bumpHourET(stats);
+  trackUniqueVisitor(stats, c.visitorId);
 };
 
 /** Search given up before a match (cancel/disconnect) — funnel + event. */
@@ -339,6 +365,32 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── ICE servers — STUN + TURN config for clients. TURN_* env vars let
+  // you point at a real relay (coturn/CF Calls credentials endpoint); the
+  // free OpenRelay fallback won't survive real load. ──
+  if (req.method === "GET" && req.url === "/api/ice-servers") {
+    const iceServers: object[] = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+    ];
+    if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
+      iceServers.push({
+        urls: process.env.TURN_URL,
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
+      });
+    } else {
+      iceServers.push({
+        urls: "turn:openrelay.metered.ca:443?transport=tcp",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      });
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ iceServers }));
+    return;
+  }
+
   // ── URL preview scraper (OpenGraph metadata) ──
   if (req.method === "POST" && req.url === "/api/fetch-preview") {
     let body = "";
@@ -439,11 +491,11 @@ const send = (ws: WebSocket, msg: object) => {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 };
 
-// Broadcast real online count to every connected client
+// Broadcast real online + queue counts to every connected client
 const broadcastOnlineCount = () => {
-  const count = clients.size;
+  const live = liveCounts();
   for (const c of clients.values()) {
-    send(c.ws, { type: "presence", onlineCount: count });
+    send(c.ws, { type: "presence", onlineCount: live.online, searching: live.searching });
   }
 };
 
@@ -654,10 +706,13 @@ const removeClient = (id: string, reason = "disconnect") => {
   }
 
   // ── Analytics: abandoned search + session + call duration ──
+  // (only identified clients count — silent sockets never had a session)
   abandonSearch(client, "disconnect");
   endCall(client, reason);
-  stats.sessionsEnded++;
-  stats.totalSessionMs += Date.now() - client.joinedAt;
+  if (client.counted) {
+    stats.sessionsEnded++;
+    stats.totalSessionMs += Date.now() - client.joinedAt;
+  }
 
   // Clean up lobby rooms
   for (const [rid, room] of lobbyRooms) {
@@ -718,10 +773,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
   };
   clients.set(id, client);
 
-  // ── Analytics: new connection ──
-  stats.totalConnections++;
-  bumpDay(stats, "connections");
-  bumpHourET(stats);
+  // NOTE: connection stats are NOT counted here — bots/probes open silent
+  // sockets all day. markIdentified() counts on the first real message.
 
   // Send assigned ID + real online count
   send(ws, { type: "connected", id, onlineCount: clients.size });
@@ -744,7 +797,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     switch (msg.type) {
       // ── Register country (sent right after connect) ──
       case "register": {
-        c.country = msg.country ?? null;
+        markIdentified(c, msg.visitorId);
+        c.country = msg.country ?? c.country;
         c.name = msg.name ?? c.name;
         if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
         const regAge = normalizeAge(msg.selfAge);
@@ -758,6 +812,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
       // ── Start searching for a match ──
       case "search": {
+        markIdentified(c, msg.visitorId);
         // If this client was still paired (e.g. they re-searched after a
         // reconnect without skipping), release the old partner so they aren't
         // stuck with a dangling partnerId in "matched" status forever.
@@ -803,7 +858,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         if (match) {
           pairClients(c, match);
         } else {
-          send(ws, { type: "searching", onlineCount: clients.size });
+          send(ws, { type: "searching", onlineCount: clients.size, searching: liveCounts().searching });
         }
         break;
       }
@@ -902,7 +957,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         // Don't immediately match — let the client navigate to the Match
         // searching view and re-search from there (like Monkey app).
         // Just confirm the skip; the client's search() call will trigger findMatch.
-        send(ws, { type: "searching", onlineCount: clients.size });
+        send(ws, { type: "searching", onlineCount: clients.size, searching: liveCounts().searching });
         break;
       }
 
@@ -959,6 +1014,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
       // ── Lobby: create a room (host) ──
       case "lobby-create": {
+        markIdentified(c, msg.visitorId);
         const roomId = `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         lobbyRooms.set(roomId, { hostId: id });
         send(ws, { type: "lobby-created", roomId });
@@ -968,6 +1024,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
       // ── Lobby: join a room (guest) ──
       case "lobby-join": {
+        markIdentified(c, msg.visitorId);
         const roomId = msg.roomId;
         const room = lobbyRooms.get(roomId);
         if (!room) {
@@ -1091,8 +1148,8 @@ setInterval(() => {
       cleaned++;
       continue;
     }
-    // Remove clients we haven't heard from in 10s (ghosts that don't respond to ping)
-    if (now - c.lastSeen > 10000) {
+    // Remove clients we haven't heard from in a while (ghosts that don't respond to ping)
+    if (now - c.lastSeen > GHOST_TIMEOUT_MS) {
       console.log(`Removing ghost client ${id} (no activity for ${Math.round((now - c.lastSeen)/1000)}s)`);
       removeClient(id);
       cleaned++;

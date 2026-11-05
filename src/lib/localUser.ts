@@ -11,6 +11,7 @@ export type LocalProfile = {
   id: string;
   display_name: string;
   gender: string | null;
+  age: number | null;
   country: string | null;
   interests: string[];
   avatar_url: string | null;
@@ -23,6 +24,7 @@ export type LocalUser = {
   user_metadata: {
     display_name: string;
     gender: string | null;
+    age?: number | null;
     country: string | null;
     interests: string[];
   };
@@ -69,6 +71,7 @@ export const getLocalProfile = (): LocalProfile => {
     id: user.id,
     display_name: user.user_metadata.display_name,
     gender: null,
+    age: null,
     country: null,
     interests: [],
     avatar_url: null,

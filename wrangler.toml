@@ -4,10 +4,18 @@ compatibility_date = "2025-09-17"
 
 [vars]
 FRONTEND_URL = "https://www.facefrenzy.fun"
+# Matchmaker is sharded per continent (mm-<continent>-<i>). SUBSHARDS adds
+# extra shards to the big regions (NA/EU/AS): "1" = one DO per continent
+# (~10-20k sockets each); "4" ≈ 16 DOs total for ~100k concurrency.
+SUBSHARDS = "1"
 
 # STRIPE_SECRET_KEY is set via: npx wrangler secret put STRIPE_SECRET_KEY
 # ADMIN_KEY (optional) protects /api/analytics + /api/insights:
 #   npx wrangler secret put ADMIN_KEY
+# TURN for real-scale relay (~10-20% of calls can't do pure P2P):
+#   provision Cloudflare Calls, then:
+#   npx wrangler secret put TURN_KEY_ID
+#   npx wrangler secret put TURN_API_TOKEN
 # PostHog AI Observability requires these Worker bindings:
 #   npx wrangler secret put VITE_PUBLIC_POSTHOG_KEY
 #   npx wrangler secret put VITE_PUBLIC_POSTHOG_HOST

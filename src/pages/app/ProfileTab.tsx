@@ -28,6 +28,7 @@ type ProfileRow = {
   id: string;
   display_name: string | null;
   gender: string | null;
+  age: number | null;
   country: string | null;
   interests: string[] | null;
   avatar_url: string | null;
@@ -50,6 +51,7 @@ const ProfileTab = () => {
 
   const [displayName, setDisplayName] = useState("");
   const [gender, setGender] = useState<string | null>(null);
+  const [age, setAge] = useState<number | null>(null);
   const [country, setCountry] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -69,6 +71,7 @@ const ProfileTab = () => {
       const p = getLocalProfile();
       setDisplayName(p.display_name);
       setGender(p.gender);
+      setAge(p.age ?? null);
       setCountry(p.country);
       setInterests(p.interests);
       setAvatarUrl(p.avatar_url);
@@ -86,6 +89,7 @@ const ProfileTab = () => {
         const p = data as ProfileRow | null;
         setDisplayName(p?.display_name ?? "");
         setGender(p?.gender ?? null);
+        setAge(p?.age ?? null);
         setCountry(p?.country ?? null);
         setInterests(p?.interests ?? []);
         setAvatarUrl(p?.avatar_url ?? null);
@@ -154,20 +158,21 @@ const ProfileTab = () => {
     if (!displayName.trim()) { toast.error("Display name can't be empty"); return; }
     setSaving(true);
     if (isLocal) {
-      saveLocalProfile({ display_name: displayName.trim(), gender, country, interests, socials } as Partial<LocalProfile> & { socials?: Record<string, string> });
-      updateLocalUserMeta({ display_name: displayName.trim(), gender, country, interests });
+      saveLocalProfile({ display_name: displayName.trim(), gender, age, country, interests, socials } as Partial<LocalProfile> & { socials?: Record<string, string> });
+      updateLocalUserMeta({ display_name: displayName.trim(), gender, age, country, interests });
       capturePostHogEvent(posthog, "profile_saved");
       setSaving(false);
       toast.success("Profile saved ✨");
       return;
     }
     const { error } = await supabase.from("profiles").update({
-      display_name: displayName.trim(), gender, country, interests, socials,
+      display_name: displayName.trim(), gender, age, country, interests, socials,
     }).eq("id", user.id);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    // Keep the local name (used as the match name) in sync with the DB
+    // Keep the local profile (used for matchmaking analytics) in sync with the DB
     setLocalDisplayName(displayName.trim());
+    saveLocalProfile({ gender, age, country });
     capturePostHogEvent(posthog, "profile_saved");
     toast.success("Profile saved ✨");
   };
@@ -383,6 +388,18 @@ const ProfileTab = () => {
                 <button key={g} onClick={() => setGender(g)} className={`chip ${gender === g ? "chip-selected" : ""}`}>{g}</button>
               ))}
             </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Age</h3>
+            <input
+              type="number"
+              min={16}
+              max={99}
+              value={age ?? ""}
+              onChange={(e) => setAge(e.target.value ? Math.min(99, Math.max(1, parseInt(e.target.value, 10) || 0)) : null)}
+              className="input-glass w-28 text-center"
+              placeholder="e.g. 21"
+            />
           </div>
           <div>
             <h3 className="text-sm font-semibold mb-2">Country</h3>

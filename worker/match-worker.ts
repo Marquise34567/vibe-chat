@@ -24,7 +24,7 @@ import { DurableObject } from "cloudflare:workers";
 import {
   MatchAnalytics, emptyStats, bumpDay, bumpHourET, normalizeGender, normalizeAge,
   ageBracket, durationBucket, genderPairKey, pushSample, pushEvent,
-  analyticsView, heuristicInsights,
+  analyticsView, heuristicInsights, trackUniqueVisitor, mergeAnalytics,
 } from "../shared/analytics";
 
 interface Env {
@@ -36,6 +36,9 @@ interface Env {
   VITE_PUBLIC_POSTHOG_KEY?: string;
   VITE_PUBLIC_POSTHOG_HOST?: string;
   ENVIRONMENT?: string;
+  SUBSHARDS?: string;             // extra DO shards for NA/EU/AS — "1" = off, raise at scale
+  TURN_KEY_ID?: string;           // Cloudflare Calls TURN key (optional)
+  TURN_API_TOKEN?: string;        // Cloudflare Calls API token (optional)
 }
 
 const SPONSOR_PRICE_CENTS_PER_DAY = 500; // $5/day
@@ -55,8 +58,130 @@ const PLUS_PRICES: Record<string, { amount: number; interval: "week" | "month" |
 const MAX_VIOLATIONS = 3; // Auto-ban after this many violations
 const BAN_DURATION_MS = 86400000; // 24 hour ban
 const VIOLATION_COOLDOWN_MS = 5000; // Ignore duplicate reports within 5s
-const GHOST_TIMEOUT_MS = 10000; // No messages for 10s → dead client
+// Silence before a client is reaped. Kept generous (45s) because mobile
+// browsers suspend JS timers when the tab is backgrounded — a 10s cutoff
+// caused constant disconnect/reconnect churn (each reconnect = a counted
+// connection). findMatch still enforces a 5s freshness check, so suspended
+// searchers can never actually be paired while backgrounded.
+const GHOST_TIMEOUT_MS = 45000;
 const SWEEP_INTERVAL_MS = 5000;
+
+// ── Sharding: one Matchmaker DO per continent (+ optional subshards) ──
+// A single global DO is the scaling bottleneck — one isolate, one thread.
+// Users are routed to the DO for their continent (request.cf.continent),
+// or the continent their region filter targets (?shard=). Lobby rooms pin
+// to the shard embedded in the room ID (?room=r-<cont><i>-xxxx) so host
+// and guest always land on the same DO. SUBSHARDS splits the biggest
+// regions further (mm-na-0..N) — raise via wrangler vars as traffic grows;
+// "1" = one DO per continent, which keeps small queues maximally liquid.
+const CONTINENTS = ["AF", "AS", "EU", "NA", "OC", "SA"] as const;
+
+const subshardsFor = (env: Env, c: string): number =>
+  c === "NA" || c === "EU" || c === "AS"
+    ? Math.min(16, Math.max(1, parseInt(env.SUBSHARDS ?? "1", 10) || 1))
+    : 1;
+
+const shardName = (c: string, i: number) => `mm-${c.toLowerCase()}-${i}`;
+
+const hashStr = (s: string): number => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+/** Which Matchmaker DO should host this socket? */
+const shardForRequest = (request: Request, env: Env): string => {
+  const url = new URL(request.url);
+  // Lobby joins carry the room's home shard (?room=r-NA2-xxxx)
+  const room = url.searchParams.get("room") ?? "";
+  const m = room.match(/^r-([a-z]{2})(\d+)-/i);
+  if (m) return shardName(m[1], parseInt(m[2], 10));
+  // Region-filtered searches can target another continent (?shard=EU)
+  const hint = (url.searchParams.get("shard") ?? "").toUpperCase();
+  const cont = (CONTINENTS as readonly string[]).includes(hint)
+    ? hint
+    : ((request.cf?.continent as string | undefined) ?? "NA");
+  const n = subshardsFor(env, cont);
+  // Stable per-user shard — the same visitorId/IP always lands on the
+  // same DO, which also makes daily unique counts exact.
+  const key = url.searchParams.get("v") || request.headers.get("cf-connecting-ip") || "";
+  return shardName(cont, n > 1 ? hashStr(key) % n : 0);
+};
+
+const allShardNames = (env: Env): string[] =>
+  CONTINENTS.flatMap((c) => Array.from({ length: subshardsFor(env, c) }, (_, i) => shardName(c, i)));
+
+/** Aggregate stats + live counts across every shard DO. */
+const aggregateStats = async (env: Env) => {
+  const parts = await Promise.all(
+    allShardNames(env).map(async (name) => {
+      try {
+        const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name));
+        const res = await stub.fetch("https://do/internal/stats");
+        return (await res.json()) as {
+          stats: MatchAnalytics;
+          live: { online: number; searching: number; inCall: number };
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+  const stats = emptyStats();
+  const live = { online: 0, searching: 0, inCall: 0 };
+  let startedAt = Infinity;
+  for (const p of parts) {
+    if (!p) continue;
+    mergeAnalytics(stats, p.stats);
+    if (p.stats.startedAt) startedAt = Math.min(startedAt, p.stats.startedAt);
+    live.online += p.live?.online ?? 0;
+    live.searching += p.live?.searching ?? 0;
+    live.inCall += p.live?.inCall ?? 0;
+  }
+  if (Number.isFinite(startedAt)) stats.startedAt = startedAt;
+  return { stats, live };
+};
+
+const adminOk = (request: Request, env: Env): boolean => {
+  const key = env.ADMIN_KEY;
+  if (!key) return true;
+  return new URL(request.url).searchParams.get("key") === key;
+};
+
+/** ICE server config for clients — Cloudflare Calls TURN when provisioned,
+ *  else public STUN + the free OpenRelay fallback (not 100k-ready). */
+const handleIceServers = async (request: Request, env: Env): Promise<Response> => {
+  const iceServers: unknown[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+  if (env.TURN_KEY_ID && env.TURN_API_TOKEN) {
+    try {
+      const res = await fetch(
+        `https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_KEY_ID}/credentials/generate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.TURN_API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ttl: 86400 }),
+        }
+      );
+      const data = (await res.json()) as { iceServers?: unknown };
+      if (res.ok && data.iceServers) iceServers.push(data.iceServers);
+    } catch (err) {
+      console.error("TURN credential fetch failed:", err);
+    }
+  } else {
+    iceServers.push({
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    });
+  }
+  return json({ iceServers }, { status: 200 }, request, env);
+};
 
 // ── Per-client state, persisted in the WebSocket attachment ──
 type ClientState = {
@@ -83,6 +208,8 @@ type ClientState = {
   countryCounted?: boolean;       // analytics: already counted in byCountry
   genderCounted?: boolean;        // analytics: already counted in byGender
   ageCounted?: boolean;           // analytics: already counted in byAgeBracket
+  counted?: boolean;              // analytics: client identified (register/search/lobby)
+  visitorId?: string | null;      // stable per-browser ID — daily unique dedupe
   joinedAt: number;
   lastSeen: number;
   violations: number;
@@ -143,7 +270,7 @@ const corsHeaders = (request: Request, env: Env): Record<string, string> => {
       : env.FRONTEND_URL;
   return {
     "Access-Control-Allow-Origin": allow,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 };
@@ -374,7 +501,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // ── WebSocket upgrade → global matchmaker Durable Object ──
+    // ── WebSocket upgrade → the client's continental Matchmaker DO ──
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       // Forward the real client IP + country so the DO can use them for
       // bans and region matching (DO fetches don't see request.cf).
@@ -384,7 +511,7 @@ export default {
       const country = request.cf?.country;
       if (country) headers.set("x-client-country", String(country));
 
-      const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName("global"));
+      const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(shardForRequest(request, env)));
       return stub.fetch(new Request(request.url, { method: request.method, headers }));
     }
 
@@ -400,10 +527,28 @@ export default {
       return handlePlusVerify(request, env);
     }
 
-    // ── Analytics + AI insights — served by the Matchmaker DO ──
-    if (url.pathname === "/api/analytics" || url.pathname === "/api/insights") {
-      const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName("global"));
-      return stub.fetch(new Request(request.url, { method: request.method, headers: request.headers }));
+    // ── Analytics — aggregate across every shard DO ──
+    if (url.pathname === "/api/analytics") {
+      if (!adminOk(request, env)) return json({ error: "Unauthorized" }, { status: 401 }, request, env);
+      const { stats, live } = await aggregateStats(env);
+      return json(analyticsView(stats, live), { status: 200 }, request, env);
+    }
+
+    // ── AI insights — merged stats analyzed by the primary shard's AI ──
+    if (url.pathname === "/api/insights") {
+      if (!adminOk(request, env)) return json({ error: "Unauthorized" }, { status: 401 }, request, env);
+      const { stats, live } = await aggregateStats(env);
+      const stub = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(shardName("na", 0)));
+      const res = await stub.fetch("https://do/internal/insights", {
+        method: "POST",
+        body: JSON.stringify({ stats, live }),
+      });
+      return json(await res.json(), { status: 200 }, request, env);
+    }
+
+    // ── ICE servers — clients fetch TURN/STUN config before calling ──
+    if (url.pathname === "/api/ice-servers") {
+      return handleIceServers(request, env);
     }
 
     if (request.method === "POST" && url.pathname === "/api/fetch-preview") {
@@ -422,6 +567,42 @@ export class Matchmaker extends DurableObject<Env> {
   private bannedIps = new Map<string, number>();
   private stats: MatchAnalytics = emptyStats();
   private readonly aiInsightsSessionId = `admin-insights-${crypto.randomUUID()}`;
+
+  // ── In-memory search queue: mode → ordered client ids (FIFO = fair) ──
+  // findMatch iterates only same-mode searchers — a small subset of all
+  // sockets — instead of deserializing every client attachment per search.
+  // Rebuilt lazily after hibernation (attachment state is the source of truth).
+  private searchQueues: Map<string, Set<string>> | null = null;
+
+  private queues(): Map<string, Set<string>> {
+    if (this.searchQueues) return this.searchQueues;
+    const q = new Map<string, Set<string>>();
+    for (const ws of this.ctx.getWebSockets()) {
+      const c = this.getClient(ws);
+      if (c && !c.closed && c.status === "searching") {
+        const set = q.get(c.mode) ?? new Set<string>();
+        set.add(c.id);
+        q.set(c.mode, set);
+      }
+    }
+    this.searchQueues = q;
+    return q;
+  }
+
+  private queueFor(mode: string): Set<string> {
+    const q = this.queues();
+    let set = q.get(mode);
+    if (!set) { set = new Set<string>(); q.set(mode, set); }
+    return set;
+  }
+
+  /** Status changes must flow through here to keep the queue index in sync. */
+  private setStatus(c: ClientState, status: ClientState["status"]) {
+    if (c.status === status) return;
+    if (c.status === "searching") this.queueFor(c.mode).delete(c.id);
+    c.status = status;
+    if (status === "searching") this.queueFor(c.mode).add(c.id);
+  }
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -463,6 +644,26 @@ export class Matchmaker extends DurableObject<Env> {
       pushSample(this.stats.ageSample, c.selfAge);
       this.persistStats();
     }
+  }
+
+  /**
+   * Count a client in connection stats — called on the FIRST purposeful
+   * message (register/search/lobby), not at socket-open. Silent sockets
+   * (bots, probes, people who bounce before registering) never pollute
+   * totalConnections/byCountry/days.
+   */
+  private markIdentified(c: ClientState, visitorId?: unknown) {
+    if (typeof visitorId === "string" && visitorId && visitorId.length <= 128 && !c.visitorId) {
+      c.visitorId = visitorId;
+    }
+    if (c.counted) return;
+    c.counted = true;
+    this.stats.totalConnections++;
+    bumpDay(this.stats, "connections");
+    bumpHourET(this.stats);
+    trackUniqueVisitor(this.stats, c.visitorId);
+    this.trackCountry(c); // CF geo baseline is already set — count it now that the client is real
+    this.persistStats();
   }
 
   /** Search given up before a match (cancel/disconnect) — funnel + event. */
@@ -543,7 +744,7 @@ export class Matchmaker extends DurableObject<Env> {
   }
 
   // ── AI insights via Workers AI (Llama) with heuristic fallback ──
-  private async buildInsights(): Promise<{ insights: string[]; source: string }> {
+  private async buildInsights(stats: MatchAnalytics, live: { online: number; searching: number; inCall: number }): Promise<{ insights: string[]; source: string }> {
     if (this.env.ENVIRONMENT === "development") {
       const missingPostHogVariable = !this.env.VITE_PUBLIC_POSTHOG_KEY
         ? "VITE_PUBLIC_POSTHOG_KEY"
@@ -555,8 +756,7 @@ export class Matchmaker extends DurableObject<Env> {
       }
     }
 
-    const live = this.liveCounts();
-    const view = analyticsView(this.stats, live);
+    const view = analyticsView(stats, live);
 
     if (this.env.AI) {
       try {
@@ -608,7 +808,7 @@ export class Matchmaker extends DurableObject<Env> {
         console.error("[insights] Workers AI failed, falling back:", err);
       }
     }
-    return { insights: heuristicInsights(this.stats, live), source: "heuristic" };
+    return { insights: heuristicInsights(stats, live), source: "heuristic" };
   }
 
   // ── Attachment helpers ──
@@ -647,9 +847,9 @@ export class Matchmaker extends DurableObject<Env> {
   }
 
   private broadcastOnlineCount() {
-    const count = this.clientCount();
+    const live = this.liveCounts();
     for (const ws of this.ctx.getWebSockets()) {
-      this.send(ws, { type: "presence", onlineCount: count });
+      this.send(ws, { type: "presence", onlineCount: live.online, searching: live.searching });
     }
   }
 
@@ -706,7 +906,7 @@ export class Matchmaker extends DurableObject<Env> {
         const partner = partnerWs ? this.getClient(partnerWs) : null;
         if (partnerWs && partner) {
           this.send(partnerWs, { type: "partner-banned", peerId: client.id });
-          partner.status = "searching";
+          this.setStatus(partner, "searching");
           partner.partnerId = undefined;
           this.endCall(partner, "partner-left");
           this.putClient(partnerWs, partner);
@@ -734,12 +934,19 @@ export class Matchmaker extends DurableObject<Env> {
     if (client.partnerId) return null;
     const now = Date.now();
 
-    for (const otherWs of this.ctx.getWebSockets()) {
+    // Iterate only same-mode searchers (oldest first = FIFO fairness).
+    const queue = this.queues().get(client.mode);
+    if (!queue || queue.size === 0) return null;
+
+    for (const otherId of queue) {
+      if (otherId === client.id) continue;
+      const otherWs = this.wsById(otherId);
+      if (!otherWs) { queue.delete(otherId); continue; } // stale entry
       const other = this.getClient(otherWs);
-      if (!other || other.closed) continue;
-      if (other.id === client.id) continue;
-      if (other.status !== "searching") continue;
-      if (other.partnerId) continue;
+      if (!other || other.closed || other.status !== "searching" || other.partnerId) {
+        queue.delete(otherId);
+        continue;
+      }
       if (now - other.lastSeen > 5000) continue; // ghost check
       if (other.mode !== client.mode) continue;
 
@@ -787,8 +994,8 @@ export class Matchmaker extends DurableObject<Env> {
       return;
     }
 
-    a.status = "matched";
-    b.status = "matched";
+    this.setStatus(a, "matched");
+    this.setStatus(b, "matched");
     a.partnerId = b.id;
     b.partnerId = a.id;
     a.matchedAt = Date.now();
@@ -901,18 +1108,22 @@ export class Matchmaker extends DurableObject<Env> {
       const partner = partnerWs ? this.getClient(partnerWs) : null;
       if (partnerWs && partner) {
         this.send(partnerWs, { type: "partner-left", peerId: c.id });
-        partner.status = "searching";
+        this.setStatus(partner, "searching");
         partner.partnerId = undefined;
         this.endCall(partner, "partner-left");
         this.putClient(partnerWs, partner);
       }
     }
+    this.queueFor(c.mode).delete(c.id); // drop from queue index (client is gone)
 
     // ── Analytics: abandoned search + session + call duration ──
+    // (only identified clients count — silent sockets never had a session)
     this.abandonSearch(c, "disconnect");
     this.endCall(c, reason);
-    this.stats.sessionsEnded++;
-    this.stats.totalSessionMs += Date.now() - c.joinedAt;
+    if (c.counted) {
+      this.stats.sessionsEnded++;
+      this.stats.totalSessionMs += Date.now() - c.joinedAt;
+    }
     this.persistStats();
 
     await this.leaveLobby(ws, c);
@@ -925,7 +1136,23 @@ export class Matchmaker extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
     const pathname = new URL(request.url).pathname;
 
-    // Analytics snapshot — "who's using it, from where, how long"
+    // Internal: raw stats for cross-shard aggregation (worker fan-out only —
+    // /internal/* is never routed from the public fetch handler)
+    if (pathname === "/internal/stats") {
+      return Response.json({ stats: this.stats, live: this.liveCounts() });
+    }
+    if (pathname === "/internal/insights" && request.method === "POST") {
+      const body = (await request.json().catch(() => ({}))) as {
+        stats?: MatchAnalytics;
+        live?: { online: number; searching: number; inCall: number };
+      };
+      const stats = body.stats ?? this.stats;
+      const live = body.live ?? this.liveCounts();
+      const result = await this.buildInsights(stats, live);
+      return Response.json({ ...result, stats: analyticsView(stats, live) });
+    }
+
+    // Analytics snapshot — "who's using it, from where, how long" (this shard)
     if (pathname === "/api/analytics") {
       if (!this.adminOk(request)) return new Response("Unauthorized", { status: 401 });
       return Response.json(analyticsView(this.stats, this.liveCounts()));
@@ -934,7 +1161,7 @@ export class Matchmaker extends DurableObject<Env> {
     // AI-generated insights (Workers AI, heuristic fallback)
     if (pathname === "/api/insights") {
       if (!this.adminOk(request)) return new Response("Unauthorized", { status: 401 });
-      const result = await this.buildInsights();
+      const result = await this.buildInsights(this.stats, this.liveCounts());
       return Response.json({ ...result, stats: analyticsView(this.stats, this.liveCounts()) });
     }
 
@@ -984,12 +1211,9 @@ export class Matchmaker extends DurableObject<Env> {
       peerCountry: null,
     };
 
-    // ── Analytics: connection + country ──
-    this.stats.totalConnections++;
-    bumpDay(this.stats, "connections");
-    bumpHourET(this.stats);
-    this.trackCountry(client);
-    this.persistStats();
+    // NOTE: connection stats are NOT counted here — bots/probes open
+    // silent sockets all day. markIdentified() counts on the first real
+    // message (register/search/lobby).
 
     // Tag the socket with the client ID so we can look it up directly
     this.ctx.acceptWebSocket(server, [id]);
@@ -1024,6 +1248,7 @@ export class Matchmaker extends DurableObject<Env> {
     switch (msg.type) {
       // ── Register country (sent right after connect) ──
       case "register": {
+        this.markIdentified(c, msg.visitorId);
         c.country = msg.country ?? c.country;
         c.name = msg.name ?? c.name;
         if (msg.selfGender) c.selfGender = normalizeGender(msg.selfGender);
@@ -1038,6 +1263,7 @@ export class Matchmaker extends DurableObject<Env> {
 
       // ── Start searching for a match ──
       case "search": {
+        this.markIdentified(c, msg.visitorId);
         // If still paired (e.g. re-search after reconnect without skipping),
         // release the old partner so they aren't stuck in "matched" status
         // with a dangling partnerId forever.
@@ -1048,7 +1274,7 @@ export class Matchmaker extends DurableObject<Env> {
             const now = Date.now();
             c.recentlySkipped[oldPartner.id] = now + 60000;
             oldPartner.recentlySkipped[id] = now + 60000;
-            oldPartner.status = "searching";
+            this.setStatus(oldPartner, "searching");
             oldPartner.partnerId = undefined;
             this.endCall(oldPartner, "partner-left");
             this.putClient(oldWs, oldPartner);
@@ -1058,7 +1284,7 @@ export class Matchmaker extends DurableObject<Env> {
           // from spanning the old call + the new search.
           this.endCall(c, "replaced");
         }
-        c.status = "searching";
+        this.setStatus(c, "searching");
         c.mode = msg.mode ?? "solo";
         c.gender = msg.gender ?? "any";
         c.scholarOnly = msg.scholarOnly ?? false;
@@ -1085,7 +1311,7 @@ export class Matchmaker extends DurableObject<Env> {
           this.putClient(ws, c);
           this.pairClients(ws, c, match.ws, match.client);
         } else {
-          this.send(ws, { type: "searching", onlineCount: this.clientCount() });
+          this.send(ws, { type: "searching", onlineCount: this.clientCount(), searching: this.liveCounts().searching });
         }
         break;
       }
@@ -1096,7 +1322,7 @@ export class Matchmaker extends DurableObject<Env> {
         this.abandonSearch(c, "cancel");
         // "in-call" = not in the queue — keeps findMatch from pairing a user
         // who already backed out to the lobby.
-        c.status = "in-call";
+        this.setStatus(c, "in-call");
         c.partnerId = undefined;
         this.send(ws, { type: "cancelled" });
         break;
@@ -1149,7 +1375,7 @@ export class Matchmaker extends DurableObject<Env> {
             const expiry = now + 60000;
             c.recentlySkipped[partner.id] = expiry;
             partner.recentlySkipped[id] = expiry;
-            partner.status = "searching";
+            this.setStatus(partner, "searching");
             partner.partnerId = undefined;
             this.endCall(partner, "partner-left");
             this.putClient(partnerWs, partner);
@@ -1158,11 +1384,11 @@ export class Matchmaker extends DurableObject<Env> {
         }
         this.stats.skips++;
         this.endCall(c, "skip");
-        c.status = "searching";
+        this.setStatus(c, "searching");
         c.partnerId = undefined;
         this.send(ws, { type: "skipped" });
         // The client's next search() call will trigger findMatch
-        this.send(ws, { type: "searching", onlineCount: this.clientCount() });
+        this.send(ws, { type: "searching", onlineCount: this.clientCount(), searching: this.liveCounts().searching });
         break;
       }
 
@@ -1199,21 +1425,29 @@ export class Matchmaker extends DurableObject<Env> {
           const partner = partnerWs ? this.getClient(partnerWs) : null;
           if (partnerWs && partner) {
             this.send(partnerWs, { type: "partner-left", peerId: id });
-            partner.status = "searching";
+            this.setStatus(partner, "searching");
             partner.partnerId = undefined;
             this.endCall(partner, "partner-left");
             this.putClient(partnerWs, partner);
           }
         }
         this.endCall(c, "leave");
-        c.status = "in-call";
+        this.setStatus(c, "in-call");
         c.partnerId = undefined;
         break;
       }
 
       // ── Lobby: create a room (host) ──
       case "lobby-create": {
-        const roomId = `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        this.markIdentified(c, msg.visitorId);
+        // Room ID embeds this DO's shard tag so a guest anywhere in the
+        // world gets routed to the same shard (?room= on the WS upgrade).
+        // "mm-na-2" → "NA2" → room "r-NA2-xxxx".
+        const tag = (this.ctx.id.name ?? "mm-na-0")
+          .replace(/^mm-/i, "")
+          .replace("-", "")
+          .toUpperCase();
+        const roomId = `r-${tag}-${Math.random().toString(36).slice(2, 10)}`;
         await this.ctx.storage.put(`room:${roomId}`, { hostId: id } satisfies LobbyRoom);
         c.lobbyRoomId = roomId;
         c.lobbyRole = "host";
@@ -1224,6 +1458,7 @@ export class Matchmaker extends DurableObject<Env> {
 
       // ── Lobby: join a room (guest) ──
       case "lobby-join": {
+        this.markIdentified(c, msg.visitorId);
         const roomId = msg.roomId;
         const room = await this.ctx.storage.get<LobbyRoom>(`room:${roomId}`);
         if (!room) {

@@ -11,6 +11,7 @@
  */
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { getLocalProfile } from "@/lib/localUser";
 
 const MATCH_SERVER_URL =
   (import.meta as any).env?.VITE_MATCH_SERVER_URL ?? "ws://localhost:8090";
@@ -44,7 +45,10 @@ export function useLobbyRoom() {
     }
 
     pc.ontrack = (event) => {
-      const [stream] = event.streams;
+      // event.streams can be empty if the sender didn't associate the
+      // track with a MediaStream — never assign undefined to srcObject.
+      const stream = event.streams[0];
+      if (!stream) return;
       if (friendVideoRef.current) {
         friendVideoRef.current.srcObject = stream;
         friendVideoRef.current.play().catch(() => {});
@@ -171,9 +175,9 @@ export function useLobbyRoom() {
   }, [createPC, startLocalStream, isHost]);
 
   // ── Connect WebSocket ──
-  const ensureConnected = useCallback(() => {
+  const ensureConnected = useCallback((qs = "") => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
-    const ws = new WebSocket(MATCH_SERVER_URL);
+    const ws = new WebSocket(MATCH_SERVER_URL + qs);
     wsRef.current = ws;
     ws.onopen = () => setState("connected");
     ws.onmessage = (event) => {
@@ -191,7 +195,7 @@ export function useLobbyRoom() {
     // Wait for connection then send
     const trySend = () => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: "lobby-create" }));
+        wsRef.current.send(JSON.stringify({ type: "lobby-create", visitorId: getLocalProfile().id }));
       } else {
         setTimeout(trySend, 200);
       }
@@ -201,10 +205,12 @@ export function useLobbyRoom() {
 
   // ── Join a room (guest) ──
   const joinRoom = useCallback((rid: string) => {
-    ensureConnected();
+    // Room IDs embed the host's shard — ?room= routes this socket to the
+    // same matchmaker DO so the room lookup actually finds it.
+    ensureConnected(`?room=${encodeURIComponent(rid)}`);
     const trySend = () => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: "lobby-join", roomId: rid }));
+        wsRef.current.send(JSON.stringify({ type: "lobby-join", roomId: rid, visitorId: getLocalProfile().id }));
       } else {
         setTimeout(trySend, 200);
       }
