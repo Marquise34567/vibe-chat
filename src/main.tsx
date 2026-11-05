@@ -38,9 +38,10 @@ const posthogEnabled = Boolean(posthogKeyConfigured && posthogOptions);
 const app = <App posthogEnabled={posthogEnabled} />;
 
 // Register the push service worker early — it only handles "someone's
-// online" ping events, no fetch interception.
+// online" ping events, no fetch interception. Lives at /ff-push-sw.js;
+// /sw.js belongs to the ad network's push worker.
 if ("serviceWorker" in navigator && import.meta.env.VITE_VAPID_PUBLIC_KEY) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker.register("/ff-push-sw.js").catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(

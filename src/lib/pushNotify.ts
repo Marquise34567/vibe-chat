@@ -20,11 +20,15 @@ const b64uToBytes = (s: string): Uint8Array => {
   return out;
 };
 
+// Own worker path — /sw.js is claimed by the ad network's in-page-push
+// worker, so pool pings register under a separate scope.
+const PUSH_SW_URL = "/ff-push-sw.js";
+
 let regPromise: Promise<ServiceWorkerRegistration> | null = null;
 
 export const swRegistration = (): Promise<ServiceWorkerRegistration | null> => {
   if (!pushSupported()) return Promise.resolve(null);
-  regPromise ??= navigator.serviceWorker.register("/sw.js");
+  regPromise ??= navigator.serviceWorker.register(PUSH_SW_URL);
   return regPromise;
 };
 
