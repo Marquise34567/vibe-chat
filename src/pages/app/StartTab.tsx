@@ -16,11 +16,10 @@ import {
 } from "@/components/FaceFrenzyIcons";
 import { BrandMark } from "@/components/BrandMark";
 import { FloatingStickers } from "@/components/FloatingStickers";
-import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
+import { apiBase, SOCIAL_LINKS, PLUS_PLANS, VIP_PLANS } from "@/lib/config";
 import { useTier } from "@/hooks/useTier";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
-import { apiBase, SOCIAL_LINKS, PLUS_PLANS, VIP_PLANS } from "@/lib/config";
 import { Crown } from "lucide-react";
 import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
 import { loadLobbyAds, loadLobbyPopunder, loadPopunder } from "@/lib/videoAd";
@@ -77,7 +76,7 @@ const StartTab = () => {
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
   const [showCrown, setShowCrown] = useState(false);
-  const [paywall, setPaywall] = useState<PaywallReason | null>(null);
+  // Paywall surfaces all route to the crown sheet (see setShowCrown calls).
   const { tier, setTier, loading: tierLoading } = useTier();
   const isMobile = useIsMobile();
   const isPaid = tier !== "free";
@@ -216,7 +215,7 @@ const StartTab = () => {
     // Hard paywall — free tier daily match cap (defer while tier resolves;
     // Match.tsx re-checks authoritatively before searching)
     if (!tierLoading && isMatchLimitHit(isPaid)) {
-      setPaywall("limit");
+      setShowCrown(true);
       return;
     }
     capturePostHogEvent(posthog, "match_started", {
@@ -515,7 +514,7 @@ const StartTab = () => {
                 const sel = gender === g.id;
                 return (
                   <button key={g.id}
-                    onClick={() => { if (locked) { setPaywall("gender"); return; } setGender(g.id); }}
+                    onClick={() => { if (locked) { setShowCrown(true); return; } setGender(g.id); }}
                     style={{
                       height: "100%", border: "none", padding: "0 10px",
                       borderRadius: 18,
@@ -634,11 +633,11 @@ const StartTab = () => {
                     ))}
                   </div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: BUBBLE.faint }}>
-                    {matchesLeft()} free matches left today — <button onClick={() => setPaywall("generic")} style={{ color: BUBBLE.brand, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button>
+                    {matchesLeft()} free matches left today — <button onClick={() => setShowCrown(true)} style={{ color: BUBBLE.brand, fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>go unlimited</button>
                   </div>
                 </>
               ) : (
-                <button onClick={() => setPaywall("limit")} style={{ color: "#e11d48", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
+                <button onClick={() => setShowCrown(true)} style={{ color: "#e11d48", fontWeight: 800, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11 }}>
                   Out of free matches today — unlock Plus
                 </button>
               )}
@@ -775,7 +774,7 @@ const StartTab = () => {
           setRegion={setRegion}
           onClose={() => setShowRegionPicker(false)}
           canPickRegions={canPickRegions}
-          onLocked={() => { setShowRegionPicker(false); setPaywall("region"); }}
+          onLocked={() => { setShowRegionPicker(false); setShowCrown(true); }}
         />
       )}
       {showSettings && (
@@ -784,13 +783,10 @@ const StartTab = () => {
           scholarOnly={scholarOnly} setScholarOnly={setScholarOnly} scholarVerified={scholarVerified}
           camStatus={camStatus} camError={camError} onRetryCam={camStart}
           canPickGender={canPickGirls}
-          onLockedGender={() => { setShowSettings(false); setPaywall("gender"); }}
+          onLockedGender={() => { setShowSettings(false); setShowCrown(true); }}
         />
       )}
       {showCrown && <CrownPlusSheet onClose={() => setShowCrown(false)} tier={tier} />}
-      {paywall && (
-        <PaywallSheet reason={paywall} onClose={() => setPaywall(null)} />
-      )}
       {showShareSheet && pendingShareUrl && (
         <ShareSheet url={pendingShareUrl} onClose={() => { setShowShareSheet(false); setPendingShareUrl(null); }} />
       )}
