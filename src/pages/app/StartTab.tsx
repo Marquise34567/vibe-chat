@@ -20,7 +20,8 @@ import { PaywallSheet, PaywallReason } from "@/components/PaywallSheet";
 import { useTier } from "@/hooks/useTier";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { matchesLeft, isMatchLimitHit } from "@/lib/limits";
-import { apiBase, SOCIAL_LINKS } from "@/lib/config";
+import { apiBase, SOCIAL_LINKS, PLUS_PLANS, VIP_PLANS } from "@/lib/config";
+import { Crown } from "lucide-react";
 import { BUBBLE, chipStyle, circleBtnStyle, ctaStyle, ghostPillStyle } from "@/lib/bubble";
 import { loadLobbyAds, loadLobbyPopunder, loadPopunder } from "@/lib/videoAd";
 import { capturePostHogEvent } from "@/lib/posthogLogs";
@@ -75,6 +76,7 @@ const StartTab = () => {
   const [showShareSheet, setShowShareSheet] = useState(false);
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [showSponsorSheet, setShowSponsorSheet] = useState(false);
+  const [showCrown, setShowCrown] = useState(false);
   const [paywall, setPaywall] = useState<PaywallReason | null>(null);
   const { tier, setTier, loading: tierLoading } = useTier();
   const isMobile = useIsMobile();
@@ -297,6 +299,21 @@ const StartTab = () => {
               𝕏
             </a>
           )}
+
+          {/* Crown — opens the Plus sheet */}
+          <button
+            onClick={() => setShowCrown(true)}
+            aria-label="FaceFrenzy Plus"
+            className="bub-btn bub-btn-ghost"
+            style={{
+              ...circleBtnStyle,
+              background: "linear-gradient(145deg, #FFE08A, #FFB340)",
+              border: "1px solid rgba(255,159,10,0.45)",
+              boxShadow: "inset 0 1.5px 0 rgba(255,255,255,0.5), inset 0 -2px 0 rgba(140,80,10,0.18), 0 6px 16px rgba(255,159,10,0.35)",
+            }}
+          >
+            <Crown className="w-4 h-4" style={{ color: "#8A5000" }} strokeWidth={2.5} />
+          </button>
 
           {/* Menu */}
           <button onClick={() => setShowSettings(true)} aria-label="Settings" className="bub-btn bub-btn-ghost" style={circleBtnStyle}>
@@ -770,6 +787,7 @@ const StartTab = () => {
           onLockedGender={() => { setShowSettings(false); setPaywall("gender"); }}
         />
       )}
+      {showCrown && <CrownPlusSheet onClose={() => setShowCrown(false)} tier={tier} />}
       {paywall && (
         <PaywallSheet reason={paywall} onClose={() => setPaywall(null)} />
       )}
@@ -1265,6 +1283,169 @@ const SponsorSheet = ({ onClose, onSubmit }: {
             Pay ${total} & Submit
           </button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   CrownPlusSheet — Monkey-Plus-style tier sheet in lobby tokens.
+   Two-column feature comparison + plan cards → real Stripe checkout.
+═══════════════════════════════════════════════════════════════ */
+const CrownPlusSheet = ({ onClose, tier }: { onClose: () => void; tier: string }) => {
+  const posthog = usePostHog();
+  const [tab, setTab] = useState<"plus" | "vip">("plus");
+  const [selected, setSelected] = useState("plus-yearly");
+  const [loading, setLoading] = useState(false);
+
+  const plans = tab === "vip" ? VIP_PLANS : PLUS_PLANS;
+  const selectedPlan = plans.find((p) => p.id === selected) ?? plans[0];
+  const onTab = (t: "plus" | "vip") => { setTab(t); setSelected(t === "vip" ? "vip-yearly" : "plus-yearly"); };
+
+  const subscribe = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase()}/api/sponsor-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: selectedPlan.id }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        capturePostHogEvent(posthog, "checkout_started", { plan_id: selectedPlan.id, subscription_tier: tab });
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error(data.error || "Checkout failed to start");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not connect to payment server");
+      setLoading(false);
+    }
+  };
+
+  const FeatRow = ({ label, plus, vip }: { label: string; plus: boolean | string; vip: boolean | string }) => (
+    <div style={{ display: "flex", alignItems: "center", padding: "10px 2px", borderTop: `1px solid ${BUBBLE.border}` }}>
+      <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: BUBBLE.ink }}>{label}</span>
+      <span style={{ width: 76, textAlign: "center", fontSize: 13, fontWeight: 800, color: plus ? BUBBLE.brand : BUBBLE.faint }}>
+        {plus === true ? "✓" : plus === false ? "—" : plus}
+      </span>
+      <span style={{ width: 76, textAlign: "center", fontSize: 13, fontWeight: 800, color: vip ? "#7C5CFF" : BUBBLE.faint }}>
+        {vip === true ? "✓" : vip === false ? "—" : vip}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4" style={sheetWrap} onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="animate-pop-in"
+        style={{
+          background: BUBBLE.card, borderRadius: 28, padding: "22px 22px 20px",
+          width: "100%", maxWidth: 420, maxHeight: "86dvh", overflowY: "auto",
+          border: `1px solid ${BUBBLE.border}`, boxShadow: BUBBLE.cardShadow,
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <span style={{
+              width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "linear-gradient(145deg, #FFE08A, #FFB340)",
+              boxShadow: "inset 0 1.5px 0 rgba(255,255,255,0.5), 0 6px 14px rgba(255,159,10,0.35)",
+            }}>
+              <Crown style={{ width: 18, height: 18, color: "#8A5000" }} strokeWidth={2.5} />
+            </span>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: BUBBLE.ink, letterSpacing: "-0.3px" }}>
+              FaceFrenzy {tab === "vip" ? "VIP" : "Plus"}
+            </h2>
+          </div>
+          <button onClick={onClose} className="bub-btn" style={sheetCloseBtn}>
+            <X className="w-4 h-4" style={{ color: BUBBLE.ink }} />
+          </button>
+        </div>
+
+        {/* Tier tabs — segmented like the gender picker */}
+        <div style={{
+          height: 42, borderRadius: 21, marginBottom: 14,
+          background: "rgba(255,159,10,0.06)", border: `1px solid ${BUBBLE.border}`,
+          display: "flex", alignItems: "center", padding: 3, gap: 3,
+        }}>
+          {(["plus", "vip"] as const).map((t) => (
+            <button key={t} onClick={() => onTab(t)}
+              style={{
+                flex: 1, height: "100%", border: "none", borderRadius: 18, cursor: "pointer",
+                background: tab === t ? BUBBLE.card : "transparent",
+                boxShadow: tab === t ? "0 2px 8px rgba(120,72,20,0.10)" : "none",
+                color: tab === t ? (t === "vip" ? "#7C5CFF" : BUBBLE.brand) : BUBBLE.sub,
+                fontSize: 13, fontWeight: 800, transition: "all 0.2s ease",
+              }}>
+              {t === "vip" ? "💎 VIP" : "👑 Plus"}
+            </button>
+          ))}
+        </div>
+
+        {/* Feature comparison — Monkey-style two-column table */}
+        <div style={{ display: "flex", padding: "4px 2px 6px" }}>
+          <span style={{ flex: 1 }} />
+          <span style={{ width: 76, textAlign: "center", fontSize: 11, fontWeight: 900, color: BUBBLE.brand, textTransform: "uppercase", letterSpacing: "0.5px" }}>👑 Plus</span>
+          <span style={{ width: 76, textAlign: "center", fontSize: 11, fontWeight: 900, color: "#7C5CFF", textTransform: "uppercase", letterSpacing: "0.5px" }}>💎 VIP</span>
+        </div>
+        <FeatRow label="Match with girls" plus={true} vip={true} />
+        <FeatRow label="Unlimited matches" plus={true} vip={true} />
+        <FeatRow label="No ads" plus={true} vip={true} />
+        <FeatRow label="Priority queue" plus={false} vip={true} />
+        <FeatRow label="See who liked you" plus={false} vip={true} />
+        <div style={{ borderTop: `1px solid ${BUBBLE.border}` }} />
+
+        {/* Plans — radio cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+          {plans.map((p) => {
+            const sel = selected === p.id;
+            return (
+              <button key={p.id} onClick={() => setSelected(p.id)}
+                style={{
+                  height: 56, padding: "0 16px", borderRadius: 18, cursor: "pointer", textAlign: "left",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: sel ? BUBBLE.brandSoft : "rgba(255,159,10,0.035)",
+                  border: sel ? "1.5px solid rgba(255,159,10,0.45)" : `1px solid ${BUBBLE.border}`,
+                  transition: "all 0.2s ease",
+                }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{
+                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                    border: sel ? "5px solid " + BUBBLE.brand : `2px solid ${BUBBLE.faint}`,
+                    background: "#fff",
+                  }} />
+                  <span style={{ fontSize: 14, fontWeight: 800, color: sel ? BUBBLE.brand : BUBBLE.ink }}>
+                    {p.label}
+                    {p.save && <span style={{ marginLeft: 7, fontSize: 10, fontWeight: 800, color: "#16a34a", background: "rgba(34,197,94,0.10)", padding: "2px 7px", borderRadius: 999 }}>{p.save}</span>}
+                  </span>
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: sel ? BUBBLE.brand : BUBBLE.ink }}>
+                  {p.price}<span style={{ fontSize: 11, fontWeight: 700, color: BUBBLE.faint }}>{p.per}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={subscribe}
+          disabled={loading || tier === tab}
+          className="bub-btn bub-btn-primary"
+          style={{
+            ...ctaStyle, width: "100%", height: 52, fontSize: 16, marginTop: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            opacity: tier === tab ? 0.55 : 1,
+          }}
+        >
+          {tier === tab ? `You're on ${tab === "vip" ? "VIP" : "Plus"} ✓` : loading ? "Opening checkout…" : `Continue — ${selectedPlan.price}${selectedPlan.per}`}
+        </button>
+        <p style={{ marginTop: 9, fontSize: 11, fontWeight: 600, color: BUBBLE.faint, textAlign: "center", lineHeight: 1.4 }}>
+          Recurring billing, cancel anytime. {tab === "plus" ? "VIP adds priority queue + likes." : "Plus has the essentials."}
+        </p>
       </div>
     </div>
   );
