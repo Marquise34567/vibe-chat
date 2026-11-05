@@ -10,6 +10,7 @@ const SLIDER_SRCS = [
 ];
 const POPUNDER_SRCS = [
   "//loyal-product.com/cbDM9/6.b-2c5kl/S-W/Qt9xNfzzUS5hNGzkIJ3vMqyY0q3/NfTrk/3cMBjgc/3u",
+  "//loyal-product.com/dlmcFVzKd.GUNSvyZQGNUS/le/mi9vuVZMUllukrP/Tnc/1WOVT/kr3iNMjBUTt/NFzaUB5xOnTUcj2OOjQ_",
   // paste extra popunder zone URLs here
 ];
 const LOBBY_POPUNDER_SRC =
