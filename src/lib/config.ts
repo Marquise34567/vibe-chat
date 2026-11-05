@@ -58,13 +58,11 @@ export const PLUS_FEATURES = [
 ];
 
 export const PLUS_PLANS = [
-  { id: "plus-weekly",  label: "Weekly",  price: "$1.99",  per: "/wk", save: null,        featured: false, tier: "plus" as const },
   { id: "plus-monthly", label: "Monthly", price: "$4.99",  per: "/mo", save: null,        featured: false, tier: "plus" as const },
   { id: "plus-yearly",  label: "Yearly",  price: "$29.99", per: "/yr", save: "Save 50%",  featured: true,  tier: "plus" as const },
 ];
 
 export const VIP_PLANS = [
-  { id: "vip-weekly",  label: "Weekly",  price: "$3.99",  per: "/wk", save: null,       featured: false, tier: "vip" as const },
   { id: "vip-monthly", label: "Monthly", price: "$9.99",  per: "/mo", save: null,       featured: false, tier: "vip" as const },
   { id: "vip-yearly",  label: "Yearly",  price: "$59.99", per: "/yr", save: "Save 50%", featured: true,  tier: "vip" as const },
 ];
